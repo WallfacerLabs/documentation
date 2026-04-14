@@ -1,0 +1,124 @@
+---
+title: "API Overview"
+description: "The vaults.fyi V2 API — comprehensive DeFi vault data and transaction execution across 20+ networks."
+---
+
+## Base URL
+
+```
+https://api.vaults.fyi/v2
+```
+
+## Authentication
+
+Every request must include your API key as a header:
+
+```bash
+x-api-key: YOUR_API_KEY
+```
+
+Basic API keys are rate-limited to **10 requests per minute**. PRO keys lift this limit and unlock additional endpoints.
+
+## Tiers
+
+| Endpoint group | Basic | PRO |
+|----------------|:-----:|:---:|
+| General (vaults, assets, networks) | ✓ | ✓ |
+| Detailed Vaults | ✓ | ✓ |
+| Historical | — | ✓ |
+| Benchmarks | — | ✓ |
+| Portfolio | — | ✓ |
+| Transactions | — | ✓ |
+
+## Networks
+
+The API tracks vaults across 20+ EVM-compatible networks. Networks can be identified by name or CAIP-2 identifier:
+
+| Name | Chain ID | CAIP-2 |
+|------|----------|--------|
+| `mainnet` | 1 | `eip155:1` |
+| `arbitrum` | 42161 | `eip155:42161` |
+| `base` | 8453 | `eip155:8453` |
+| `optimism` | 10 | `eip155:10` |
+| `polygon` | 137 | `eip155:137` |
+| `gnosis` | 100 | `eip155:100` |
+| `unichain` | 130 | `eip155:130` |
+| `bsc` | 56 | `eip155:56` |
+| `avalanche` | 43114 | `eip155:43114` |
+| `hyperliquid` | 999 | `eip155:999` |
+| `plasma` | 9745 | `eip155:9745` |
+| `monad` | 143 | `eip155:143` |
+| `berachain` | 80094 | `eip155:80094` |
+
+Use `GET /v2/networks` for the complete current list.
+
+## APY values
+
+All APY fields are **raw decimals**. Multiply by 100 to display as a percentage:
+
+```js
+// API returns: 0.0543
+// Display as:  5.43%
+const displayApy = (rawApy * 100).toFixed(2) + '%';
+```
+
+## Pagination
+
+All list endpoints use offset pagination with `page` (zero-indexed) and `perPage`:
+
+```bash
+GET /v2/detailed-vaults?page=0&perPage=50   # first page
+GET /v2/detailed-vaults?page=1&perPage=50   # second page
+```
+
+The response includes `nextPage` — it is `null` when you are on the last page.
+
+## Error responses
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Invalid parameters |
+| `401` | Missing or invalid API key |
+| `403` | Endpoint requires PRO key |
+| `404` | Resource not found |
+| `429` | Rate limit exceeded |
+| `500` | Internal server error |
+| `503` | Service temporarily unavailable |
+
+Error bodies follow this shape:
+
+```json
+{
+  "error": "Internal Server Error",
+  "message": "Descriptive error message",
+  "errorId": "abc-123"
+}
+```
+
+## Quick start
+
+Fetch the top 5 USDC vaults by 7-day APY on Ethereum mainnet:
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.vaults.fyi/v2/detailed-vaults\
+?allowedAssets=USDC\
+&allowedNetworks=mainnet\
+&minTvl=1000000\
+&sortBy=apy7day\
+&sortOrder=desc\
+&perPage=5"
+```
+
+Check a user's idle assets and suggest vaults to deposit into:
+
+```bash
+# Step 1 — find idle assets
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.vaults.fyi/v2/portfolio/idle-assets/0xYourWallet"
+
+# Step 2 — get ranked deposit suggestions
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.vaults.fyi/v2/portfolio/best-deposit-options/0xYourWallet\
+?onlyTransactional=true&maxVaultsPerAsset=3"
+```
