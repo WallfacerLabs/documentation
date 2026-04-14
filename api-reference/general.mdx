@@ -1,0 +1,222 @@
+---
+title: "General"
+description: "Core reference endpoints for vaults, assets, networks, protocols, and curators."
+---
+
+## Authentication
+
+All API requests require an `x-api-key` header.
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" https://api.vaults.fyi/v2/vaults
+```
+
+Basic API keys are rate-limited to **10 requests per minute**.
+
+---
+
+## GET /v2/health
+
+Check whether the API is operational.
+
+```bash
+GET https://api.vaults.fyi/v2/health
+```
+
+**Response**
+
+```json
+{
+  "status": "ok",
+  "message": "Service is healthy"
+}
+```
+
+---
+
+## GET /v2/vaults
+
+Returns a paginated list of vaults with basic information: address, network, asset, and transactional support status. Use this endpoint to build vault indexes or populate dropdowns.
+
+```bash
+GET https://api.vaults.fyi/v2/vaults
+```
+
+### Query parameters
+
+<ParamField query="page" type="integer" default="0">
+  Page number (zero-indexed).
+</ParamField>
+
+<ParamField query="perPage" type="integer" default="50">
+  Number of results per page. Maximum 5000.
+</ParamField>
+
+<ParamField query="network" type="string">
+  Filter by network name (`mainnet`, `arbitrum`, `base`, `optimism`, `polygon`, `gnosis`, `unichain`, `bsc`, `avalanche`, `hyperliquid`, `plasma`, `monad`, etc.) or CAIP-2 identifier (e.g. `eip155:1`).
+</ParamField>
+
+<ParamField query="assetSymbol" type="string">
+  Filter by asset ticker, e.g. `USDC`, `WETH`.
+</ParamField>
+
+<ParamField query="onlyTransactional" type="boolean">
+  When `true`, returns only vaults that support the transactional endpoints (deposit/redeem).
+</ParamField>
+
+<ParamField query="onlyAppFeatured" type="boolean">
+  When `true`, returns only vaults featured on app.vaults.fyi.
+</ParamField>
+
+<ParamField query="allowCorrupted" type="boolean" default="false">
+  When `true`, includes vaults with data integrity issues.
+</ParamField>
+
+### Response
+
+<ResponseField name="itemsOnPage" type="integer">
+  Number of items in this page.
+</ResponseField>
+
+<ResponseField name="nextPage" type="integer">
+  Next page number. Null when on the last page.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  <Expandable title="Vault object">
+    <ResponseField name="address" type="string">Vault contract address.</ResponseField>
+    <ResponseField name="network" type="object">
+      <Expandable title="Network">
+        <ResponseField name="name" type="string">Network name, e.g. `mainnet`.</ResponseField>
+        <ResponseField name="chainId" type="integer">EVM chain ID.</ResponseField>
+        <ResponseField name="networkCaip" type="string">CAIP-2 identifier, e.g. `eip155:1`.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="asset" type="object">
+      <Expandable title="Asset">
+        <ResponseField name="address" type="string">Asset contract address.</ResponseField>
+        <ResponseField name="assetCaip" type="string">CAIP-19 asset identifier.</ResponseField>
+        <ResponseField name="name" type="string">Full asset name.</ResponseField>
+        <ResponseField name="symbol" type="string">Asset ticker symbol.</ResponseField>
+        <ResponseField name="decimals" type="integer">Token decimal places.</ResponseField>
+        <ResponseField name="assetLogo" type="string">URL to the asset logo image.</ResponseField>
+        <ResponseField name="assetPriceInUsd" type="string">Current asset price in USD.</ResponseField>
+        <ResponseField name="assetGroup" type="string">Asset category: `ETH`, `USD`, `BTC`, `EURO`, or `OTHER`.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="isTransactional" type="boolean">Whether this vault supports the transactional API.</ResponseField>
+    <ResponseField name="isAppFeatured" type="boolean">Whether this vault is featured on app.vaults.fyi.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "x-api-key: YOUR_API_KEY" \
+  "https://api.vaults.fyi/v2/vaults?network=mainnet&assetSymbol=USDC&perPage=10"
+```
+
+```json
+{
+  "itemsOnPage": 10,
+  "nextPage": 1,
+  "data": [
+    {
+      "address": "0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB",
+      "network": {
+        "name": "mainnet",
+        "chainId": 1,
+        "networkCaip": "eip155:1"
+      },
+      "asset": {
+        "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "assetCaip": "eip155:1/erc20:0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "name": "USD Coin",
+        "symbol": "USDC",
+        "decimals": 6,
+        "assetLogo": "https://...",
+        "assetPriceInUsd": "1.00",
+        "assetGroup": "USD"
+      },
+      "isTransactional": true,
+      "isAppFeatured": true
+    }
+  ]
+}
+```
+
+---
+
+## GET /v2/assets
+
+Returns a paginated list of supported assets with metadata. Useful for populating asset filters or resolving asset addresses.
+
+```bash
+GET https://api.vaults.fyi/v2/assets
+```
+
+### Query parameters
+
+<ParamField query="page" type="integer" default="0">Page number (zero-indexed).</ParamField>
+<ParamField query="perPage" type="integer" default="50">Number of results per page.</ParamField>
+<ParamField query="network" type="string">Filter by network name or CAIP-2 identifier.</ParamField>
+
+### Response
+
+<ResponseField name="data" type="array">
+  <Expandable title="Asset object">
+    <ResponseField name="address" type="string">Asset contract address.</ResponseField>
+    <ResponseField name="assetCaip" type="string">CAIP-19 identifier.</ResponseField>
+    <ResponseField name="name" type="string">Full asset name.</ResponseField>
+    <ResponseField name="symbol" type="string">Ticker symbol.</ResponseField>
+    <ResponseField name="decimals" type="integer">Token decimal places.</ResponseField>
+    <ResponseField name="assetLogo" type="string">Logo URL.</ResponseField>
+    <ResponseField name="assetPriceInUsd" type="string">Current price in USD.</ResponseField>
+    <ResponseField name="assetGroup" type="string">`ETH`, `USD`, `BTC`, `EURO`, or `OTHER`.</ResponseField>
+    <ResponseField name="network" type="object">Network object (name, chainId, networkCaip).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /v2/networks
+
+Returns all supported networks with their name, chain ID, and CAIP-2 identifier.
+
+```bash
+GET https://api.vaults.fyi/v2/networks
+```
+
+Supported networks include: `mainnet`, `arbitrum`, `base`, `optimism`, `polygon`, `gnosis`, `unichain`, `bsc`, `avalanche`, `hyperliquid`, `plasma`, `monad`, `berachain`, `celo`, `worldchain`, `linea`, `katana`, and more.
+
+---
+
+## GET /v2/tags
+
+Returns all available vault tags that can be used for filtering in `/v2/detailed-vaults`.
+
+```bash
+GET https://api.vaults.fyi/v2/tags
+```
+
+Example tags: `stablecoin`, `liquid-staking`, `restaking`, `rwa`, `basis-trade`, `delta-neutral`.
+
+---
+
+## GET /v2/curators
+
+Returns all available vault curators. Curator names can be passed to the `curators` filter on `/v2/detailed-vaults`.
+
+```bash
+GET https://api.vaults.fyi/v2/curators
+```
+
+---
+
+## GET /v2/protocols
+
+Returns all available DeFi protocols tracked by vaults.fyi. Protocol names can be used for the `allowedProtocols` / `disallowedProtocols` filters.
+
+```bash
+GET https://api.vaults.fyi/v2/protocols
+```
