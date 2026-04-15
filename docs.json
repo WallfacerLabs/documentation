@@ -87,16 +87,7 @@
           "api-reference/overview",
           {
             "group": "Endpoints",
-            "expanded": true,
-            "openapi": "https://api.vaults.fyi/v2/documentation/json",
-            "pages": [
-              "api-reference/general",
-              "api-reference/detailed-vaults",
-              "api-reference/historical",
-              "api-reference/benchmarks",
-              "api-reference/transactions",
-              "api-reference/portfolio"
-            ]
+            "openapi": "https://api.vaults.fyi/v2/documentation/json"
           },
           {
             "group": "Legacy v1",
