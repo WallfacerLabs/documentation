@@ -86,7 +86,7 @@
         "pages": [
           "api-reference/overview",
           {
-            "group": "Endpoints",
+            "group": "Sections",
             "pages": [
               "api-reference/general",
               "api-reference/detailed-vaults",
@@ -94,7 +94,10 @@
               "api-reference/benchmarks",
               "api-reference/portfolio",
               "api-reference/transactions"
-            ],
+            ]
+          },
+          {
+            "group": "Endpoints",
             "openapi": "https://api.vaults.fyi/v2/documentation/json"
           },
           {
