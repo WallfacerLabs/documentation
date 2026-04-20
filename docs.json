@@ -104,7 +104,8 @@
               "api-reference/historical",
               "api-reference/benchmarks",
               "api-reference/portfolio",
-              "api-reference/transactions"
+              "api-reference/transactions",
+              "api-reference/nrt"
             ]
           },
           {
