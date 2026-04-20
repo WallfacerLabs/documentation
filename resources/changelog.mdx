@@ -8,6 +8,21 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 16, 2026 — Apr 14–20
+
+**API**
+
+- **NRT endpoints promoted to production** — [near-real-time vault data](/api-reference/nrt) (`/v2/nrt/vault/...`) is now available on the V2 API under the NRT (PRO) tier, delivering live share price, total supply, total assets, and underlying asset price.
+- All 34 V2 endpoints now include `operationId` and `summary` fields in the OpenAPI spec, improving SDK code generation and API explorer usability.
+- New descriptive tags across all endpoint groups (General, Detailed Vaults, Benchmarks, Historical, Portfolio, Transactions, NRT) for better API navigation.
+- `apyComposite` on [detailed-vaults](/api-reference/detailed-vaults) responses now includes `assetGroup` and `assetPriceInUsd` for the underlying asset.
+- Removed **ERC-4626 restriction** for Rhinestone intent quotes, broadening cross-chain deposit support to non-ERC-4626 vaults.
+- Added **Kamino** and **Jupiter Earn** vault aggregates for Solana coverage.
+
+**App**
+
+- **Intrinsic APY** now displays on the dashboard for vaults with nested yield sources.
+
 ## Week 15, 2026 — Apr 7–13
 
 **API**
