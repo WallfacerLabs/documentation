@@ -10,7 +10,7 @@ This integration is a core part of Kraken's strategy to establish itself as a le
 
 ## How It Works
 
-**Token-level yield suggestions.** When users view their balances and select a specific asset, the vaults.fyi API surfaces relevant Earn opportunities for that token — meeting users at the moment of intent.
+**Token-level yield suggestions.** When users view their balances and select a specific asset, the vaults.fyi API surfaces relevant Earn opportunities for that token, meeting users at the moment of intent.
 
 **Explore tab.** Powered by vaults.fyi market data, the Explore tab lets users browse DeFi opportunities across major protocols without leaving the wallet.
 
@@ -21,7 +21,7 @@ This integration is a core part of Kraken's strategy to establish itself as a le
 <Columns cols={3}>
   <Column>
     <Frame>
-      ![Image](/images/image-4.png)
+      ![Image](/images/kraken_earn_1.png)
     </Frame>
   </Column>
   <Column>
@@ -31,25 +31,21 @@ This integration is a core part of Kraken's strategy to establish itself as a le
   </Column>
   <Column>
     <Frame>
-      <img
-        src="/images/image-6.png"
-        alt="Image"
-        title="Image"
-      />
+      ![Image](/images/image-6.png)
     </Frame>
   </Column>
 </Columns>
 
 ## API Capabilities Used
 
-The integration relies on two core vaults.fyi API categories:
+The integration relies on core vaults.fyi API categories:
 
-- **Market data:** APY, TVL, and vault metadata across protocols and networks.
-- **Portfolio and personalized insights:** Tailored suggestions derived from the user's existing token balances.
+- **Market data:** APY, TVL, and vault metadata (icons, descriptions, etc.) across protocols and networks.
+- **Portfolio tracking:** Accurate position values, transaction events, and returns accrued on each yield-bearing position.
 
 ## Why Kraken Built This with vaults.fyi
 
-Building DeFi yield analytics in-house would require maintaining protocol-specific indexers, normalizing yield calculations across incompatible schemas, and tracking coverage across five networks continuously. By integrating vaults.fyi, Kraken reduced that to a single API — enabling the team to focus on product experience rather than data infrastructure.
+Building DeFi yield analytics in-house would require maintaining protocol-specific indexers, normalizing yield calculations across incompatible schemas, and tracking coverage across five networks continuously. By integrating vaults.fyi, Kraken reduced that to a single API, enabling the team to focus on product experience rather than data infrastructure.
 
 **For users, this means:**
 
@@ -57,10 +53,6 @@ Building DeFi yield analytics in-house would require maintaining protocol-specif
 - Yield discovery without leaving the wallet.
 - Multi-chain opportunities in one place.
 - Real-time data from verified onchain sources.
-
-## Roadmap
-
-The current integration focuses on analytics and personalized discovery. Planned expansions include transaction support for one- and two-click supply and withdraw directly from the Earn interface, additional network coverage, and further personalization based on user behavior.
 
 ---
 
