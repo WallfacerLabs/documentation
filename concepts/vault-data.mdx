@@ -9,7 +9,7 @@ The Vaults.fyi API surfaces more data about a DeFi vault than most applications 
 The primary source for static vault data is [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details). Additional endpoints extend that with time-series history, near real-time state, and per-user position data.
 
 <Note>
-The auto-generated [API Reference endpoint pages](/api-reference/detailed-vaults) are the authoritative source for exact field names, types, and required/optional status — they update automatically from the OpenAPI spec on every release. This page is the narrative layer: what each field means and when to use it. If you spot a discrepancy, the endpoint page is correct.
+  The auto-generated [API Reference endpoint pages](/api-reference/detailed-vaults) are the authoritative source for exact field names, types, and required/optional status — they update automatically from the OpenAPI spec on every release. This page is the narrative layer: what each field means and when to use it. If you spot a discrepancy, the endpoint page is correct.
 </Note>
 
 ---
@@ -19,7 +19,7 @@ The auto-generated [API Reference endpoint pages](/api-reference/detailed-vaults
 Every vault has a stable identity and a set of descriptive fields.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `vaultId` | Stable identifier used in all API calls and deep links. Persists across vault upgrades. |
 | `address` | Vault contract address (EIP-55 checksummed). |
 | `name` | Human-readable vault name. |
@@ -38,7 +38,7 @@ Every vault has a stable identity and a set of descriptive fields.
 Vaults belong to a protocol. Some are additionally managed by a named curator (e.g. a risk manager or strategy team).
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `protocol.name` | Protocol name (e.g. `Morpho`, `Aave`, `Compound`). |
 | `protocol.product` | Product line within the protocol, if applicable. |
 | `protocol.version` | Protocol version. |
@@ -58,7 +58,7 @@ Vaults belong to a protocol. Some are additionally managed by a named curator (e
 The underlying asset is what users deposit and withdraw. All balances and TVL figures reference this token.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `asset.symbol` | Token symbol (e.g. `USDC`, `WETH`). |
 | `asset.name` | Full token name. |
 | `asset.address` | Token contract address. |
@@ -76,12 +76,13 @@ The underlying asset is what users deposit and withdraw. All balances and TVL fi
 When a user deposits into a vault, they receive LP tokens representing their share. These are the tokens held in a wallet.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `lpToken.symbol` | LP token symbol. |
 | `lpToken.name` | LP token name. |
 | `lpToken.address` | LP token contract address. |
 | `lpToken.tokenCaip` | CAIP-19 identifier for the LP token. |
 | `lpToken.decimals` | LP token precision. |
+| `sharePrice` | LP token share price. |
 
 ---
 
@@ -92,7 +93,7 @@ APY data is normalized across all protocols using a consistent methodology. See 
 Each vault returns APY across four time windows, each broken into three components:
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `apy.1hour.base` | Base yield earned from lending or strategy, annualized over the last hour. |
 | `apy.1hour.reward` | Token reward APY (e.g. incentive programs), annualized over the last hour. |
 | `apy.1hour.total` | Sum of base and reward. |
@@ -101,7 +102,7 @@ Each vault returns APY across four time windows, each broken into three componen
 | `apy.30day` | Same breakdown averaged over 30 days. |
 
 <Tip>
-Use `apy.7day.total` or `apy.30day.total` for user-facing yield displays. The 1-hour and 1-day figures are noisier and better suited for dashboards or anomaly detection.
+  Use `apy.7day.total` or `apy.30day.total` for user-facing yield displays. The 1-hour and 1-day figures are noisier and better suited for dashboards or anomaly detection.
 </Tip>
 
 ### Composite APY (nested vaults)
@@ -109,7 +110,7 @@ Use `apy.7day.total` or `apy.30day.total` for user-facing yield displays. The 1-
 When a vault's underlying asset is itself another vault's LP token (e.g. a vault that deposits into another yield vault), an additional `apyComposite` object is present. It compounds both layers of yield into a single figure.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `apyComposite.totalApy` | Compounded APY combining this vault and the underlying vault (same 1h/1d/7d/30d windows). |
 | `apyComposite.intrinsicApy` | The underlying vault's own APY, before compounding. |
 | `apyComposite.vault.vaultId` | ID of the underlying vault. |
@@ -120,7 +121,7 @@ When a vault's underlying asset is itself another vault's LP token (e.g. a vault
 ## TVL
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `tvl.usd` | Total value locked, denominated in USD. |
 | `tvl.native` | Total value locked, denominated in the vault's native asset. |
 
@@ -131,7 +132,7 @@ When a vault's underlying asset is itself another vault's LP token (e.g. a vault
 Many vaults distribute bonus reward tokens on top of base yield. Each entry in the `rewards` array represents one reward token.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `rewards[].asset.symbol` | Reward token symbol. |
 | `rewards[].asset.assetPriceInUsd` | Current USD price of the reward token. |
 | `rewards[].apy.1hour` | Reward APY over 1 hour. |
@@ -140,7 +141,7 @@ Many vaults distribute bonus reward tokens on top of base yield. Each entry in t
 | `rewards[].apy.30day` | Reward APY over 30 days. |
 
 <Note>
-Reward APYs are already included in the top-level `apy.*.reward` field. The `rewards` array lets you attribute yield to specific tokens and display individual reward rates.
+  Reward APYs are already included in the top-level `apy.*.reward` field. The `rewards` array lets you attribute yield to specific tokens and display individual reward rates.
 </Note>
 
 ---
@@ -150,7 +151,7 @@ Reward APYs are already included in the top-level `apy.*.reward` field. The `rew
 Vaults.fyi computes a composite reputation score for each vault based on several risk signals. Higher is better. See [Reputation Scores](/methodology/reputation-scores) for methodology.
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `score.vaultScore` | Composite score combining all sub-scores. |
 | `score.vaultTvlScore` | Score component based on this vault's TVL. |
 | `score.protocolTvlScore` | Score component based on the protocol's total TVL. |
@@ -163,7 +164,7 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 ## Holders
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `holdersData.totalCount` | Total number of unique vault holders. |
 | `holdersData.totalBalance` | Combined LP token balance across all holders. |
 | `holdersData.topHolders[].address` | Address of a top holder. |
@@ -174,7 +175,7 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 ## Capacity
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `maxCapacity` | Maximum total deposit capacity enforced by the vault, in asset units. Omitted if uncapped. |
 | `remainingCapacity` | How much more can be deposited before the cap is reached. |
 
@@ -183,14 +184,14 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 ## Fee Structure
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `fees.performanceFee` | Percentage of yield taken by the protocol (as a decimal, e.g. `0.10` for 10%). |
 | `fees.managementFee` | Annual fee on AUM (as a decimal). |
 | `fees.withdrawalFee` | Fee charged on withdrawals (as a decimal). |
 | `fees.depositFee` | Fee charged on deposits (as a decimal). |
 
 <Note>
-All fee fields are optional and omitted when not applicable to a given vault.
+  All fee fields are optional and omitted when not applicable to a given vault.
 </Note>
 
 ---
@@ -198,7 +199,7 @@ All fee fields are optional and omitted when not applicable to a given vault.
 ## Flags and Warnings
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `warnings` | Array of plain-text warning strings. Used for notices that don't require action (e.g. migration announcements). |
 | `flags[].content` | Flag message text. |
 | `flags[].severity` | One of `info`, `warning`, or `critical`. |
@@ -211,7 +212,7 @@ Use `flags` to surface active protocol notices in your UI, such as paused deposi
 ## Transactional Support
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `isTransactional` | Whether this vault supports the Transactions API for deposit, redeem, and claim flows. |
 | `transactionalProperties.depositStepsType` | `instant` (single tx) or `complex` (multi-step, e.g. requires approval). |
 | `transactionalProperties.redeemStepsType` | `instant` or `complex`. |
@@ -224,7 +225,7 @@ See [Transactions](/concepts/transactions) for full details on building deposit 
 ## Other Metadata
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `additionalIncentives` | Free-text description of any non-token incentives (e.g. points, airdrop eligibility). |
 | `childrenVaults` | For aggregator vaults: the list of sub-vaults the vault allocates to, each with their own asset and LP token info. |
 | `userEventsIndexed` | Whether deposit and withdrawal events for this vault are indexed and queryable via the portfolio endpoints. |
@@ -239,7 +240,7 @@ The following is available from the historical endpoints (`GET /v2/historical/{n
 Each data point in the time series includes:
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `timestamp` | Unix timestamp of the snapshot. |
 | `blockNumber` | Block number of the snapshot. |
 | `apy.base` / `apy.reward` / `apy.total` | APY breakdown at that point in time. |
@@ -252,12 +253,14 @@ Separate endpoints allow fetching APY-only, TVL-only, or share price-only histor
 
 ## Near Real-Time Metrics
 
-<Info>Requires a **PRO API key**.</Info>
+<Info>
+  Requires a **PRO API key**.
+</Info>
 
 For applications that need the most current vault state (deposit previews, live dashboards, liquidation monitoring), the NRT endpoints query onchain state directly rather than relying on the hourly index.
 
 | Endpoint | Returns |
-|---|---|
+| --- | --- |
 | `/v2/nrt/vault/{network}/{vaultId}` | All four metrics in one call |
 | `/v2/nrt/vault/{network}/{vaultId}/sharePrice` | Current share price |
 | `/v2/nrt/vault/{network}/{vaultId}/totalAssets` | Total assets in asset-wei |
@@ -275,7 +278,7 @@ The portfolio endpoints return per-wallet position data for any vault where `use
 `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}`
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `asset.balanceNative` | Position value in the underlying asset's native units. |
 | `asset.balanceUsd` | Position value in USD (omitted if asset price unavailable). |
 | `asset.unclaimedNative` | Unclaimed reward balance in native units. |
@@ -290,7 +293,7 @@ The portfolio endpoints return per-wallet position data for any vault where `use
 `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `returnsNative` | Total yield earned by this address in this vault, in native token units. |
 | `symbol` / `name` / `assetPriceInUsd` | Asset details for display. |
 
@@ -299,7 +302,7 @@ The portfolio endpoints return per-wallet position data for any vault where `use
 `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `eventType` | Transaction type: deposit, withdrawal, or reward claim. |
 | `timestamp` | Unix timestamp of the transaction. |
 | `assetAmountNative` | Asset amount moved, in native units. |
