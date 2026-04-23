@@ -110,15 +110,8 @@
             ]
           },
           {
-            "group": "Legacy v1",
-            "hidden": true,
-            "pages": [
-              "api/legacy/overview",
-              "api/legacy/market-data",
-              "api/legacy/position-tracking",
-              "api/legacy/generate-payloads",
-              "api/legacy/contextual-insights"
-            ]
+            "group": "Endpoints",
+            "openapi": "https://api.vaults.fyi/v2/documentation/json"
           },
           {
             "group": "Beta",
@@ -141,8 +134,15 @@
             ]
           },
           {
-            "group": "Endpoints",
-            "openapi": "https://api.vaults.fyi/v2/documentation/json"
+            "group": "Legacy v1",
+            "hidden": true,
+            "pages": [
+              "api/legacy/overview",
+              "api/legacy/market-data",
+              "api/legacy/position-tracking",
+              "api/legacy/generate-payloads",
+              "api/legacy/contextual-insights"
+            ]
           }
         ]
       }
