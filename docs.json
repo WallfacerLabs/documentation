@@ -2,6 +2,11 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Vaults.fyi",
+  "integrations": {
+    "ga4": {
+        "measurementId": "G-6YJ3LN6CD5"
+    }
+  },
   "colors": {
     "primary": "#18abff",
     "light": "#96caff",
