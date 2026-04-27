@@ -8,6 +8,26 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 17, 2026 — Apr 21–27
+
+**API**
+
+• Introduced`vaultId` — a new stable identifier field on vault responses and a new path parameter across detailed-vaults, historical, NRT, portfolio, and transactions endpoints. `vaultId` supports both contract addresses and non-address identifiers like Morpho market IDs. Fully backwards compatible: existing vault addresses continue to work.
+
+• **Faster holder queries** — vault holder data now returns significantly faster, especially for high-holder-count vaults.
+
+**• Near real-time (NRT) endpoints** moved out of Alpha API, now exclusively available on the V2 production API.
+
+• Rhinestone intent transactions now **reject partial solves** instead of silently returning incomplete execution paths.
+
+**App**
+
+• Continued **app redesign** rollout: refreshed top navigation bar, updated vault page layout, redesigned table UI, and new input styling.
+
+• Updated **vault score thresholds** in the UI display.
+
+---
+
 ## Week 16, 2026 — Apr 14–20
 
 **API**
@@ -22,6 +42,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 **App**
 
 - **Intrinsic APY** now displays on the dashboard for vaults with nested yield sources.
+  ---
 
 ## Week 15, 2026 — Apr 7–13
 
@@ -43,7 +64,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - Added **APYx**, **Aave V4** (tokenized spokes), and **Ember** as new protocol integrations.
 - New [`GET /v2/protocols`](/api-reference/general) endpoint returns the full list of available protocols with name, product, and version. Useful for populating filter dropdowns and validating `allowedProtocols` params.
-- New `apyComposite` field on [detailed-vaults](/api-reference/detailed-vaults) responses replaces `intrinsic`, with a richer structure: `totalApy` (compounded vault + underlying APY) and `intrinsicApy` (yield intrinsic to the underlying asset, e.g. staking yield), each with 1day / 7day / 30day intervals including base, reward, and total.
+- New `apyComposite` field on [detailed-vaults](/api-reference/detailed-vaults) responses replaces `intrinsic`, with a richer structure: `totalApy` (compounded vault \+ underlying APY) and `intrinsicApy` (yield intrinsic to the underlying asset, e.g. staking yield), each with 1day / 7day / 30day intervals including base, reward, and total.
 - New `minVaultScore` filter on [detailed-vaults](/api-reference/detailed-vaults) endpoints for filtering by vault quality score.
 - Shipped **auto-indexing** for new vaults — newly deployed vaults are now surfaced in the API faster.
 
