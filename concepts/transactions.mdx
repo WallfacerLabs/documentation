@@ -68,10 +68,40 @@ The API works with both externally owned accounts (EOA) and ERC-4337 compatible 
   <Card title="Multi-vault rewards" icon="coins">
     The rewards endpoint discovers claimable rewards across all supported vaults for an address and generates batched claim payloads.
   </Card>
-  <Card title="Monetization ready" icon="circle-dollar-sign">
-    Optionally embed a fee into transaction payloads to generate revenue when users transact through your integration.
+  <Card title="Onchain referrals" icon="circle-dollar-sign">
+    Append a builder code to transaction calldata via the suffix endpoint to register your integration as the onchain referrer and earn protocol rebates.
   </Card>
 </CardGroup>
+
+## Onchain referrals with the transaction suffix
+
+The suffix endpoint returns a hex string that encodes your API key, the user address, and the vault as an onchain builder code. Appending it to transaction calldata registers your integration as the referrer at the protocol level — similar in spirit to ERC-8021 builder codes — and makes your integration eligible for referral rebates from protocols that support them.
+
+```
+GET /v2/transactions/suffix/{userAddress}/{vaultId}
+```
+
+**Response:**
+
+```json
+{
+  "suffix": "000000000000000000000000..."
+}
+```
+
+Append the returned value to your transaction calldata **without** a `0x` prefix:
+
+```js
+const { calldata } = await getTransactionPayload(...)
+const { suffix } = await getTransactionSuffix(userAddress, vaultId)
+const calldataWithReferral = calldata + suffix
+```
+
+No intermediary contract is required. The referral is recorded onchain by the protocol itself.
+
+<Note>
+The suffix is specific to your API key, user address, and vault. Fetch it per-transaction — do not cache and reuse across different users or vaults.
+</Note>
 
 <Warning>
 Always call the transaction context endpoint before generating a payload. Attempting to prepare a transaction for an unsupported action or insufficient balance will return an error.

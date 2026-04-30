@@ -3,8 +3,6 @@ title: "Transactions"
 description: "Ready-to-sign transaction payloads for deposits, redemptions, and reward claims."
 ---
 
-<Info>Requires a **PRO API key**.</Info>
-
 Generates ready-to-sign transaction calldata for any supported vault action. Pass the output directly to your wallet provider — no ABI encoding required.
 
 | Method | Endpoint | Description |
@@ -13,3 +11,4 @@ Generates ready-to-sign transaction calldata for any supported vault action. Pas
 | `GET` | [/v2/transactions/\{action\}/\{userAddress\}/\{network\}/\{vaultAddress\}](/api-reference/transactions-pro/get-transaction-payload) | Calldata for deposit, redeem, or claim |
 | `GET` | [/v2/transactions/rewards/context/\{userAddress\}](/api-reference/transactions-pro/get-rewards-context) | Claimable rewards for a wallet |
 | `GET` | [/v2/transactions/rewards/claim/\{userAddress\}](/api-reference/transactions-pro/claim-rewards) | Calldata to claim pending rewards |
+| `GET` | [/v2/transactions/suffix/\{userAddress\}/\{vaultId\}](/api-reference/transactions-pro/get-transaction-suffix) | Onchain referral builder code to append to calldata |

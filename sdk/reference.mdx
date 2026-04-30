@@ -674,7 +674,7 @@ try:
 except AuthenticationError:
     print("Invalid or missing API key")
 except ForbiddenError:
-    print("Insufficient plan — upgrade to PRO for this endpoint")
+    print("API key has exhausted available credits")
 except RateLimitError:
     print("Rate limit exceeded — slow down requests")
 except HttpResponseError as e:

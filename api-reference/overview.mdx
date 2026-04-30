@@ -18,18 +18,7 @@ Every request must include your API key as a header:
 x-api-key: YOUR_API_KEY
 ```
 
-Basic API keys are rate-limited to **10 requests per minute**. PRO keys lift this limit and unlock additional endpoints.
-
-## Tiers
-
-| Endpoint group | Basic | PRO |
-|----------------|:-----:|:---:|
-| General (vaults, assets, networks) | ✓ | ✓ |
-| Detailed Vaults | ✓ | ✓ |
-| Historical | — | ✓ |
-| Benchmarks | — | ✓ |
-| Portfolio | — | ✓ |
-| Transactions | — | ✓ |
+All API keys have access to all endpoints. Keys are rate-limited to **10 requests per minute** by default — contact support to increase your limit.
 
 ## Networks
 
@@ -80,7 +69,7 @@ The response includes `nextPage` — it is `null` when you are on the last page.
 |--------|---------|
 | `400` | Invalid parameters |
 | `401` | Missing or invalid API key |
-| `403` | Endpoint requires PRO key |
+| `403` | API key has exhausted available credits |
 | `404` | Resource not found |
 | `429` | Rate limit exceeded |
 | `500` | Internal server error |
