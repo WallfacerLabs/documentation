@@ -152,12 +152,13 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 
 | Field | Description |
 | --- | --- |
-| `score.vaultScore` | Composite score combining all sub-scores. |
+| `score.vaultScore` | Composite score combining all sub-scores, after any flag penalties are applied. |
 | `score.vaultTvlScore` | Score component based on this vault's TVL. |
 | `score.protocolTvlScore` | Score component based on the protocol's total TVL. |
 | `score.holderScore` | Score component based on holder count and distribution. |
 | `score.networkScore` | Score component based on which network the vault is on. |
 | `score.assetScore` | Score component based on the underlying asset type and liquidity. |
+| `score.penaltyComponents` | Active or decaying flag penalties applied to the composite score, with severity and resolution status for each. |
 
 ---
 
@@ -205,7 +206,7 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 | `flags[].severity` | One of `info`, `warning`, or `critical`. |
 | `flags[].endDate` | Unix timestamp when the flag expires. Past flags are not returned. |
 
-Use `flags` to surface active protocol notices in your UI, such as paused deposits, ongoing audits, or deprecation notices.
+Use `flags` to surface active protocol notices in your UI, such as paused deposits, ongoing audits, or deprecation notices. Active flags also reduce the vault's Reputation Score — see [Flag penalties](/methodology/reputation-scores#flag-penalties) for how severity and decay work.
 
 ---
 
