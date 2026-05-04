@@ -8,6 +8,33 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 18, 2026 — Apr 28–May 4
+
+**API**
+
+- **[Reputation Score](/methodology/reputation-scores) now reflects active vault flags** — warnings and risk indicators directly apply severity-based penalties to vault scores: critical flags carry the largest deduction, warning flags moderate, and info-level flags minimal. Vaults with active warnings will show lower scores, providing a more accurate signal of current vault health. Scores are backwards compatible. Responses now include a `penaltyComponents` field detailing each active flag and its resolution status.
+
+- **New `GET /v2/transactions/suffix/{userAddress}/{vaultId}` [endpoint](/api-reference/transactions)** — returns a raw hex suffix to append to transaction calldata, enabling on-chain attribution of deposits and withdrawals back to your API key.
+
+- **New borrow markets endpoints ([Alpha](/api-reference/alpha))** — four new endpoints for discovering and analyzing borrowing opportunities:
+  - `GET /alpha/borrow/markets/` — all supported borrow markets across networks
+  - `GET /alpha/borrow/markets/{network}` — filter by network
+  - `GET /alpha/borrow/markets/{network}/{marketId}` — detailed data for a single market, including rates, utilization, and collateral
+  - `GET /alpha/borrow/markets/historical/{network}/{marketId}/{assetAddress}` — historical rates and utilization over time for a specific asset within a market
+
+- **StakeWise V3 transactional support** — deposit and withdrawal flows now available for StakeWise V3 vaults. See the [transactions reference](/api-reference/transactions).
+
+- **Expanded Solana vault coverage** — Jupiter and Kamino Vaults are now fully integrated, extending beyond the data aggregates added in Week 16 to include complete vault support.
+
+- **Improved BoringVault support** — async deposit and withdrawal queues are now handled correctly throughout the transaction lifecycle.
+
+**App**
+
+- Updated landing page at [vaults.fyi](https://www.vaults.fyi/).
+- Redesigned side panel on vault detail pages.
+
+---
+
 ## Week 17, 2026 — Apr 21–27
 
 **API**
