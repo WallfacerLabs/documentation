@@ -1,10 +1,10 @@
 ---
 title: "Vault Reputation Scores: Risk Filtering Guide"
-description: "Learn how Vaults.fyi Reputation Scores work, what five dimensions they measure, and how to use minVaultScore to filter vaults programmatically."
+description: "Learn how Vaults.fyi Reputation Scores work, what five dimensions they measure, how flag penalties apply, and how to use minVaultScore to filter vaults programmatically."
 sidebarTitle: "Reputation Scores"
 ---
 
-The Vaults.fyi Reputation Score is a proprietary metric that gives you a single, objective number to assess how battle-tested a vault is. It is not a comprehensive risk rating — it is a signal about how long a protocol has secured significant capital, and how well the underlying assets and blockchain have held up over time.
+The Vaults.fyi Reputation Score is a proprietary metric that gives you a single, objective number to assess how battle-tested a vault is. It is not a comprehensive risk rating — it is a signal about how long a protocol has secured significant capital, how well the underlying assets and blockchain have held up over time, and whether any active risk flags are currently applied.
 
 ## What reputation scores measure
 
@@ -35,6 +35,14 @@ Vaults.fyi breaks the Reputation Score into five weighted dimensions:
     Assesses the maturity and security of the network the vault runs on. For Ethereum L2s, Vaults.fyi uses the [L2Beat Stages framework](https://l2beat.com/scaling/summary) as input. For alt-L1s like Polygon and Gnosis, the score is set at the equivalent of a Stage 0 L2. Mainnet Ethereum scores highest by default.
   </Accordion>
 </AccordionGroup>
+
+## Flag penalties
+
+Active vault flags — security incidents, protocol risk warnings, and similar indicators — directly reduce the Reputation Score. Higher-severity flags carry larger deductions. Only the single largest active penalty applies; multiple flags do not stack.
+
+When a flag is resolved, the penalty does not disappear immediately. It decays gradually over time, so a vault that resolves an incident recovers trust incrementally rather than resetting overnight.
+
+The `penaltyComponents` field in [detailed-vaults](/api-reference/detailed-vaults) responses shows each active or decaying flag penalty, its severity, and resolution status.
 
 ## Interpreting scores
 
@@ -69,5 +77,6 @@ Reputation Scores are also visible in the Vaults.fyi app at [app.vaults.fyi](htt
 - The score does not account for governance risk, upgrade mechanisms, or admin key exposure.
 - Networks not rated by L2Beat may not have blockchain security scores.
 - Smart contract audit status is not currently a direct input to the score.
+- Flag penalties reflect known incidents surfaced by vaults.fyi — they do not capture all possible risk vectors.
 
 For a deeper explanation of the methodology and the thinking behind the Lindy-based approach, read the [Vaults.fyi reputation score blog post](https://blog.vaults.fyi/beyond-apy-the-vaultsfyi-reputation/).
