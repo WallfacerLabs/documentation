@@ -81,6 +81,7 @@
             "pages": [
               "resources/faq",
               "resources/changelog",
+              "resources/brand",
               {
                 "group": "Case Studies",
                 "pages": [
