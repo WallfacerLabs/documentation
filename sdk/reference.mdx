@@ -690,7 +690,7 @@ The Python SDK exposes five exception classes, all inheriting from `VaultsFyiErr
 |-----------|-------|
 | `HttpResponseError` | Any non-2xx HTTP response |
 | `AuthenticationError` | Invalid or missing API key |
-| `ForbiddenError` | Endpoint requires a higher plan tier |
+| `ForbiddenError` | API key has exhausted available credits |
 | `RateLimitError` | Too many requests |
 | `NetworkError` | Connection or timeout failure |
 
