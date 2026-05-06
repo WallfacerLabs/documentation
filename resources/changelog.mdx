@@ -14,7 +14,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - **[Reputation Score](/methodology/reputation-score) now reflects active vault flags** — warnings and risk indicators directly apply severity-based penalties to each vault's Reputation Score: critical flags carry the largest deduction, warning flags moderate, and info-level flags minimal. Vaults with active warnings will show a lower Reputation Score, providing a more accurate signal of current vault health. This change is backwards compatible. Responses now include a `penaltyComponents` field detailing each active flag and its resolution status.
 
-- **New `GET /v2/transactions/suffix/{userAddress}/{vaultId}` [endpoint](/api-reference/transactions)** — returns a raw hex suffix to append to transaction calldata, enabling on-chain attribution of deposits and withdrawals back to your API key.
+- **New `GET /v2/transactions/suffix/{userAddress}/{vaultId}` [endpoint](/api-reference/transactions)** — returns a raw hex suffix to append to transaction calldata, enabling onchain attribution of deposits and withdrawals back to your API key.
 
 - **New borrow markets endpoints ([Alpha](/api-reference/alpha))** — four new endpoints for discovering and analyzing borrowing opportunities:
   - `GET /alpha/borrow/markets/` — all supported borrow markets across networks
@@ -183,7 +183,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 **API**
 
-- Launched **vault fees in the API** — the `detailed-vaults` endpoint now returns fee data (performance, management, deposit) read from on-chain contracts.
+- Launched **vault fees in the API** — the `detailed-vaults` endpoint now returns fee data (performance, management, deposit) read from onchain contracts.
 
 ---
 

@@ -31,7 +31,7 @@ Vaults.fyi calculates the Reputation Score from five weighted component scores:
     Measures holder distribution and diversity. More unique holders indicate broader trust and reduce concentration risk. Future improvements to this component will include filtering low-value addresses, distinguishing individual holders from protocol-owned positions, and analyzing the ability of large holders to exit and affect liquidity.
   </Accordion>
   <Accordion title="Underlying asset reliability (12.5%)">
-    Evaluates the stability and creditworthiness of the vault's deposit asset. For stablecoins and pegged assets (ETH/BTC derivatives), this component measures historical price stability relative to the peg, plus/minus 2% liquidity depth in on-chain markets, and CEX and DEX trading volume. Assets with a consistent peg and deep liquidity contribute more positively.
+    Evaluates the stability and creditworthiness of the vault's deposit asset. For stablecoins and pegged assets (ETH/BTC derivatives), this component measures historical price stability relative to the peg, plus/minus 2% liquidity depth in onchain markets, and CEX and DEX trading volume. Assets with a consistent peg and deep liquidity contribute more positively.
   </Accordion>
   <Accordion title="Underlying blockchain security (12.5%)">
     Assesses the maturity and security of the network the vault runs on. For Ethereum L2s, Vaults.fyi uses the [L2Beat Stages framework](https://l2beat.com/scaling/summary) as input. For alt-L1s like Polygon and Gnosis, the component is set at the equivalent of a Stage 0 L2. Mainnet Ethereum contributes the highest value by default.

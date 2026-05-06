@@ -8,7 +8,7 @@ TVL tracking lets wallets, apps, protocol frontends, and other transaction build
 
 By adding a Vaults.fyi tracking suffix to vault transactions, your integration can see which deposits and withdrawals came from your product, how much attributed TVL remains in each vault, and how that traffic changes over time in [portal.vaults.fyi](https://portal.vaults.fyi).
 
-The tracking layer does not change the user's transaction path. Users still interact directly with the target vault or protocol contract. Vaults.fyi only adds attribution metadata to the calldata so confirmed on-chain activity can be connected back to your integration.
+The tracking layer does not change the user's transaction path. Users still interact directly with the target vault or protocol contract. Vaults.fyi only adds attribution metadata to the calldata so confirmed onchain activity can be connected back to your integration.
 
 ## What you can track
 
@@ -112,7 +112,7 @@ const trackedTransaction = {
 
 Append the suffix to every vault transaction you want attributed, including deposits, withdrawals, redeems, claims, and any other supported vault action. Attribution is transaction-level: if a transaction is sent without the suffix, Vaults.fyi cannot attribute that flow to your integration.
 
-Send `trackedTransaction` through your normal wallet or transaction pipeline. Once confirmed on-chain, the transaction can be attributed and analyzed for free in [portal.vaults.fyi](https://portal.vaults.fyi).
+Send `trackedTransaction` through your normal wallet or transaction pipeline. Once confirmed onchain, the transaction can be attributed and analyzed for free in [portal.vaults.fyi](https://portal.vaults.fyi).
 
 <Note>
   The transaction recipient, value, chain, and function arguments do not change. Only the calldata string is extended with the tracking suffix.

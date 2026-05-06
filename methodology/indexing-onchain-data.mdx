@@ -8,7 +8,7 @@ Vaults.fyi reads vault state directly from the blockchain every hour. This direc
 
 ## The indexing pipeline
 
-Each hour, Vaults.fyi executes specialized smart contracts that fetch and transform vault data in a single function call. These contracts are deployed as **static calls**: they execute transiently without writing to blockchain storage, so they cost no gas and leave no on-chain footprint.
+Each hour, Vaults.fyi executes specialized smart contracts that fetch and transform vault data in a single function call. These contracts are deployed as **static calls**: they execute transiently without writing to blockchain storage, so they cost no gas and leave no onchain footprint.
 
 This architecture has two key advantages over standard multi-call patterns:
 
@@ -68,7 +68,7 @@ Different vault standards expose share price through different contract interfac
     The `totalSupply` value produced here is a simulation — it is not read directly from the contract. This lets Vaults.fyi apply the same APY formula consistently across vault types.
   </Accordion>
   <Accordion title="Real world asset (RWA) vaults">
-    RWA vaults are ERC-20 tokens that represent interests in off-chain financial assets. Share price cannot be derived from on-chain balances alone — it requires oracle prices for both the RWA token and its underlying stablecoin.
+    RWA vaults are ERC-20 tokens that represent interests in off-chain financial assets. Share price cannot be derived from onchain balances alone — it requires oracle prices for both the RWA token and its underlying stablecoin.
 
     Vaults.fyi uses three functions:
 
@@ -91,7 +91,7 @@ Different vault standards expose share price through different contract interfac
 Vaults.fyi indexes all vaults on an hourly cadence. API responses reflect the most recent hourly snapshot. Because Vaults.fyi reads directly from chain rather than consuming third-party data feeds, yield figures are not subject to delays or data gaps introduced by intermediate data providers.
 
 <Warning>
-  APY values in API responses represent the state at the last hourly index. If a vault's on-chain state changed in the past hour — for example, due to a large deposit or an earnings update — the API will not reflect that change until the next indexing cycle completes.
+  APY values in API responses represent the state at the last hourly index. If a vault's onchain state changed in the past hour — for example, due to a large deposit or an earnings update — the API will not reflect that change until the next indexing cycle completes.
 </Warning>
 
 ## Why direct indexing matters

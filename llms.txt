@@ -12,7 +12,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 - For a single vault: `GET /v2/detailed-vaults/{network}/{address}`.
 - For user portfolio: `GET /v2/positions/{address}`, `GET /v2/idle-assets/{address}`, `GET /v2/best-vault/{address}`.
 - Transaction payloads are ready-to-sign — no intermediary contracts. Use `GET /v2/transactions/context/{network}/{address}/{vaultAddress}` then `GET /v2/transactions/{action}/{network}/{address}/{vaultAddress}`.
-- APY values are trailing averages computed from on-chain share prices. Always check whether rewards are included (`totalApy` vs `baseApy`).
+- APY values are trailing averages computed from onchain share prices. Always check whether rewards are included (`totalApy` vs `baseApy`).
 
 ## Getting Started
 
@@ -25,7 +25,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 ## Core Concepts
 
 - [Everything You Can Know About a Vault](https://docs.vaults.fyi/concepts/vault-data.md): Complete field reference — APY, TVL, fees, the Reputation Score, holders, historical time-series, near real-time metrics, and user positions.
-- [Market Data: APY, TVL, and Fees](https://docs.vaults.fyi/concepts/market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly on-chain indexing.
+- [Market Data: APY, TVL, and Fees](https://docs.vaults.fyi/concepts/market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly onchain indexing.
 - [Portfolio Tracking](https://docs.vaults.fyi/concepts/portfolio.md): Track positions, detect idle assets, surface personalized deposit recommendations, and report PnL.
 - [Transaction Execution](https://docs.vaults.fyi/concepts/transactions.md): Non-custodial deposit, redeem, and claim payloads — no intermediary contracts.
 - [Supported Protocols & Networks](https://docs.vaults.fyi/concepts/supported-protocols.md): 80+ protocols on 20+ networks. Covers analytics-only vs. full transactional support tiers.
