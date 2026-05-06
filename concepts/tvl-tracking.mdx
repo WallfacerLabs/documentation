@@ -63,7 +63,7 @@ This is the recommended integration path for wallets, apps, and protocol fronten
 
 - A free Vaults.fyi account. Accounts are currently invite-only.
 - An API key created from that account.
-- Access to [portal.vaults.fyi](https://portal.vaults.fyi), where attributed TVL can be tracked for free.
+- Access to [portal.vaults.fyi](https://portal.vaults.fyi), **where attributed TVL can be tracked for free**.
 - The user address and vault ID for each transaction being tagged.
 
 ### Endpoint
@@ -73,7 +73,7 @@ GET https://api.vaults.fyi/v2/transactions/suffix/{userAddress}/{vaultId}
 x-api-key: YOUR_API_KEY
 ```
 
-The endpoint is free to use. The returned suffix identifies your integration for TVL attribution.
+**The endpoint is free to use.** The returned suffix identifies your integration for TVL attribution.
 
 The suffix is generated from both the user wallet address and the vault ID. Vaults.fyi uses these values to correctly attribute transactions even when the submitted transaction path is more complex than a simple EOA-to-vault call, including account abstraction, smart wallets, relayers, and other flows where the transaction sender may not be the same as the end user whose vault position should be tracked.
 
