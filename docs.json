@@ -38,10 +38,10 @@
             "pages": [
               "concepts/vault-data",
               "concepts/market-data",
-              "concepts/tvl-tracking",
               "concepts/transactions",
               "concepts/portfolio",
-              "concepts/supported-protocols"
+              "concepts/supported-protocols",
+              "concepts/tvl-tracking"
             ]
           },
           {
