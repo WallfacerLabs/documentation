@@ -75,6 +75,8 @@ x-api-key: YOUR_API_KEY
 
 The endpoint is free to use. The returned suffix identifies your integration for TVL attribution.
 
+The suffix is generated from both the user wallet address and the vault ID. Vaults.fyi uses these values to correctly attribute transactions even when the submitted transaction path is more complex than a simple EOA-to-vault call, including account abstraction, smart wallets, relayers, and other flows where the transaction sender may not be the same as the end user whose vault position should be tracked.
+
 Example response:
 
 ```json
