@@ -1,6 +1,6 @@
 ---
 title: "DeFi Yield Market Data: APY, TVL, and Fees"
-description: "Query standardized APY, TVL, fees, reputation scores, and rewards across 1,000+ vaults via hourly on-chain indexing — all from a single API."
+description: "Query standardized APY, TVL, fees, the Reputation Score, and rewards across 1,000+ vaults via hourly on-chain indexing — all from a single API."
 sidebarTitle: "Market Data"
 ---
 
@@ -10,10 +10,10 @@ Data is indexed on-chain on an hourly basis, so you always have current metrics 
 
 ## What data is available
 
-Each vault object includes APY across four time windows, TVL in USD and native units, a fee breakdown, a reputation score with sub-scores, reward token rates, holder counts, capacity limits, and flags for active protocol notices — among other fields.
+Each vault object includes APY across four time windows, TVL in USD and native units, a fee breakdown, the Reputation Score with component scores, reward token rates, holder counts, capacity limits, and flags for active protocol notices — among other fields.
 
 <Note>
-APY, TVL, fees, and reputation scores are computed consistently across all protocols. This means you can safely sort and compare vaults from different protocols side by side.
+APY, TVL, fees, and the Reputation Score are computed consistently across all protocols. This means you can safely sort and compare vaults from different protocols side by side.
 </Note>
 
 For a complete field-by-field reference covering everything the API can tell you about a vault, see [Everything You Can Know About a Vault](/concepts/vault-data).
@@ -25,7 +25,7 @@ For a complete field-by-field reference covering everything the API can tell you
     Filter and sort vaults by APY, TVL, protocol, network, asset, reputation score, and more.
   </Card>
   <Card title="Single vault detail" icon="circle-info" href="/api-reference/detailed-vaults">
-    Full detail on a specific vault including current and historical APY, TVL, fees, rewards, and risk scores.
+    Full detail on a specific vault including current and historical APY, TVL, fees, rewards, and the Reputation Score.
   </Card>
   <Card title="Historical data" icon="chart-line" href="/api-reference/historical">
     Time-series APY, TVL, and asset price data over configurable date ranges and granularity.

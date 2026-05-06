@@ -51,7 +51,7 @@
             "pages": [
               "methodology/calculating-apy",
               "methodology/benchmark-rates",
-              "methodology/reputation-scores",
+              "methodology/reputation-score",
               "methodology/indexing-onchain-data"
             ]
           },
@@ -104,7 +104,7 @@
     "Market data for 1,000+ DeFi vaults across 80+ protocols and 20+ chains",
     "Non-custodial transaction preparation for deposit, redeem, and claim actions",
     "Portfolio intelligence with idle asset detection and personalized yield recommendations",
-    "Hourly on-chain indexing with proprietary reputation scores",
+    "Hourly on-chain indexing with the proprietary Reputation Score",
     "TypeScript and Python SDKs with full type safety",
     "AI/agent-ready with MCP server support and x402 pay-per-request access",
     "Benchmark rates (USD & ETH) for cross-network yield comparison",

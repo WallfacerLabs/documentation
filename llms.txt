@@ -8,7 +8,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 - Use v2 endpoints for all production integrations. Alpha and beta endpoints may change without notice.
 - Authentication: include your API key as `x-api-key` header. Get access at https://portal.vaults.fyi.
-- Primary vault discovery endpoint: `GET /v2/detailed-vaults` — returns APY, TVL, risk scores, fees, and protocol details across all supported vaults.
+- Primary vault discovery endpoint: `GET /v2/detailed-vaults` — returns APY, TVL, the Reputation Score, fees, and protocol details across all supported vaults.
 - For a single vault: `GET /v2/detailed-vaults/{network}/{address}`.
 - For user portfolio: `GET /v2/positions/{address}`, `GET /v2/idle-assets/{address}`, `GET /v2/best-vault/{address}`.
 - Transaction payloads are ready-to-sign — no intermediary contracts. Use `GET /v2/transactions/context/{network}/{address}/{vaultAddress}` then `GET /v2/transactions/{action}/{network}/{address}/{vaultAddress}`.
@@ -24,7 +24,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 ## Core Concepts
 
-- [Everything You Can Know About a Vault](https://docs.vaults.fyi/concepts/vault-data.md): Complete field reference — APY, TVL, fees, reputation scores, holders, historical time-series, near real-time metrics, and user positions.
+- [Everything You Can Know About a Vault](https://docs.vaults.fyi/concepts/vault-data.md): Complete field reference — APY, TVL, fees, the Reputation Score, holders, historical time-series, near real-time metrics, and user positions.
 - [Market Data: APY, TVL, and Fees](https://docs.vaults.fyi/concepts/market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly on-chain indexing.
 - [Portfolio Tracking](https://docs.vaults.fyi/concepts/portfolio.md): Track positions, detect idle assets, surface personalized deposit recommendations, and report PnL.
 - [Transaction Execution](https://docs.vaults.fyi/concepts/transactions.md): Non-custodial deposit, redeem, and claim payloads — no intermediary contracts.
@@ -34,13 +34,13 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 - [How APY is Calculated](https://docs.vaults.fyi/methodology/calculating-apy.md): Trailing windows, TVL-weighted averages, reward token accounting, and edge cases.
 - [Benchmark Rates](https://docs.vaults.fyi/methodology/benchmark-rates.md): How USD and ETH benchmark rates are constructed from top vaults by TVL.
-- [Reputation Scores](https://docs.vaults.fyi/methodology/reputation-scores.md): Five-dimension risk scoring and how to use `minVaultScore` to filter programmatically.
+- [Reputation Score](https://docs.vaults.fyi/methodology/reputation-score.md): Five-dimension risk scoring and how to use `minVaultScore` to filter programmatically.
 - [On-Chain Indexing](https://docs.vaults.fyi/methodology/indexing-onchain-data.md): How vaults.fyi reads share prices hourly via static smart contract calls.
 
 ## API Reference
 
 - [General](https://docs.vaults.fyi/api-reference/general.md): Vault discovery, assets, networks, protocols, curators, and tags.
-- [Detailed Vaults](https://docs.vaults.fyi/api-reference/detailed-vaults.md): Full vault data — APY breakdown, TVL, risk scores, fees, holder data, protocol details.
+- [Detailed Vaults](https://docs.vaults.fyi/api-reference/detailed-vaults.md): Full vault data — APY breakdown, TVL, the Reputation Score, fees, holder data, protocol details.
 - [Historical](https://docs.vaults.fyi/api-reference/historical.md): Time-series APY, TVL, share price, and asset price data for any vault.
 - [Benchmarks](https://docs.vaults.fyi/api-reference/benchmarks.md): USD and ETH benchmark APY rates with historical time-series.
 - [Portfolio](https://docs.vaults.fyi/api-reference/portfolio.md): User positions, idle assets, deposit recommendations, returns, and transaction history.
@@ -50,7 +50,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 ## Use Cases
 
 - [Embed Yield in Wallets & Apps](https://docs.vaults.fyi/use-cases/for-wallets-and-apps.md): Add yield discovery, non-custodial deposits, and fee revenue to any wallet or consumer app.
-- [DeFi Yield Data for Analysts](https://docs.vaults.fyi/use-cases/for-analysts.md): Normalized APY, TVL, risk scores, and benchmark rates across 1,000+ vaults — no blockchain parsing.
+- [DeFi Yield Data for Analysts](https://docs.vaults.fyi/use-cases/for-analysts.md): Normalized APY, TVL, the Reputation Score, and benchmark rates across 1,000+ vaults — no blockchain parsing.
 - [Get Your Vaults Discovered](https://docs.vaults.fyi/use-cases/for-protocols.md): List vaults on vaults.fyi to reach wallets, apps, and analysts. Monitor integration performance.
 
 ## SDK & Tutorials

@@ -48,7 +48,7 @@
             "pages": [
               "methodology/calculating-apy",
               "methodology/benchmark-rates",
-              "methodology/reputation-scores",
+              "methodology/reputation-score",
               "methodology/indexing-onchain-data"
             ]
           },
@@ -281,8 +281,16 @@
       "destination": "/methodology/benchmark-rates"
     },
     {
+      "source": "/methodology/reputation-scores",
+      "destination": "/methodology/reputation-score"
+    },
+    {
       "source": "/general/methodology/reputation-scores",
-      "destination": "/methodology/reputation-scores"
+      "destination": "/methodology/reputation-score"
+    },
+    {
+      "source": "/general/methodology/reputation-score",
+      "destination": "/methodology/reputation-score"
     },
     {
       "source": "/general/methodology/vaults.fyi-usd-benchmark-rate",
