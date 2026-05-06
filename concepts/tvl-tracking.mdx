@@ -1,0 +1,114 @@
+---
+title: "TVL Tracking and Flow Attribution"
+description: "Track which integrations, wallets, and applications drive deposits into vaults, then measure the attributed TVL that remains on-chain."
+sidebarTitle: "TVL Tracking"
+---
+
+TVL tracking helps protocols, curators, and distribution partners understand where vault deposits originate and how much value remains attributable to each source over time.
+
+When a transaction is prepared through Vaults.fyi or tagged with a Vaults.fyi transaction suffix, it can be attributed to the application, wallet, or integration that created the transaction. This gives teams a clean view of distribution performance without adding intermediary contracts or changing the user's vault interaction.
+
+## Why TVL attribution matters
+
+DeFi distribution is increasingly multi-channel. Users may discover and enter the same vault through a protocol frontend, wallet, curator dashboard, institutional platform, or embedded app. Standard on-chain data shows that a deposit happened, but not which product experience initiated it.
+
+Vaults.fyi TVL tracking connects those deposits back to the originating integration so teams can answer questions like:
+
+- Which wallets or apps are driving new deposits?
+- How much current TVL is attributable to each distribution partner?
+- Which curators or strategies are retaining deposits after users enter?
+- Which acquisition channels generate sticky vault balances rather than one-off transactions?
+
+The result is attribution that is both on-chain-verifiable and useful for commercial reporting, partner management, and product analytics.
+
+## Who uses it
+
+<CardGroup cols={3}>
+  <Card title="Curators" icon="chart-line">
+    Measure how much TVL in curated vaults came from specific distribution channels, wallets, or campaigns. Use this to understand which partners are bringing durable deposits into your strategies.
+  </Card>
+  <Card title="Protocols" icon="network">
+    See which integrations are routing users into protocol vaults, compare partner performance, and quantify the TVL associated with each source.
+  </Card>
+  <Card title="Integrators" icon="plug">
+    Prove the value your app or wallet contributes by tracking deposits and current attributed TVL through portal.vaults.fyi.
+  </Card>
+</CardGroup>
+
+## How tracking works
+
+Vaults.fyi uses a small calldata suffix to identify the source of a vault transaction. The suffix is appended to the transaction calldata and includes the information needed to associate the transaction with a Vaults.fyi API key, user-vault interaction, and vault.
+
+This does not route funds through Vaults.fyi. Users still transact directly with the target vault or protocol contract. The suffix is only metadata added to calldata for attribution.
+
+<Note>
+  The transaction recipient, value, chain, and function arguments do not change. Only the calldata string is extended with the tracking suffix.
+</Note>
+
+## Automatic tracking with the Transactions API
+
+Every transaction created with the Vaults.fyi Transactions API automatically has TVL tracking enabled.
+
+If you use Vaults.fyi to generate deposit, redeem, claim, or other supported vault transaction payloads, no additional integration work is required. The returned transaction data already includes the tracking suffix, so deposits can be attributed and reported in portal.vaults.fyi.
+
+For most apps and wallets, this is the recommended path: use the Transactions API to prepare the vault action, pass the returned payload to the user's wallet, and let Vaults.fyi handle the tracking metadata automatically.
+
+## Free manual tracking for existing transaction flows
+
+If you already have your own transaction-building flow, you can still use Vaults.fyi TVL tracking without using the Transactions API. Call the free suffix endpoint, append the returned value to your calldata, and continue sending transactions through your existing wallet, app, or backend flow.
+
+This is the recommended integration path for wallets, apps, and protocol frontends that already build vault transactions themselves but want their deposits and withdrawals to be attributable in Vaults.fyi.
+
+### What integrators need
+
+- A free Vaults.fyi account. Accounts are currently invite-only.
+- An API key created from that account.
+- Access to [portal.vaults.fyi](https://portal.vaults.fyi), where attributed TVL can be tracked for free.
+- The user address and vault ID for each transaction being tagged.
+
+### Endpoint
+
+```http
+GET https://api.vaults.fyi/v2/transactions/suffix/{userAddress}/{vaultId}
+x-api-key: YOUR_API_KEY
+```
+
+The endpoint is free to use. The returned suffix identifies your integration for TVL attribution.
+
+Example response:
+
+```json
+{
+  "suffix": "d9d16d34ffb15ba3263708f3dcff6ee7535a2a0fffc69deb"
+}
+```
+
+### Append the suffix to calldata
+
+Append the returned suffix to your existing calldata without adding another `0x` prefix:
+
+```ts
+const tx = buildVaultTransaction(...)
+
+const { suffix } = await fetch(
+  `https://api.vaults.fyi/v2/transactions/suffix/${userAddress}/${vaultId}`,
+  {
+    headers: {
+      "x-api-key": process.env.VAULTS_FYI_API_KEY,
+    },
+  }
+).then((response) => response.json())
+
+const trackedTransaction = {
+  ...tx,
+  data: `${tx.data}${suffix}`,
+}
+```
+
+Append the suffix to every vault transaction you want attributed, including deposits, withdrawals, redeems, claims, and any other supported vault action. Attribution is transaction-level: if a transaction is sent without the suffix, Vaults.fyi cannot attribute that flow to your integration.
+
+Send `trackedTransaction` through your normal wallet or transaction pipeline. Once confirmed on-chain, the transaction can be attributed and analyzed for free in [portal.vaults.fyi](https://portal.vaults.fyi).
+
+## API reference
+
+See the full endpoint reference at [/api-reference/transactions](/api-reference/transactions), or explore the live OpenAPI spec at `https://api.vaults.fyi/v2/documentation/json`.
