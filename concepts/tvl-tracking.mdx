@@ -35,6 +35,50 @@ The result is attribution that is both on-chain-verifiable and useful for commer
   </Card>
 </CardGroup>
 
+## Tracking views in the portal
+
+[portal.vaults.fyi](https://portal.vaults.fyi) is organized as a drill-down from aggregate TVL to individual user activity. Curators can share the manual tracking section with integrators, then use the portal to monitor whether those integrations are driving deposits, withdrawals, and durable vault balances.
+
+### 1. Overview: total attributed TVL
+
+Start with the global TVL overview to see total attributed value, asset allocation, and daily TVL over time.
+
+<Frame>
+  ![TVL Tracking overview showing total net TVL, asset allocation, and daily TVL chart](/images/tvl-tracking-overview.jpg)
+</Frame>
+
+### 2. Breakdown: curator or protocol source
+
+Drill into attributed TVL by curator or protocol to understand which sources are contributing the most value and how those balances change over time.
+
+<Frame>
+  ![TVL Tracking protocol breakdown showing daily TVL by protocol and protocol table](/images/tvl-tracking-by-protocol.jpg)
+</Frame>
+
+### 3. Vaults: attributed TVL by vault
+
+Open a source to see the vaults receiving tracked flows, including network, APY, average value outstanding, and net TVL.
+
+<Frame>
+  ![TVL Tracking vault list showing vaults, networks, APY, AVO, and net TVL](/images/tvl-tracking-vaults-list.jpg)
+</Frame>
+
+### 4. Vault detail: users in a specific vault
+
+Select a vault to inspect its daily attributed TVL and the users contributing to that balance.
+
+<Frame>
+  ![TVL Tracking vault detail showing Smokehouse USDC daily TVL and users table](/images/tvl-tracking-vault-detail.jpg)
+</Frame>
+
+### 5. User detail: transaction-level history
+
+Open a user to review the attributed balance and transaction history for that user-vault relationship.
+
+<Frame>
+  ![TVL Tracking user detail showing daily TVL and transaction history](/images/tvl-tracking-user-detail.jpg)
+</Frame>
+
 ## How tracking works
 
 Vaults.fyi uses a small calldata suffix to identify the source of a vault transaction. The suffix is appended to the transaction calldata and includes the information needed to associate the transaction with a Vaults.fyi API key, user-vault interaction, and vault.
