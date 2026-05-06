@@ -6,7 +6,7 @@ sidebarTitle: "TVL Tracking"
 
 TVL tracking lets wallets, apps, protocol frontends, and other transaction builders measure the vault flows they generate.
 
-By adding a Vaults.fyi tracking suffix to vault transactions, your integration can see which deposits and withdrawals came from your product, how much attributed TVL remains in each vault, and how that traffic changes over time in [portal.vaults.fyi](https://portal.vaults.fyi).
+By adding a Vaults.fyi tracking suffix to vault transactions, your integration can see which deposits and withdrawals came from your product, how much attributed TVL remains in each vault, and how that traffic changes over time in [portal.vaults.fyi](https://portal.vaults.fyi). The same attribution layer can also support monetization through fee rebate programs where available.
 
 The tracking layer does not change the user's transaction path. Users still interact directly with the target vault or protocol contract. Vaults.fyi only adds attribution metadata to the calldata so confirmed onchain activity can be connected back to your integration.
 
@@ -21,6 +21,7 @@ You can track:
 - Daily TVL changes over time.
 - User-level balances and transaction history for tracked vault interactions.
 - Which flows are sticky and how much value remains in vaults after users enter.
+- Which attributed flows may be eligible for fee rebate programs where available.
 
 <Frame>
   ![TVL Tracking vault list showing attributed vault TVL, AVO, and network breakdown](/images/tvl-tracking-vaults-list.jpg)
@@ -35,8 +36,8 @@ You can track:
   <Card title="Analyze retained TVL" icon="database">
     Measure not only transaction volume, but how much value remains in vaults over time after users deposit.
   </Card>
-  <Card title="Track for free" icon="circle-dollar-sign">
-    Use the free suffix endpoint and track attributed TVL for free in portal.vaults.fyi.
+  <Card title="Track and monetize" icon="circle-dollar-sign">
+    Use the free suffix endpoint to track attributed TVL for free in portal.vaults.fyi and support fee rebate programs where available.
   </Card>
 </CardGroup>
 
