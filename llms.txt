@@ -35,7 +35,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 - [How APY is Calculated](https://docs.vaults.fyi/methodology/calculating-apy.md): Trailing windows, TVL-weighted averages, reward token accounting, and edge cases.
 - [Benchmark Rates](https://docs.vaults.fyi/methodology/benchmark-rates.md): How USD and ETH benchmark rates are constructed from top vaults by TVL.
 - [Reputation Score](https://docs.vaults.fyi/methodology/reputation-score.md): Five-dimension risk scoring and how to use `minVaultScore` to filter programmatically.
-- [On-Chain Indexing](https://docs.vaults.fyi/methodology/indexing-onchain-data.md): How vaults.fyi reads share prices hourly via static smart contract calls.
+- [Onchain Indexing](https://docs.vaults.fyi/methodology/indexing-onchain-data.md): How vaults.fyi reads share prices hourly via static smart contract calls.
 
 ## API Reference
 

@@ -98,7 +98,7 @@ The API returns an `apyComposite` object that breaks APY into two components:
     Some vaults — particularly liquid staking tokens (LSTs) and Yearn-style strategies — accrue yield in batches rather than continuously. When an earnings update lands, the share price jumps sharply, which inflates the short-term APY reading for that window. Vaults.fyi surfaces this behavior honestly; the 7d and 30d windows tend to give a cleaner picture for these vault types.
   </Accordion>
   <Accordion title="Are there vault types with special share price logic?">
-    Yes. Rebasing vaults (such as Aave aTokens) grow the user's token balance directly rather than the share price. Staking mechanism vaults (such as StakeWise) separate principal and reward tokens. RWA vaults use oracle prices to compute share value. Each type requires its own onchain data extraction — see [Indexing On-Chain Data](/methodology/indexing-onchain-data) for details.
+    Yes. Rebasing vaults (such as Aave aTokens) grow the user's token balance directly rather than the share price. Staking mechanism vaults (such as StakeWise) separate principal and reward tokens. RWA vaults use oracle prices to compute share value. Each type requires its own onchain data extraction — see [Indexing Onchain Data](/methodology/indexing-onchain-data) for details.
   </Accordion>
 </AccordionGroup>
 
