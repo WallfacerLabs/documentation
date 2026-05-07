@@ -1,44 +1,53 @@
 ---
 title: "Vaults.fyi API Plans & Pricing Overview"
-description: "Compare Analyst, Growth, Builder, and Enterprise API plans — pricing, credit allowances, rate limits, and features to find the right fit."
+description: "Compare pay-as-you-go, Analyst, Growth, Builder, and Enterprise API plans — pricing, credit allowances, rate limits, and support to find the right fit."
 sidebarTitle: "Plans Overview"
 ---
 
-The vaults.fyi API offers four plans designed to match different usage levels, from individual analysts to enterprise-scale applications. All paid plans include priority support with under-24-hour SLAs, and subscriptions are measured in [Credits (Compute Units)](/plans/credits) that reflect the actual compute cost of each request.
+The vaults.fyi API offers usage-based and subscription plans designed to match different usage levels, from individual analysts to enterprise-scale applications. Every API key can access all endpoints; plans differ by pricing model, included credits, rate limits, and support. Usage is measured in [Credits (Compute Units)](/plans/credits) that reflect the actual compute cost of each request.
 
 ## Plan Comparison
 
-| Feature | Analyst | Growth | Builder | Enterprise |
-|---|---|---|---|---|
-| **Price** | $399 / mo | $599 / mo | $999 / mo | Custom |
-| **Credits** | 250k / mo | 500k / mo | 1M / mo | Custom |
-| **Rate Limits** | 10 req/s | 20 req/s | 50 req/s | Custom |
-| **Market data** | ✓ | ✓ | ✓ | ✓ |
-| **Portfolio & personalized insights** | ✗ | ✓ | ✓ | ✓ |
-| **Transactional support** | ✗ | ✓ | ✓ | ✓ |
+| Feature | Pay as you go | Analyst | Growth | Builder | Enterprise |
+|---|---|---|---|---|---|
+| **Price** | $0.002 / credit | $399 / mo | $599 / mo | $999 / mo | Custom |
+| **Included credits** | None — pay for usage | 250k / mo | 500k / mo | 1M / mo | Custom |
+| **Endpoint access** | All endpoints | All endpoints | All endpoints | All endpoints | All endpoints |
+| **Rate limits** | Standard | 10 req/s | 20 req/s | 50 req/s | Custom |
 
 ## Plan Details
 
 <CardGroup cols={2}>
+  <Card title="Pay as you go" icon="credit-card">
+    **$0.002 / credit**
+
+    Best for testing, variable workloads, and teams that want access to the full API without committing to a monthly credit package.
+
+    - No monthly credit commitment
+    - Flat $0.002 per credit
+    - Access to all endpoints
+    - Standard rate limits
+    - Upgrade to a subscription plan when usage becomes predictable
+  </Card>
   <Card title="Analyst" icon="chart-line">
     **$399 / month**
 
-    Best for researchers and data teams that need comprehensive market data across protocols and chains.
+    Best for researchers and data teams that need comprehensive data across protocols and chains.
 
     - 250,000 credits / month
     - 10 requests per second
-    - Market data access
+    - Access to all endpoints
     - Priority support, &lt;24 hr SLAs
     - Standard product roadmap requests
   </Card>
   <Card title="Growth" icon="arrow-trend-up">
     **$599 / month**
 
-    Best for product teams launching yield features that need personalized insights and transaction support.
+    Best for product teams launching yield features that need higher included usage and more throughput.
 
     - 500,000 credits / month
     - 20 requests per second
-    - Market data, portfolio & insights, transactional support
+    - Access to all endpoints
     - Priority support, &lt;24 hr SLAs
     - Prioritized integrations for requested protocols
   </Card>
@@ -49,7 +58,7 @@ The vaults.fyi API offers four plans designed to match different usage levels, f
 
     - 1,000,000 credits / month
     - 50 requests per second
-    - Market data, portfolio & insights, transactional support
+    - Access to all endpoints
     - Priority support, &lt;24 hr SLAs
     - Prioritized integrations for requested protocols and chains
     - Prioritized API features
@@ -61,7 +70,7 @@ The vaults.fyi API offers four plans designed to match different usage levels, f
 
     - Custom credit volume
     - Custom rate limits
-    - All feature categories
+    - Access to all endpoints
     - Dedicated support, &lt;24 hr SLAs, on-call for critical issues
     - Prioritized integrations, API features, and custom feature development
     - [Chat with us](https://cal.com/vaultsfyi/) to discuss
@@ -70,14 +79,14 @@ The vaults.fyi API offers four plans designed to match different usage levels, f
 
 ## Subscribe or Upgrade
 
-To subscribe to a paid plan or upgrade your existing plan, [fill out the subscription form](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus). For Enterprise inquiries, [schedule a call](https://cal.com/vaultsfyi/) with the team.
+To start on pay as you go, subscribe to a paid plan, or upgrade your existing plan, [fill out the subscription form](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus). For Enterprise inquiries, [schedule a call](https://cal.com/vaultsfyi/) with the team.
 
 <Note>
-  **Using AI agents or building agentic workflows?** The vaults.fyi API also supports pay-per-request access via [x402](/ai-agents/x402), a micropayment protocol for AI agents. This lets autonomous systems call the API without a fixed monthly subscription — paying only for the requests they make.
+  **Using AI agents or building agentic workflows?** Pay as you go gives you usage-based API-key access. The vaults.fyi API also supports keyless pay-per-request access via [x402](/ai-agents/x402), a micropayment protocol for autonomous systems that prefer to pay from an onchain wallet instead of managing an API key.
 </Note>
 
 ## Understanding Credits
 
-Subscriptions are measured in Credits (Compute Units), which reflect the resources required to fulfill each type of request. Lightweight endpoints like `/v2/assets` cost 1 CU per call, while data-heavy endpoints return multiple datapoints and cost more per response.
+API usage is measured in Credits (Compute Units), which reflect the resources required to fulfill each type of request. Lightweight endpoints like `/v2/assets` cost 1 CU per call, while data-heavy endpoints return multiple datapoints and cost more per response. On pay as you go, each credit costs $0.002.
 
 See the full breakdown of endpoint credit costs on the [Credits](/plans/credits) page.

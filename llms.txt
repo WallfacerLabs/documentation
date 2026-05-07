@@ -18,7 +18,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 - [Introduction](https://docs.vaults.fyi/introduction.md): What vaults.fyi is, who it's for, and what the API covers.
 - [API Overview](https://docs.vaults.fyi/api-reference/overview.md): V2 API structure, authentication, base URLs, rate limits, and versioning.
-- [Plans & Pricing](https://docs.vaults.fyi/plans/overview.md): Analyst, Growth, Builder, and Enterprise plans — credit allowances and rate limits.
+- [Plans & Pricing](https://docs.vaults.fyi/plans/overview.md): Pay-as-you-go, Analyst, Growth, Builder, and Enterprise plans — credit pricing, allowances, and rate limits.
 - [API Credits & Compute Units](https://docs.vaults.fyi/plans/credits.md): Per-endpoint cost table for all v2 endpoints.
 - [SDK Quickstart](https://docs.vaults.fyi/sdk/quickstart.md): Install the TypeScript or Python SDK and make your first call in under five minutes.
 

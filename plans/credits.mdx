@@ -4,7 +4,7 @@ description: "Learn how vaults.fyi Credits (Compute Units) work, and see the ful
 sidebarTitle: "Credits"
 ---
 
-Every vaults.fyi API plan allocates a monthly Credit budget. Credits — also called Compute Units (CUs) — measure the compute resources consumed by each request. This model lets you pay proportionally for what you actually use, rather than treating a simple lookup the same as a rich multi-vault data pull.
+Every vaults.fyi API request consumes Credits. Credits — also called Compute Units (CUs) — measure the compute resources consumed by each request. Subscription plans include a monthly Credit budget, while pay as you go charges a flat **$0.002 per credit**. This model lets you pay proportionally for what you actually use, rather than treating a simple lookup the same as a rich multi-vault data pull.
 
 ## How Credits Work
 
@@ -61,7 +61,7 @@ By contrast, `/v2/detailed-vaults/{network}/{vaultAddress}/apy` costs only 1 CU 
 
 ### Portfolio
 
-Portfolio endpoints require the Growth plan or higher.
+All plans can access portfolio endpoints.
 
 | Endpoint | Base CU per call | CU per datapoint |
 |---|---|---|
@@ -76,7 +76,7 @@ Portfolio endpoints require the Growth plan or higher.
 
 ### Transactions
 
-Transaction endpoints require the Growth plan or higher.
+All plans can access transaction endpoints.
 
 | Endpoint | Base CU per call | CU per datapoint |
 |---|---|---|
