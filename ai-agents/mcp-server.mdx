@@ -32,7 +32,7 @@ A few prompts that exercise meaningful tool chains:
   <Accordion title="Audit positions" icon="wallet">
     > "Audit positions for 0xabc… — total deposited, current value, unclaimed rewards, and any flagged exposure."
   </Accordion>
-  <Accordion title="Build and execute transactions" icon="code">
+  <Accordion title="Build transaction payloads" icon="code">
     > "Build a deposit of 10,000 USDC into the highest-rated Morpho vault on Base and return the calldata."
   </Accordion>
 </AccordionGroup>
@@ -45,15 +45,24 @@ A few prompts that exercise meaningful tool chains:
 
 <Tabs>
   <Tab title="Claude Desktop">
-    Add the server to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+    Claude Desktop may require a local bridge for remote MCP servers. Add Vaults.fyi through [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) in your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
     ```json claude_desktop_config.json
     {
       "mcpServers": {
         "vaults-fyi": {
-          "url": "https://mcp.vaults.fyi/mcp",
-          "headers": {
-            "Authorization": "Bearer YOUR_VAULTS_API_KEY"
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote@latest",
+            "https://mcp.vaults.fyi/mcp",
+            "--header",
+            "Authorization:${VAULTS_AUTH_HEADER}",
+            "--transport",
+            "http-only"
+          ],
+          "env": {
+            "VAULTS_AUTH_HEADER": "Bearer YOUR_VAULTS_API_KEY"
           }
         }
       }
@@ -97,7 +106,7 @@ Six capability surfaces, each backed by several tools:
   <Card title="Analyze history" icon="chart-line">
     APY, TVL, share-price, and total-return time series for any vault. Asset-price history and benchmark APY for relative performance.
   </Card>
-  <Card title="Build and execute transactions" icon="bolt">
+  <Card title="Build transaction payloads" icon="bolt">
     Deposit, withdraw, claim rewards, and approve. Tools return decoded calldata and signing instructions; your client signs and submits.
   </Card>
   <Card title="Track portfolios" icon="briefcase">
