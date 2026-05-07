@@ -62,7 +62,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 ## AI Agents
 
 - [AI Agents Overview](https://docs.vaults.fyi/ai-agents/overview.md): Build agents that discover, evaluate, execute, and manage DeFi yield strategies via the API.
-- [MCP for Claude Desktop](https://docs.vaults.fyi/ai-agents/mcp-claude-desktop.md): Connect vaults.fyi to Claude Desktop to query live DeFi data and execute transactions.
+- [MCP Server](https://docs.vaults.fyi/ai-agents/mcp-server.md): Hosted MCP server (38 tools) for Claude Desktop, Claude Code, Cursor, and any streamable-HTTP MCP client. Discovery, history, recommendations, positions, and onchain transaction building.
 - [x402 Keyless Access](https://docs.vaults.fyi/ai-agents/x402.md): Pay-per-request access without an API key — pay in USDC on Base from your agent's wallet.
 
 ## Resources

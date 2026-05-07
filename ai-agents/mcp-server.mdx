@@ -1,0 +1,227 @@
+---
+title: "MCP Server: Onchain Yield Tools for Claude, Cursor, and Any MCP Client"
+description: "Connect Claude Desktop, Claude Code, Cursor, and any streamable-HTTP MCP client to the full Vaults.fyi data and transaction surface — discovery, history, recommendations, position tracking, and onchain transaction building."
+sidebarTitle: "MCP Server"
+---
+
+The Vaults.fyi MCP server connects MCP-compatible clients to the full Vaults.fyi data and transaction surface. Discovery, history, recommendations, position tracking, and transaction building are all callable as tools — your client decides which to use and how to chain them.
+
+Hosted at `https://mcp.vaults.fyi/mcp` over streamable HTTP. 38 tools. Bearer-token auth. No server-side private keys: every transaction tool returns calldata for your client to sign.
+
+## What people use it for
+
+A few prompts that exercise meaningful tool chains:
+
+<AccordionGroup>
+  <Accordion title="Discover yield" icon="magnifying-glass">
+    > "Find me the best USDC yields right now with TVL over $10M and no active warnings."
+
+    > "What yields beat the USDC benchmark by more than 200 bps over the last 30 days?"
+  </Accordion>
+  <Accordion title="Filter by curator or protocol" icon="filter">
+    > "Show me Steakhouse and Gauntlet curated Morpho vaults across all stablecoins."
+
+    > "Which Aave v3 markets have the highest USDC supply APY across networks?"
+  </Accordion>
+  <Accordion title="Model layered yield" icon="layer-group">
+    > "I'd consider sUSDe and sUSDS — find vaults with composite APY above 8% accounting for the underlying asset rate."
+  </Accordion>
+  <Accordion title="Run history and benchmarks" icon="chart-line">
+    > "Plot Fluid USD Vault APY against the USDC benchmark for the last 90 days."
+  </Accordion>
+  <Accordion title="Audit positions" icon="wallet">
+    > "Audit positions for 0xabc… — total deposited, current value, unclaimed rewards, and any flagged exposure."
+  </Accordion>
+  <Accordion title="Build and execute transactions" icon="code">
+    > "Build a deposit of 10,000 USDC into the highest-rated Morpho vault on Base and return the calldata."
+  </Accordion>
+</AccordionGroup>
+
+## Quickstart
+
+<Note>
+  You'll need a Vaults.fyi API key. Request one at [portal.vaults.fyi](https://portal.vaults.fyi/).
+</Note>
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Add the server to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+    ```json claude_desktop_config.json
+    {
+      "mcpServers": {
+        "vaults-fyi": {
+          "url": "https://mcp.vaults.fyi/mcp",
+          "headers": {
+            "Authorization": "Bearer YOUR_VAULTS_API_KEY"
+          }
+        }
+      }
+    }
+    ```
+
+    Restart Claude Desktop. The 38 Vaults.fyi tools will appear in the tools menu.
+  </Tab>
+  <Tab title="Claude Code">
+    Add the server with one command:
+
+    ```bash
+    claude mcp add --transport http vaults-fyi https://mcp.vaults.fyi/mcp \
+      --header "Authorization: Bearer YOUR_VAULTS_API_KEY"
+    ```
+
+    Verify with `claude mcp list`.
+  </Tab>
+  <Tab title="Cursor & other clients">
+    Any client that supports streamable-HTTP MCP works. Point it at `https://mcp.vaults.fyi/mcp` and pass `Authorization: Bearer YOUR_VAULTS_API_KEY` as a header.
+
+    Health check:
+
+    ```bash
+    curl -i https://mcp.vaults.fyi/health
+    ```
+  </Tab>
+</Tabs>
+
+## What you can do
+
+Six capability surfaces, each backed by several tools:
+
+<CardGroup cols={2}>
+  <Card title="Discover and filter" icon="compass">
+    Search across networks, protocols, assets, curators, and tags. Filter by TVL, APY, score, and active warnings in a single structured query.
+  </Card>
+  <Card title="Evaluate risk" icon="shield-check">
+    Reputation Scores and inline flags (bad debt exposure, qualified-investor gates, depegs, recent incidents) ship with the data. No separate lookup.
+  </Card>
+  <Card title="Analyze history" icon="chart-line">
+    APY, TVL, share-price, and total-return time series for any vault. Asset-price history and benchmark APY for relative performance.
+  </Card>
+  <Card title="Build and execute transactions" icon="bolt">
+    Deposit, withdraw, claim rewards, and approve. Tools return decoded calldata and signing instructions; your client signs and submits.
+  </Card>
+  <Card title="Track portfolios" icon="briefcase">
+    Aggregate positions and rewards across networks for any address. Drill into per-position cost basis and event history.
+  </Card>
+  <Card title="Operate on tokens" icon="coins">
+    Approve, transfer, wrap, and unwrap as primitives — useful when an agent is composing multi-step flows.
+  </Card>
+</CardGroup>
+
+## Tool inventory
+
+38 tools, grouped by purpose. Each returns structured JSON optimized for agent consumption.
+
+<AccordionGroup>
+  <Accordion title="Discovery and search (7)" icon="magnifying-glass">
+    | Tool | Purpose |
+    |------|---------|
+    | `vaults_search` | Filtered search across vaults (TVL, APY, score, curator, tags, warnings) |
+    | `vaults_list` | Paginated full vault list |
+    | `networks` | Supported chains |
+    | `protocols` | Supported protocols |
+    | `assets` | Supported assets |
+    | `curators` | Named curators (79+) |
+    | `tags` | Vault tags (e.g., `top-curator`, `lst`, `rwa`) |
+  </Accordion>
+  <Accordion title="Vault detail (3)" icon="circle-info">
+    | Tool | Purpose |
+    |------|---------|
+    | `vault_details` | Full vault metadata, including flags and Reputation Score |
+    | `vault_apy` | Current APY (headline, base, rewards, composite) |
+    | `vault_tvl` | Current TVL |
+  </Accordion>
+  <Accordion title="History and benchmarks (8)" icon="chart-line">
+    | Tool | Purpose |
+    |------|---------|
+    | `vault_apy_history` | APY time series |
+    | `vault_tvl_history` | TVL time series |
+    | `vault_share_price_history` | Share-price time series |
+    | `vault_history` | Combined APY/TVL/share-price |
+    | `vault_returns` | Realized total returns |
+    | `asset_price_history` | Underlying asset price |
+    | `benchmark_apy` | Asset-level benchmark APY |
+    | `benchmark_apy_history` | Benchmark APY time series |
+  </Accordion>
+  <Accordion title="Recommendations (2)" icon="star">
+    | Tool | Purpose |
+    |------|---------|
+    | `best_vault` | Single best-fit vault for a given asset/criteria |
+    | `best_deposit_options` | Ranked deposit options |
+  </Accordion>
+  <Accordion title="Wallet and positions (6)" icon="briefcase">
+    | Tool | Purpose |
+    |------|---------|
+    | `positions` | All positions for an address |
+    | `position_details` | Per-position cost basis, current value, P&L |
+    | `wallet_balances` | Token balances across networks |
+    | `token_balance` | Single token balance |
+    | `user_events` | Deposit/withdraw/claim history |
+    | `rewards` | Outstanding reward entitlements |
+  </Accordion>
+  <Accordion title="Vault transactions (7)" icon="bolt">
+    | Tool | Purpose |
+    |------|---------|
+    | `transaction_context` | Pre-flight context (allowance, balances, gas) |
+    | `build_vault_tx` | Deposit/withdraw calldata with decoded steps |
+    | `build_claim_rewards` | Claim calldata for a single vault |
+    | `claim_all_rewards` | Multi-vault claim calldata |
+    | `withdraw_all_positions` | Multi-vault withdraw calldata |
+    | `submit_tx_hash` | Register a submitted hash for status tracking |
+    | `get_transaction_status` | Status of a tracked transaction |
+  </Accordion>
+  <Accordion title="Token utilities (5)" icon="coins">
+    | Tool | Purpose |
+    |------|---------|
+    | `approve_erc20` | ERC-20 approval calldata |
+    | `transfer_erc20` | ERC-20 transfer calldata |
+    | `transfer_native` | Native transfer calldata |
+    | `wrap_native` | Wrap native to wrapped equivalent |
+    | `unwrap_native` | Unwrap |
+  </Accordion>
+</AccordionGroup>
+
+## Authentication
+
+Every request requires a bearer token:
+
+```
+Authorization: Bearer YOUR_VAULTS_API_KEY
+```
+
+<Info>
+  The API key is forwarded only to Vaults.fyi API calls and is never placed in signing URLs or transaction payloads.
+</Info>
+
+Request a key at [portal.vaults.fyi](https://portal.vaults.fyi/). For keyless pay-per-request access via USDC on Base, see [x402](/ai-agents/x402).
+
+## Signing model
+
+Transaction tools (`build_vault_tx`, `build_claim_rewards`, `approve_erc20`, etc.) return structured calldata, not signed transactions. The server holds no private keys.
+
+Each response includes:
+
+- `stepDecodings` — human-readable description of each call
+- `signingInstructions` — step-by-step guidance for the signer
+- `signingPaths` — supported signing surfaces (e.g., wallet, [OWS](https://docs.openwallet.sh/))
+- `submitTool` — the tool to call after signing (`submit_tx_hash`)
+- `statusTool` — the tool to call for status (`get_transaction_status`)
+
+This keeps key custody with the client. Agents that integrate with [OpenWallet Standard](https://docs.openwallet.sh/) can sign and submit without leaving the conversation.
+
+## Going further
+
+<CardGroup cols={2}>
+  <Card title="AI agents overview" icon="robot" href="/ai-agents/overview">
+    The full surface area for agents: MCP, x402, and the LLM-optimized API reference.
+  </Card>
+  <Card title="Keyless access via x402" icon="key" href="/ai-agents/x402">
+    Pay-per-request access on Base, no API key required.
+  </Card>
+  <Card title="LLM-optimized API reference" icon="book" href="https://api.vaults.fyi/llms.txt">
+    Full reference at `llms.txt` and `llms-full.txt`.
+  </Card>
+  <Card title="OpenAPI spec" icon="code" href="https://api.vaults.fyi/v2/documentation/json">
+    Underlying REST API the MCP wraps.
+  </Card>
+</CardGroup>
