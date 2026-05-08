@@ -42,9 +42,9 @@ Vaults.fyi calculates the Reputation Score from five weighted component scores:
 
 Active vault flags — security incidents, protocol risk warnings, and similar indicators — directly reduce the Reputation Score. Higher-severity flags carry larger deductions. Only the single largest active penalty applies; multiple flags do not stack.
 
-When a flag is resolved, the penalty does not disappear immediately. It decays gradually over time, so a vault that resolves an incident recovers trust incrementally rather than resetting overnight.
+When a flag is resolved, the penalty does not necessarily disappear immediately. Vaults.fyi can mark a flag with resolution details and reduce the effective penalty to reflect how much of the issue has been addressed. This lets a vault recover trust incrementally rather than resetting overnight.
 
-The `score.penaltyComponents` field in [detailed-vaults](/api-reference/detailed-vaults) responses shows each active or decaying flag penalty, its severity, and resolution status. The `score.totalScorePenalty` field shows the total penalty currently applied to the composite Reputation Score.
+The `score.penaltyComponents` field in [detailed-vaults](/api-reference/detailed-vaults) responses shows each active or decaying flag penalty, its severity, current penalty value, expiry, and optional `resolution` note. The `score.totalScorePenalty` field shows the total penalty currently applied to the composite Reputation Score. The same optional `resolution` note is also returned on `flags[]` entries.
 
 ## Interpreting the Reputation Score
 

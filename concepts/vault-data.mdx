@@ -158,7 +158,14 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 | `score.holderScore` | Score component based on holder count and distribution. |
 | `score.networkScore` | Score component based on which network the vault is on. |
 | `score.assetScore` | Score component based on the underlying asset type and liquidity. |
-| `score.penaltyComponents` | Active or decaying flag penalties applied to the composite score, with severity and resolution status for each. |
+| `score.totalScorePenalty` | Current point deduction applied to `score.vaultScore` because of flag penalties. |
+| `score.penaltyComponents` | Active or decaying flag penalties applied to the composite score, with severity and resolution details for each. |
+| `score.penaltyComponents[].type` | Penalty source. Flag penalties use `flag`. |
+| `score.penaltyComponents[].value` | Current point deduction from this penalty component. For resolved flags, this may be partially reduced. |
+| `score.penaltyComponents[].content` | Flag message text for flag-derived penalties. |
+| `score.penaltyComponents[].severity` | Flag severity: `info`, `warning`, or `critical`. |
+| `score.penaltyComponents[].endDate` | Unix timestamp when the flag expires. |
+| `score.penaltyComponents[].resolution` | Optional resolution note explaining how the flagged issue was addressed. Omitted for unresolved flags. |
 
 ---
 
@@ -201,12 +208,17 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 
 | Field | Description |
 | --- | --- |
-| `warnings` | Array of plain-text warning strings. Used for notices that don't require action (e.g. migration announcements). |
+| `warnings` | Array of plain-text warning strings derived from active non-`info` flags. Kept for simple integrations that only need display text. |
 | `flags[].content` | Flag message text. |
 | `flags[].severity` | One of `info`, `warning`, or `critical`. |
 | `flags[].endDate` | Unix timestamp when the flag expires. Past flags are not returned. |
+| `flags[].resolution` | Optional resolution note explaining how the flagged issue was addressed. Omitted for unresolved flags. |
 
-Use `flags` to surface active protocol notices in your UI, such as paused deposits, ongoing audits, or deprecation notices. Active flags also reduce the vault's Reputation Score — see [Flag penalties](/methodology/reputation-score#flag-penalties) for how severity and decay work.
+Use `flags` to surface active protocol notices in your UI, such as paused deposits, ongoing audits, migration notices, or resolved incidents that are still within their display window. Use `flags[].resolution` when present to show that an issue has been mitigated or otherwise addressed.
+
+`warnings` is a convenience text array for backward-compatible displays. Prefer `flags` for new integrations because it includes severity, expiry, and resolution context.
+
+Active flags can reduce the vault's Reputation Score. Resolved flags may still appear and may still contribute a reduced penalty while the Reputation Score recovers — see [Flag penalties](/methodology/reputation-score#flag-penalties) for how severity and decay work.
 
 ---
 
