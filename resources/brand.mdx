@@ -105,14 +105,7 @@ Use the symbol without the wordmark only at small sizes (favicons, app icons, UI
     <div style={{width: "48px", height: "48px", background: "#48A2FF", borderRadius: "8px", flexShrink: 0}} />
     <div>
       <div style={{fontWeight: 600}}>#48A2FF</div>
-      <div style={{fontSize: "13px", color: "#666"}}>primary-400 — dark mode variant</div>
-    </div>
-  </div>
-  <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
-    <div style={{width: "48px", height: "48px", background: "#205EA6", borderRadius: "8px", flexShrink: 0}} />
-    <div>
-      <div style={{fontWeight: 600}}>#205EA6</div>
-      <div style={{fontSize: "13px", color: "#666"}}>Brand blue — formal materials, print</div>
+      <div style={{fontSize: "13px", color: "#666"}}>primary-400 — dark mode variant of primary-500</div>
     </div>
   </div>
 </div>
@@ -155,28 +148,36 @@ Use the symbol without the wordmark only at small sizes (favicons, app icons, UI
 
 </Accordion>
 
-**Print text colors**
+**Text colors**
+
+Text colors are semantic and mode-aware — always reference by token name in code, not by hex. The three most commonly used are below; hex values are for reference only.
 
 <div style={{display: "flex", gap: "16px", flexWrap: "wrap", margin: "16px 0"}}>
   <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
-    <div style={{width: "48px", height: "48px", background: "#434356", borderRadius: "8px", flexShrink: 0}} />
+    <div style={{display: "flex", flexShrink: 0, borderRadius: "8px", overflow: "hidden", border: "1px solid #e0e0e0"}}>
+      <div style={{width: "24px", height: "48px", background: "#141625"}} />
+      <div style={{width: "24px", height: "48px", background: "#F8F9FC"}} />
+    </div>
     <div>
-      <div style={{fontWeight: 600}}>#434356</div>
-      <div style={{fontSize: "13px", color: "#666"}}>Primary text — logotype, headings</div>
+      <div style={{fontWeight: 600}}>Heading</div>
+      <div style={{fontSize: "13px", color: "#666"}}>#141625 light / #F8F9FC dark — H1–H6, prominent body text</div>
     </div>
   </div>
   <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
-    <div style={{width: "48px", height: "48px", background: "#595973", borderRadius: "8px", flexShrink: 0}} />
+    <div style={{display: "flex", flexShrink: 0, borderRadius: "8px", overflow: "hidden", border: "1px solid #e0e0e0"}}>
+      <div style={{width: "24px", height: "48px", background: "#697098"}} />
+      <div style={{width: "24px", height: "48px", background: "#C2C9DB"}} />
+    </div>
     <div>
-      <div style={{fontWeight: 600}}>#595973</div>
-      <div style={{fontSize: "13px", color: "#666"}}>Secondary text</div>
+      <div style={{fontWeight: 600}}>Caption</div>
+      <div style={{fontSize: "13px", color: "#666"}}>#697098 light / #C2C9DB dark — secondary/muted text</div>
     </div>
   </div>
   <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
-    <div style={{width: "48px", height: "48px", background: "#6F6F90", borderRadius: "8px", flexShrink: 0}} />
+    <div style={{width: "48px", height: "48px", background: "#FFFFFF", borderRadius: "8px", flexShrink: 0, border: "1px solid #e0e0e0"}} />
     <div>
-      <div style={{fontWeight: 600}}>#6F6F90</div>
-      <div style={{fontSize: "13px", color: "#666"}}>Tertiary text</div>
+      <div style={{fontWeight: 600}}>Button</div>
+      <div style={{fontSize: "13px", color: "#666"}}>#FFFFFF (both modes) — button label on primary backgrounds</div>
     </div>
   </div>
 </div>
