@@ -21,6 +21,10 @@ A single Vaults.fyi integration gives your wallet or consumer app access to hund
     Show users their current positions, accrued returns, and PnL across all yield strategies they've entered through your app.
   </Card>
 
+  <Card title="TVL attribution" icon="chart-line">
+    Track the deposits, withdrawals, and retained TVL your app drives into each vault, protocol, curator, and network.
+  </Card>
+
   <Card title="Monetization" icon="money-bills-simple">
     Attach flat or percentage-based fees to deposit and withdrawal transactions. Configure fee logic through the API without touching smart contracts.
   </Card>
@@ -37,6 +41,9 @@ A single Vaults.fyi integration gives your wallet or consumer app access to hund
   </Step>
   <Step title="Sign and submit">
     Pass the payload to the user's wallet for signing. Your app broadcasts the transaction. The user interacts directly with the target protocol.
+  </Step>
+  <Step title="Track attributed TVL">
+    Transactions generated through Vaults.fyi include TVL tracking automatically, so you can measure retained balances and vault-level flows in portal.vaults.fyi. If you build vault transactions yourself, append a free attribution suffix instead. Learn more in [TVL Tracking](/concepts/tvl-tracking).
   </Step>
   <Step title="Track positions">
     Use the portfolio endpoints to display the user's current balance in each vault, yield earned since deposit, and estimated annual return.
