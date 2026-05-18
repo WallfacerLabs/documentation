@@ -8,6 +8,30 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 20, 2026 — May 12–18
+
+**API**
+
+- **Alpha borrow market transactions** now support context and action payloads for supply, withdraw, borrow, and repay flows via `GET /alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}`.
+
+- Added **borrow market portfolio events** with `GET /alpha/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}`, giving integrators user-level event history for a specific borrow market and asset.
+
+- Added protocol-specific borrow transaction payloads for **Aave** Alpha borrow integrations, including deposit/redeem/borrow/repay actions. Morpho borrow transaction flows are still in progress and are not ready for production use yet.
+
+- Improved API-key flows: invite codes are no longer required for Portal signup, so users can now sign up and generate API keys directly at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup). Credit top-up and exhausted-credit messages now point users back to the Portal.
+
+**App**
+
+- Redesigned the **Analytics** page for a cleaner market overview and comparison experience.
+
+- Added a **score filter** to the discovery table, making it easier to screen vaults by vault quality.
+
+- Updated app signup CTAs to point directly to the self-service Portal signup flow.
+
+- Improved dashboard position visibility for low-TVL vaults, plus smaller table, filter, side-panel, and mobile transaction-panel UX fixes.
+
+---
+
 ## Week 19, 2026 — May 5–11
 
 **API**
