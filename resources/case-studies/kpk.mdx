@@ -1,11 +1,62 @@
 ---
-title: "KPK: Powering the KPK app and more"
+title: "KPK: From Treasury Data to Full-Stack Yield Infrastructure"
+description: "How KPK's relationship with vaults.fyi expanded from normalized yield data into non-custodial DAO treasury workflows, vault integrations, position tracking, and the APIs supporting app.kpk.io."
 sidebarTitle: "KPK"
-description: "How KPK uses the vaults.fyi API to provide performance data and position tracking inside the KPK app."
 ---
 
-Vaults.fyi proudly powers performance data and position tracking in the [<u>KPK app</u>](https://app.kpk.io/).
+[KPK](https://kpk.io/) works with vaults.fyi across several workflows: market data, monitoring, position tracking, and vault integrations. The relationship started with a focused data need and expanded into one of the integration layers KPK uses to support its curated vault products.
 
-Read more here: [https://x.com/vaultsfyi/status/2041843832728269115](https://x.com/vaultsfyi/status/2041843832728269115)
+<Frame>
+  ![KPK App](/images/kpk_app.png)
+</Frame>
 
-_Full case study coming soon._
+**Who Is KPK**
+
+KPK is a non-custodial onchain asset manager. Founded in 2021 as karpatkey, KPK manages capital for DAOs and institutions through treasury mandates, funds, and vaults.
+
+In 2025, KPK expanded beyond DAO treasury management into curated vaults for DeFi protocols and retail participants.
+
+**The Starting Point**
+
+KPK first came to vaults.fyi for its analytics. Their team needed normalized yield, TVL, vault metadata, and historical APY data across protocols and chains.
+
+That data supported internal allocation work for KPK's treasury and vault teams. Building and maintaining those integrations in-house would have pulled engineering time away from strategy design, risk management, and customer-facing product work. Vaults.fyi handled the data layer so KPK could focus on the work their clients and depositors rely on them to do.
+
+**How The Relationship Expanded**
+
+**1. Deeper Vault Coverage**\
+As KPK expanded its vault products, vaults.fyi expanded coverage around the protocols and products that mattered most to them. That includes the vaults KPK wanted to monitor internally, the products they wanted to expose to depositors, and the APIs, SDKs, and tools they needed to make those products accessible to integrators.
+
+The same coverage supports discovery, reporting, and integration. KPK can track their own products in the same normalized system that third-party platforms can use to discover and route into those vaults.
+
+**2. Data and Monitoring for DAO Treasury Workflows**
+
+KPK uses vaults.fyi to support DAO treasury workflows that depend on accurate, normalised data. The treasury team pulls address holdings, position data, and historical metrics through the API to monitor exposures and run internal calculations. When execution is needed, KPK signs from its own wallet and executes against the underlying protocol, fully non-custodial throughout.
+
+That matters for teams operating DAO treasuries across multiple vault protocols. They need reliable data, consistent vault metadata, and a workflow that does not require rebuilding every protocol integration from scratch.
+
+**3. Portfolio And Position Tracking**
+
+KPK also uses vaults.fyi position data to support portfolio visibility. The API can return balances, accrued yield, and historical performance across supported vault positions.
+
+For KPK, that data can supplement customer reporting and internal monitoring. For integrators, the same infrastructure makes vault positions easier to show inside wallets, dashboards, and custom applications.
+
+**4. Infrastructure For KPK's Own App**
+
+KPK's vault portal at [app.kpk.io](https://app.kpk.io/) uses vaults.fyi APIs as its underlying yield infrastructure. Vault metadata, market data, transaction payloads, and position tracking all come from the same API surface.
+
+That lets KPK own the user experience and curation layer while vaults.fyi handles the integration layer underneath. KPK focuses on strategy design, curation, and the depositor experience. Vaults.fyi provides one of the integration layers that helps make those vaults accessible across surfaces.
+
+**Why It Matters**
+
+KPK shows one expansion path for serious vault teams. Data is the entry point. Once a team works with the data layer, the same infrastructure can support monitoring, attribution, and custom distribution.
+
+That expansion compounds because each layer uses the same underlying integrations, which reduces duplication across data, monitoring, and distribution workflows.
+
+_"vaults.fyi has been a useful data partner from the start. Their coverage across protocols meant we could move quickly on [app.kpk.io](https://app.kpk.io/) and on internal monitoring without rebuilding every integration ourselves."_ — João Bandeira, Product Engineering Lead, KPK
+
+**What's Next**
+
+KPK and vaults.fyi continue to expand the relationship as KPK launches new vault structures and distribution paths. The next stage is deeper integrator support, better fee accounting feedback loops, and clearer reporting around the TVL that each channel drives.
+
+The relationship started with a single data feed. It now points toward a broader infrastructure partnership for curated vault products.
