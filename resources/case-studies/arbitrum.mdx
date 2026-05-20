@@ -1,0 +1,49 @@
+---
+title: "Arbitrum: Native Yield Discovery in the Arbitrum Portal"
+description: "How Arbitrum Earn uses the vaults.fyi API to surface standardized DeFi opportunities, transaction payloads, position tracking, and attribution inside the Arbitrum Portal."
+sidebarTitle: "Arbitrum"
+hidden: true
+---
+
+[Arbitrum](https://arbitrum.io/) has one of DeFi's richest and most diverse ecosystems. The opportunity was making that ecosystem easier to access from one native surface.
+
+Arbitrum Earn brings yield discovery into the Arbitrum Portal, giving users a cleaner way to compare opportunities, understand key metrics, and move from discovery to execution without leaving the ecosystem experience.
+
+## The Challenge: Making DeFi Easier to Navigate
+
+Yield opportunities on Arbitrum span many protocols, assets, and strategy types. For users, that creates discovery friction: each protocol has its own interface, terminology, data model, and execution flow.
+
+Arbitrum Earn addresses that by presenting opportunities in a consistent format. Users can compare APY, TVL, asset, and protocol details side by side, then move from discovery to execution on a single Arbitrum-native surface.
+
+Protocol selection for Earn uses vaults.fyi's Reputation Scores as one input. Users see a curated set of opportunities in the interface, while Reputation Scores stay in the background rather than appearing as a user-facing ranking.
+
+## The Solution: One API for Standardized Yield Infrastructure
+
+Arbitrum Earn runs on the vaults.fyi API. Rather than build and maintain a separate integration for every protocol, the Portal uses one API layer for standardized yield data, transaction payloads, and position tracking across the ecosystem.
+
+The integration also preserves self-custody. Transactions route directly to the underlying protocol, with no vaults.fyi proxy contract, no intermediary contract holding funds, and no additional wrappers on top. The position a user opens through Arbitrum Earn is the same underlying protocol position they would receive by going to the protocol directly.
+
+## Better Discovery and Attribution for the Ecosystem
+
+Arbitrum Earn helps protocols reach users who already hold assets on Arbitrum. Being included in an ecosystem-level earn surface means users can find a protocol's opportunities in context, next to other relevant options, without needing to know every protocol interface in advance.
+
+For the Arbitrum ecosystem, Earn creates a shared layer for yield discovery and execution that can expand as new protocols, assets, and opportunities come online.
+
+It also creates the foundation for measurable distribution. vaults.fyi attribution can show which surfaces, campaigns, and integrators drive deposits into protocols. That helps ecosystems understand what is working, helps protocols reward distribution partners, and gives integrators a clear record of the TVL they create.
+
+## API Capabilities Used
+
+- **Market data:** Standardized APY, TVL, asset, protocol, and vault metadata for yield discovery and comparison.
+- **Transaction support:** Ready-to-sign payloads that let users deposit into supported opportunities directly from the Portal experience.
+- **Position tracking:** Portfolio visibility across supported vault positions without protocol-specific indexing work.
+- **Attribution and TVL tracking:** Measurement of deposits driven by ecosystem surfaces, campaigns, and integrators.
+
+## What's Next
+
+Bringing Earn to the Portal is the first step in a longer collaboration between Arbitrum and vaults.fyi. The teams are working alongside Offchain Labs and the broader Arbitrum ecosystem to keep making DeFi yield more accessible to users across the network.
+
+The first user benefit is simple access to yield. Over time, the same infrastructure can support better incentive programs, smarter ecosystem growth, and more ways for users to discover productive opportunities on Arbitrum.
+
+---
+
+Want to add native yield discovery and execution to your ecosystem portal? [Get API access](https://portal.vaults.fyi/signup) to explore the market data, transaction, position tracking, and attribution APIs powering Arbitrum Earn.
