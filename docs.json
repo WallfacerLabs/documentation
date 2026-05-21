@@ -87,6 +87,7 @@
                 "group": "Case Studies",
                 "pages": [
                   "resources/case-studies",
+                  "resources/case-studies/arbitrum",
                   "resources/case-studies/jumper-earn",
                   "resources/case-studies/kraken-wallet",
                   "resources/case-studies/gauntlet",

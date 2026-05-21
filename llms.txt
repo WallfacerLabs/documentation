@@ -68,7 +68,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 ## Resources
 
 - [FAQ](https://docs.vaults.fyi/resources/faq.md): Yield calculation questions, data freshness, vault inclusion criteria, requesting new protocols.
-- [Case Studies](https://docs.vaults.fyi/resources/case-studies.md): How Jumper Earn, Kraken Wallet, Gauntlet, Maple Finance, Nashpoint, and Etherscan use the API.
+- [Case Studies](https://docs.vaults.fyi/resources/case-studies.md): How Arbitrum Earn, Jumper Earn, Kraken Wallet, Gauntlet, Maple Finance, Nashpoint, and Etherscan use the API.
 - [Changelog](https://docs.vaults.fyi/resources/changelog.md): Week-by-week log of all API and app updates.
 
 ## Optional
