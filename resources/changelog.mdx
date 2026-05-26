@@ -12,9 +12,11 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 **API**
 
-- Added **borrow portfolio positions** to the Alpha API, including list, market-level, and asset-level views via `GET /alpha/borrow/portfolio/positions/{userAddress}`, `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`, and `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}`. These endpoints expose supplied and borrowed asset positions, LTV, health factor, and optional filters for networks, assets, value thresholds, and sorting.
+- Added **partial returns** in Beta with `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}`. The endpoint calculates a user’s vault returns for a specific time window using `fromTimestamp` and optional `toTimestamp`, returning native-token returns plus asset metadata. This gives integrators a way to measure period-specific performance instead of only lifetime total returns.
 
-- Added **historical user positions** with `GET /alpha/historical-positions/{userAddress}`, returning vaults a user held during a selected time window. This helps integrators reconstruct previous user exposure, not just current balances.
+- Added **historical user positions** with `GET /alpha/historical-positions/{userAddress}`. The endpoint returns vaults a user held during a selected time window, including positions that existed at the start of the window or were opened during it. This helps apps reconstruct previous user exposure, not just current balances.
+
+- Added **borrow portfolio positions** to the Alpha API, including list, market-level, and asset-level views via `GET /alpha/borrow/portfolio/positions/{userAddress}`, `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`, and `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}`. These endpoints expose supplied and borrowed asset positions, LTV, health factor, and optional filters for networks, assets, value thresholds, and sorting.
 
 - Added **daily vault flow history** with `GET /alpha/historical/{network}/{vaultId}/daily-flows`, exposing UTC daily deposit and redemption totals for a vault over a date range.
 
