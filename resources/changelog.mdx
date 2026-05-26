@@ -8,6 +8,32 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 21, 2026 — May 19–25
+
+**API**
+
+- Added **borrow portfolio positions** to the Alpha API, including list, market-level, and asset-level views via `GET /alpha/borrow/portfolio/positions/{userAddress}`, `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`, and `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}`. These endpoints expose supplied and borrowed asset positions, LTV, health factor, and optional filters for networks, assets, value thresholds, and sorting.
+
+- Added **historical user positions** with `GET /alpha/historical-positions/{userAddress}`, returning vaults a user held during a selected time window. This helps integrators reconstruct previous user exposure, not just current balances.
+
+- Added **daily vault flow history** with `GET /alpha/historical/{network}/{vaultId}/daily-flows`, exposing UTC daily deposit and redemption totals for a vault over a date range.
+
+- Standardized API error documentation across V2 and Alpha endpoints: validation-style failures are now documented as `422 Unprocessable Entity`, and obsolete `502 Bad Gateway` response entries were removed from the OpenAPI spec.
+
+- Improved API metadata quality by ensuring endpoint definitions include `operationId` and `summary`, improving SDK generation and API explorer output.
+
+**App**
+
+- Improved dashboard portfolio views with tab-linked state, cleaner side-panel layout, hidden empty states, updated copy, and average APY by group.
+
+- Refined dashboard analytics and benchmark copy, including a clearer benchmark-rate section and reordered breakdown-chart legend items.
+
+- Improved transaction and swap UX with safer swap route selection, guarded swap execution, better loading states for returns queries, and updated fee/safety messaging.
+
+- Added agent-readiness improvements, including markdown negotiation, agent skills, and MCP fixes for AI integrations.
+
+---
+
 ## Week 20, 2026 — May 12–18
 
 **API**
