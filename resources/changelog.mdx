@@ -8,6 +8,30 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 22, 2026 — May 26–Jun 1
+
+**API**
+
+- Added **advanced vault analytics** in Alpha with `POST /alpha/advanced-analytics`. The endpoint mirrors detailed-vault filtering and pagination, while letting integrators opt into heavier per-vault analytics sections such as max drawdown, withdrawal pause ratio, and the full detailed-vault payload.
+
+- Added **max drawdown (MDD)** as an advanced analytics selector. This helps integrators compare vaults by their largest observed peak-to-trough decline over the tracked period.
+
+- Added **withdrawal pause ratio** as an advanced analytics selector. This gives integrators a structured way to screen how often vault withdrawals have been paused over the tracked window, returning `null` when the protocol or event source does not support the metric yet.
+
+- Cleaned up the Alpha borrow API by removing older protocol-specific Aave and Morpho borrow routes from the OpenAPI surface. Integrators should use the generalized borrow market and borrow portfolio endpoints under `/alpha/borrow/markets/...` and `/alpha/borrow/portfolio/...` instead.
+
+- Updated x402 payment response schemas across V2 and Alpha documentation to use structured payment-resource metadata and amount fields, improving compatibility with payment-aware clients and generated SDKs.
+
+**App**
+
+- Redesigned the vault performance section for a clearer view of vault-level performance data.
+
+- Improved mobile discovery and dashboard UX, including redesigned filters on the Discover page and a redesigned dashboard vault card on mobile.
+
+- Updated chart colors and vault reward display conditions so app visuals and reward visibility are cleaner across vault pages.
+
+---
+
 ## Week 21, 2026 — May 19–25
 
 **API**
