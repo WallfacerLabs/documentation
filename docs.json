@@ -4,7 +4,7 @@
   "name": "Vaults.fyi",
   "integrations": {
     "ga4": {
-        "measurementId": "G-6YJ3LN6CD5"
+      "measurementId": "G-6YJ3LN6CD5"
     }
   },
   "colors": {
@@ -115,7 +115,8 @@
               "api-reference/benchmarks",
               "api-reference/portfolio",
               "api-reference/transactions",
-              "api-reference/nrt"
+              "api-reference/nrt",
+              "api-reference/health"
             ]
           },
           {

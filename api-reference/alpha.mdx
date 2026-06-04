@@ -7,14 +7,90 @@ description: "Early access features. These endpoints may change without notice a
   Alpha endpoints are experimental and subject to breaking changes at any time. They are not included in the standard API changelog. Use them to explore upcoming features, not in production flows that require stability.
 </Warning>
 
-Alpha features are accessible using your existing API key. The endpoints below cover four areas in early development:
+Alpha features are accessible using your existing API key. The endpoints below cover upcoming product areas that are still in active development.
 
-**Borrow markets** — Discover and analyze borrowing opportunities across supported protocols and networks. Endpoints cover market listings (all networks or filtered by network), detailed market data including rates, utilization, and collateral, and historical rate data per asset.
+## Borrow markets
 
-**Solana (SVM)** — Vault listings, positions, and transaction support for Solana-based yield vaults.
+Build borrow dashboards and account-health views against one borrow market model instead of wiring separate protocol-specific routes. Use these endpoints for market discovery, historical rates, user positions, user events, and ready-to-sign borrow transaction payloads.
 
-**Cross-chain transactions** — Intent-based quote, execution, and status tracking for cross-chain position changes.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/borrow/markets/` | List borrow markets |
+| `GET` | `/alpha/borrow/markets/{network}` | List borrow markets by network |
+| `GET` | `/alpha/borrow/markets/{network}/{marketId}` | Get a single borrow market |
+| `GET` | `/alpha/borrow/markets/historical/{network}/{marketId}/{assetAddress}` | Historical borrow market data |
+| `GET` | `/alpha/borrow/portfolio/positions/{userAddress}` | List borrow positions for a wallet |
+| `GET` | `/alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}` | Get a borrow market position |
+| `GET` | `/alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}` | Get an asset-level borrow market position |
+| `GET` | `/alpha/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}` | List borrow market events |
+| `GET` | `/alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` | Balances and limits before building a borrow transaction |
+| `GET` | `/alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` | Ready-to-sign borrow market transaction |
 
-**Holders** — Vault holder data with LP token balance conversions.
+## Solana vaults
+
+Explore SVM vault support alongside the EVM vault API surface. These endpoints cover Solana vault discovery, detailed vault data, idle assets, wallet positions, and transaction construction.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/svm/vaults` | List SVM vaults |
+| `GET` | `/alpha/svm/detailed-vaults` | List SVM detailed vaults |
+| `GET` | `/alpha/svm/detailed-vaults/{vaultAddress}` | Get a single SVM detailed vault |
+| `GET` | `/alpha/svm/idleAsset/{userId}/{assetId}` | Get an idle SVM asset |
+| `GET` | `/alpha/svm/positions/{userId}` | List SVM positions |
+| `GET` | `/alpha/svm/transactions/context/{userAddress}/{vaultAddress}` | Balances and limits before building an SVM transaction |
+| `GET` | `/alpha/svm/transactions/{action}/{userAddress}/{vaultAddress}` | Ready-to-sign SVM transaction |
+
+## Cross-chain intents
+
+Quote, execute, and track intent-based cross-chain position changes. This is the higher-level cross-chain transaction flow for products that want to move users into vault positions without building every bridge and execution step themselves.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/alpha/transactions/intent/getQuote` | Create a transaction intent quote |
+| `POST` | `/alpha/transactions/intent/execute` | Execute a transaction intent |
+| `GET` | `/alpha/transactions/intent/status` | Check transaction intent status |
+
+## CCTP bridge
+
+Build USDC bridge flows with transaction context, calldata generation, in-transit tracking, and bridge status checks.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/transactions/cctp/context/{userAddress}/{srcNetwork}/{dstNetwork}/{assetAddress}` | Get CCTP transaction context |
+| `GET` | `/alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}` | Create a CCTP transaction |
+| `GET` | `/alpha/transactions/cctp/money-in-transit/{userAddress}` | List CCTP money in transit |
+| `GET` | `/alpha/transactions/cctp/status` | Check CCTP transaction status |
+
+## Advanced analytics
+
+Request heavier per-vault analytics only when your product needs them, rather than paying the response-size and compute cost on every detailed-vault query.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/alpha/advanced-analytics` | List advanced vault analytics using detailed-vault style filters and selected analytics sections |
+
+## Historical flows
+
+Inspect daily vault inflows and outflows for flow analytics, dashboards, and monitoring.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/historical/{network}/{vaultId}/daily-flows` | Get historical daily vault flows |
+
+## Historical positions
+
+Fetch a wallet's historical vault positions for account history, retention analytics, and portfolio timeline views.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/historical-positions/{userAddress}` | List user historical positions |
+
+## Holders
+
+Analyze vault holders and LP-token balances for concentration, ownership, and distribution views.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/alpha/{network}/{vaultId}/holders` | List vault holders |
 
 If you're interested in any of these areas, [sign up](https://portal.vaults.fyi/signup) to get an API key and start using Alpha endpoints. Existing customers can reach the team via [Telegram](https://t.me/vaultsfyisupport) or [email](mailto:support@wallfacer.io) to share feedback.

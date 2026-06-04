@@ -26,19 +26,27 @@ The API tracks vaults across 20+ EVM-compatible networks. Networks can be identi
 
 | Name | Chain ID | CAIP-2 |
 |------|----------|--------|
-| `mainnet` | 1 | `eip155:1` |
 | `arbitrum` | 42161 | `eip155:42161` |
-| `base` | 8453 | `eip155:8453` |
-| `optimism` | 10 | `eip155:10` |
-| `polygon` | 137 | `eip155:137` |
-| `gnosis` | 100 | `eip155:100` |
-| `unichain` | 130 | `eip155:130` |
-| `bsc` | 56 | `eip155:56` |
 | `avalanche` | 43114 | `eip155:43114` |
-| `hyperliquid` | 999 | `eip155:999` |
-| `plasma` | 9745 | `eip155:9745` |
-| `monad` | 143 | `eip155:143` |
+| `base` | 8453 | `eip155:8453` |
 | `berachain` | 80094 | `eip155:80094` |
+| `bsc` | 56 | `eip155:56` |
+| `celo` | 42220 | `eip155:42220` |
+| `etherlink` | 42793 | `eip155:42793` |
+| `gnosis` | 100 | `eip155:100` |
+| `hyperliquid` | 999 | `eip155:999` |
+| `ink` | 57073 | `eip155:57073` |
+| `katana` | 747474 | `eip155:747474` |
+| `linea` | 59144 | `eip155:59144` |
+| `mainnet` | 1 | `eip155:1` |
+| `mega-eth` | 4326 | `eip155:4326` |
+| `monad` | 143 | `eip155:143` |
+| `optimism` | 10 | `eip155:10` |
+| `plasma` | 9745 | `eip155:9745` |
+| `polygon` | 137 | `eip155:137` |
+| `swellchain` | 1923 | `eip155:1923` |
+| `unichain` | 130 | `eip155:130` |
+| `worldchain` | 480 | `eip155:480` |
 
 Use `GET /v2/networks` for the complete current list.
 
@@ -79,11 +87,13 @@ Error bodies follow this shape:
 
 ```json
 {
-  "error": "Internal Server Error",
-  "message": "Descriptive error message",
-  "errorId": "abc-123"
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "Descriptive error message"
 }
 ```
+
+Some authentication errors omit `statusCode`; always key your handling off the HTTP status code first.
 
 ## Quick start
 
