@@ -8,6 +8,32 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 23, 2026 — Jun 2–8
+
+**API**
+
+- Added **vault deployment timestamps** to V2 detailed vault responses. Integrators can now sort, filter, or label vaults by launch age without doing a separate chain lookup. The new `creationData.deploymentTimestamp` field is available on `GET /v2/detailed-vaults` and `GET /v2/detailed-vaults/{network}/{vaultId}`.
+
+- Improved **partial returns** in Beta so time-window return calculations use stored historical vault data points more reliably. This makes period-specific user return views more dependable, especially when the requested start or end timestamp does not line up exactly with an indexed event.
+
+- Expanded **borrow transaction support** for Morpho markets through the shared Alpha borrow transaction surface. Integrators can build borrow-market transaction flows against the same model used for generalized borrow integrations, instead of wiring protocol-specific transaction logic. Use `GET /alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` for transaction context and action payloads.
+
+- Updated x402 handling for historical endpoints to support `upto` payment requirements. Payment-aware clients can now handle variable-sized historical queries more cleanly across historical vault data, APY, TVL, share price, asset prices, and benchmarks.
+
+- Added **Savings GHO** support to Aave protocol coverage.
+
+- Clarified max drawdown documentation in Alpha advanced analytics. MDD is now described as the largest observed peak-to-trough drop in vault price per share over the selected window, rather than a generic drawdown metric.
+
+**App**
+
+- Improved Discover filters so active user input is no longer overwritten while debounced filters sync.
+
+- Improved analytics and best-performing vault views by using raw vault-history cache data for cleaner historical performance calculations.
+
+- Renamed APY language to **Yield** on Discover, matching how users evaluate vault returns across base yield, rewards, and composite vault behavior.
+
+---
+
 ## Week 22, 2026 — May 26–Jun 1
 
 **API**
