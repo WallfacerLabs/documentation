@@ -1,28 +1,30 @@
+<!-- This file is generated from the API pricing matrix. Do not edit manually. -->
+
 | Endpoint | Credit Cost |
 |---|---|
-| `GET /v1/vaults` | 1 credit |
+| `GET /v1/networks` | 1 credit |
 | `GET /v1/tags` | 1 credit |
 | `GET /v1/tokens` | 1 credit |
-| `GET /v1/networks` | 1 credit |
+| `GET /v1/transactions/assets` | 1 credit |
+| `GET /v1/transactions/vaults` | 1 credit |
+| `GET /v1/vaults` | 1 credit |
 | `GET /v1/vaults/{network}/{vaultAddress}/apy` | 1 credit |
+| `POST /v1/portfolio/best-deposit-options/{userAddress}` | 1 credit base + 2 credits per vault |
 | `GET /v1/detailed/vaults` | 1 credit base + 4 credits per vault |
-| `GET /v1/vaults/{network}/{vaultAddress}/historical-tvl/{timestamp}` | 2 credits |
-| `GET /v1/vaults/{network}/{vaultAddress}/historical-apy/{timestamp}` | 2 credits |
-| `GET /v1/vaults/{network}/{vaultAddress}/holder-total-returns/{holder}` | 2 credits |
 | `POST /v1/portfolio/best-vault/{userAddress}` | 2 credits |
-| `GET /v1/vaults/{network}/{vaultAddress}/historical-apy` | 2 credits base + 1 per datapoint |
-| `POST /v1/portfolio/best-deposit-options/{userAddress}` | 2 credits per vault |
+| `GET /v1/top-vault/{network}/{userAddress}` | 2 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-apy/{timestamp}` | 2 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-tvl/{timestamp}` | 2 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-apy` | 2 credits base + 1 credit per datapoint |
 | `GET /v1/benchmarks` | 3 credits |
-| `GET /v1/vaults/{network}/{vaultAddress}/` | 3 credits |
 | `GET /v1/transactions/vaults/actions/details` | 3 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}` | 3 credits |
 | `GET /v1/vaults/{network}/{vaultAddress}/holder-events/{holder}` | 3 credits |
-| `GET /v1/transactions/assets` | 3 credits |
-| `GET /v1/transactions/vaults` | 3 credits |
-| `GET /v1/vaults/{network}/{vaultAddress}/historical-data` | 4 credits base + 2 per historical point |
-| `POST /v1/transactions/vaults/deposit` | 5 credits |
-| `POST /v1/transactions/vaults/redeem` | 5 credits |
-| `POST /v1/transactions/vaults/request-redeem` | 5 credits |
-| `POST /v1/transactions/vaults/claim-redeem` | 5 credits |
-| `POST /v1/transactions/vaults/claim-rewards` | 5 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}/holder-total-returns/{holder}` | 3 credits |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-data` | 4 credits base + 2 credits per historical point |
 | `GET /v1/portfolio/wallet-balances` | 5 credits |
-| `GET /v1/portfolio/positions/{userAddress}` | 5 credits |
+| `GET /v1/transactions/vaults/claim-redeem` | 5 credits |
+| `GET /v1/transactions/vaults/claim-rewards` | 5 credits |
+| `GET /v1/transactions/vaults/deposit` | 5 credits |
+| `GET /v1/transactions/vaults/redeem` | 5 credits |
+| `GET /v1/transactions/vaults/request-redeem` | 5 credits |
