@@ -4,59 +4,13 @@ description: "Learn how vaults.fyi Credits (Compute Units) work, and see the ful
 sidebarTitle: "Credits"
 ---
 
-import {
-  benchmarksCreditCosts,
-  detailedVaultsCreditCosts,
-  generalCreditCosts,
-  historicalCreditCosts,
-  legacyV1CreditCosts,
-  portfolioCreditCosts,
-  transactionsCreditCosts,
-} from "./data/credit-costs.mdx";
-
-export const CreditCostTable = ({ rows }) => (
-  <table>
-    <thead>
-      <tr>
-        <th>Endpoint</th>
-        <th>Base CU per call</th>
-        <th>CU per datapoint</th>
-      </tr>
-    </thead>
-    <tbody>
-      {rows.map((row) => (
-        <tr key={row.endpoint}>
-          <td>
-            <code>{row.endpoint}</code>
-          </td>
-          <td>{row.baseCu}</td>
-          <td>{row.cuPerDatapoint}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
-
-export const LegacyCreditCostTable = ({ rows }) => (
-  <table>
-    <thead>
-      <tr>
-        <th>Endpoint</th>
-        <th>Credit Cost</th>
-      </tr>
-    </thead>
-    <tbody>
-      {rows.map((row) => (
-        <tr key={row.endpoint}>
-          <td>
-            <code>{row.endpoint}</code>
-          </td>
-          <td>{row.creditCost}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
+import GeneralCreditCosts from "./data/v2-general-credit-costs.mdx";
+import DetailedVaultsCreditCosts from "./data/v2-detailed-vaults-credit-costs.mdx";
+import BenchmarksCreditCosts from "./data/v2-benchmarks-credit-costs.mdx";
+import HistoricalCreditCosts from "./data/v2-historical-credit-costs.mdx";
+import PortfolioCreditCosts from "./data/v2-portfolio-credit-costs.mdx";
+import TransactionsCreditCosts from "./data/v2-transactions-credit-costs.mdx";
+import LegacyV1CreditCosts from "./data/v1-credit-costs.mdx";
 
 Every vaults.fyi API request consumes Credits. Credits — also called Compute Units (CUs) — measure the compute resources consumed by each request. Subscription plans include a monthly Credit budget, while pay as you go charges a flat **$0.002 per credit**. This model lets you pay proportionally for what you actually use, rather than treating a simple lookup the same as a rich multi-vault data pull.
 
@@ -79,31 +33,31 @@ By contrast, `/v2/detailed-vaults/{network}/{vaultAddress}/apy` costs only 1 CU 
 
 ### General
 
-<CreditCostTable rows={generalCreditCosts} />
+<GeneralCreditCosts />
 
 ### Detailed Vaults
 
-<CreditCostTable rows={detailedVaultsCreditCosts} />
+<DetailedVaultsCreditCosts />
 
 ### Benchmarks
 
-<CreditCostTable rows={benchmarksCreditCosts} />
+<BenchmarksCreditCosts />
 
 ### Historical
 
-<CreditCostTable rows={historicalCreditCosts} />
+<HistoricalCreditCosts />
 
 ### Portfolio
 
 All plans can access portfolio endpoints.
 
-<CreditCostTable rows={portfolioCreditCosts} />
+<PortfolioCreditCosts />
 
 ### Transactions
 
 All plans can access transaction endpoints.
 
-<CreditCostTable rows={transactionsCreditCosts} />
+<TransactionsCreditCosts />
 
 ## Legacy v1 API Credits
 
@@ -116,7 +70,7 @@ The v1 API uses a simpler flat-credit model — each endpoint has a single fixed
 <AccordionGroup>
   <Accordion title="View v1 endpoint credit costs">
 
-<LegacyCreditCostTable rows={legacyV1CreditCosts} />
+<LegacyV1CreditCosts />
 
   </Accordion>
 </AccordionGroup>
