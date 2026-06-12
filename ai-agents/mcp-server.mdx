@@ -43,6 +43,32 @@ A few prompts that exercise meaningful tool chains:
   You'll need a Vaults.fyi API key. Request one at [portal.vaults.fyi](https://portal.vaults.fyi/).
 </Note>
 
+### Recommended setup
+
+Configure Vaults.fyi across supported MCP clients with one command:
+
+```bash
+npx @vaultsfyi/scripts init-mcp --api-key YOUR_VAULTS_API_KEY
+```
+
+To configure one client:
+
+```bash
+npx @vaultsfyi/scripts init-mcp --api-key YOUR_VAULTS_API_KEY --client cursor
+```
+
+The installer creates or updates your local MCP config and adds the `vaults-fyi` server entry without removing existing servers.
+
+Supported clients: Claude Desktop, Cursor, Claude Code, Windsurf, VS Code, Zed, Amazon Q, and GitHub Copilot CLI.
+
+Restart your client after installation. The 38 Vaults.fyi tools should appear in the client's MCP tools list.
+
+<Info>
+  Without `--api-key`, the installer prompts interactively. In CI and other non-interactive environments, pass `--api-key`.
+</Info>
+
+### Manual setup
+
 <Tabs>
   <Tab title="Claude Desktop">
     Claude Desktop may require a local bridge for remote MCP servers. Add Vaults.fyi through [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) in your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
