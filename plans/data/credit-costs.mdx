@@ -1,0 +1,74 @@
+export const generalCreditCosts = [
+  { endpoint: "GET /v2/assets", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/networks", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/tags", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/vaults", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/curators", baseCu: "1", cuPerDatapoint: "—" },
+];
+
+export const detailedVaultsCreditCosts = [
+  { endpoint: "GET /v2/detailed-vaults", baseCu: "1", cuPerDatapoint: "3" },
+  { endpoint: "GET /v2/detailed-vaults/{network}/{vaultAddress}", baseCu: "3", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/detailed-vaults/{network}/{vaultAddress}/apy", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/detailed-vaults/{network}/{vaultAddress}/tvl", baseCu: "1", cuPerDatapoint: "—" },
+];
+
+export const benchmarksCreditCosts = [
+  { endpoint: "GET /v2/benchmarks/{network}", baseCu: "3", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/historical-benchmarks/{network}", baseCu: "3", cuPerDatapoint: "3" },
+];
+
+export const historicalCreditCosts = [
+  { endpoint: "GET /v2/historical/{network}/{vaultAddress}", baseCu: "3", cuPerDatapoint: "3" },
+  { endpoint: "GET /v2/historical/{network}/{vaultAddress}/apy", baseCu: "1", cuPerDatapoint: "1" },
+  { endpoint: "GET /v2/historical/{network}/{vaultAddress}/tvl", baseCu: "1", cuPerDatapoint: "1" },
+  { endpoint: "GET /v2/historical/{network}/{vaultAddress}/sharePrice", baseCu: "1", cuPerDatapoint: "1" },
+  { endpoint: "GET /v2/historical/asset-prices/{network}/{assetAddress}", baseCu: "1", cuPerDatapoint: "1" },
+];
+
+export const portfolioCreditCosts = [
+  { endpoint: "GET /v2/portfolio/best-deposit-options/{userAddress}", baseCu: "1", cuPerDatapoint: "2" },
+  { endpoint: "GET /v2/portfolio/best-vault/{userAddress}", baseCu: "2", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/events/{userAddress}/{network}/{vaultAddress}", baseCu: "3", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/idle-assets/{userAddress}", baseCu: "5", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/positions/{userAddress}", baseCu: "5", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/positions/{userAddress}/{network}/{vaultAddress}", baseCu: "1", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/returns/{userAddress}/{network}/{vaultAddress}", baseCu: "2", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultAddress}", baseCu: "1", cuPerDatapoint: "—" },
+];
+
+export const transactionsCreditCosts = [
+  { endpoint: "GET /v2/transactions/context/{userAddress}/{network}/{vaultAddress}", baseCu: "3", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/transactions/{action}/{userAddress}/{network}/{vaultAddress}", baseCu: "5", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/transactions/rewards/context/{userAddress}", baseCu: "3", cuPerDatapoint: "—" },
+  { endpoint: "GET /v2/transactions/rewards/claim/{userAddress}", baseCu: "5", cuPerDatapoint: "—" },
+];
+
+export const legacyV1CreditCosts = [
+  { endpoint: "GET /v1/vaults", creditCost: "1 credit" },
+  { endpoint: "GET /v1/tags", creditCost: "1 credit" },
+  { endpoint: "GET /v1/tokens", creditCost: "1 credit" },
+  { endpoint: "GET /v1/networks", creditCost: "1 credit" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/apy", creditCost: "1 credit" },
+  { endpoint: "GET /v1/detailed/vaults", creditCost: "1 credit base + 4 credits per vault" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/historical-tvl/{timestamp}", creditCost: "2 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/historical-apy/{timestamp}", creditCost: "2 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/holder-total-returns/{holder}", creditCost: "2 credits" },
+  { endpoint: "POST /v1/portfolio/best-vault/{userAddress}", creditCost: "2 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/historical-apy", creditCost: "2 credits base + 1 per datapoint" },
+  { endpoint: "POST /v1/portfolio/best-deposit-options/{userAddress}", creditCost: "2 credits per vault" },
+  { endpoint: "GET /v1/benchmarks", creditCost: "3 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/", creditCost: "3 credits" },
+  { endpoint: "GET /v1/transactions/vaults/actions/details", creditCost: "3 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/holder-events/{holder}", creditCost: "3 credits" },
+  { endpoint: "GET /v1/transactions/assets", creditCost: "3 credits" },
+  { endpoint: "GET /v1/transactions/vaults", creditCost: "3 credits" },
+  { endpoint: "GET /v1/vaults/{network}/{vaultAddress}/historical-data", creditCost: "4 credits base + 2 per historical point" },
+  { endpoint: "POST /v1/transactions/vaults/deposit", creditCost: "5 credits" },
+  { endpoint: "POST /v1/transactions/vaults/redeem", creditCost: "5 credits" },
+  { endpoint: "POST /v1/transactions/vaults/request-redeem", creditCost: "5 credits" },
+  { endpoint: "POST /v1/transactions/vaults/claim-redeem", creditCost: "5 credits" },
+  { endpoint: "POST /v1/transactions/vaults/claim-rewards", creditCost: "5 credits" },
+  { endpoint: "GET /v1/portfolio/wallet-balances", creditCost: "5 credits" },
+  { endpoint: "GET /v1/portfolio/positions/{userAddress}", creditCost: "5 credits" },
+];
