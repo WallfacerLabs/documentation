@@ -8,6 +8,26 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 24, 2026 — Jun 9–15
+
+**API**
+
+- Made `sharePrice` values more consistent across V2 historical, near-real-time, and portfolio event responses, especially for protocols with custom price-per-share units.
+
+- Increased API path-parameter support for longer vault identifiers and descriptors. Integrators using stable `vaultId` values, non-address market identifiers, or descriptor-style IDs can now send longer path params without hitting the previous request parser limit.
+
+- Improved **Accountable** vault aggregation so TVL and share-price calculations use the protocol-specific `convertToAssets(totalSupply)` path instead of relying on the generic ERC-4626 `totalAssets()` value. This reduces incorrect historical rows for Accountable vaults whose `totalAssets()` value does not reflect the vault's redeemable assets.
+
+- Added a one-command MCP setup path for agent integrations with `npx @vaultsfyi/scripts init-mcp --api-key YOUR_VAULTS_API_KEY`, covering Claude Desktop, Claude Code, Cursor, Windsurf, VS Code, Zed, Amazon Q, and GitHub Copilot CLI.
+
+**App**
+
+- Shipped the first version of the vaults.fyi widget for embedded earn experiences. More public integration materials will follow.
+
+- Young vaults now display as **Not Rated** instead of showing a numeric Reputation Score too early. This avoids presenting immature vault history as a mature risk signal.
+
+---
+
 ## Week 23, 2026 — Jun 2–8
 
 **API**
