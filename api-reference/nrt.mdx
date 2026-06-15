@@ -5,10 +5,10 @@ description: "Sub-second vault metrics: share price, total assets, total supply,
 
 Near real-time vault metrics sourced directly from onchain state — updated far more frequently than the standard indexed data. Use these endpoints when your product needs the most current share price or TVL figures, such as deposit previews, live dashboards, or liquidation monitoring.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | [/v2/nrt/vault/\{network\}/\{vaultId\}](/api-reference/nrt/get-vault-nrt-data) | All NRT metrics for a vault |
-| `GET` | [/v2/nrt/vault/\{network\}/\{vaultId\}/sharePrice](/api-reference/nrt/get-vault-nrt-share-price) | Current share price |
-| `GET` | [/v2/nrt/vault/\{network\}/\{vaultId\}/totalSupply](/api-reference/nrt/get-vault-nrt-total-supply) | Current total supply |
-| `GET` | [/v2/nrt/vault/\{network\}/\{vaultId\}/totalAssets](/api-reference/nrt/get-vault-nrt-total-assets) | Current total assets |
-| `GET` | [/v2/nrt/vault/\{network\}/\{vaultId\}/underlyingAssetPrice](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | Current underlying asset price |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Fetch all current vault metrics in one response | [`GET /v2/nrt/vault/{network}/{vaultId}`](/api-reference/nrt/get-vault-nrt-data) | Path: `network`, `vaultId` |
+| Fetch the current share price | [`GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`](/api-reference/nrt/get-vault-nrt-share-price) | Path: `network`, `vaultId` |
+| Fetch the current total supply | [`GET /v2/nrt/vault/{network}/{vaultId}/totalSupply`](/api-reference/nrt/get-vault-nrt-total-supply) | Path: `network`, `vaultId` |
+| Fetch the current total assets | [`GET /v2/nrt/vault/{network}/{vaultId}/totalAssets`](/api-reference/nrt/get-vault-nrt-total-assets) | Path: `network`, `vaultId` |
+| Fetch the current underlying asset price | [`GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice`](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | Path: `network`, `vaultId` |

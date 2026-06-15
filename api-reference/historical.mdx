@@ -5,10 +5,10 @@ description: "Time-series APY, TVL, share price, and asset price data for any va
 
 Time-series data for any vault over configurable date ranges and granularity. Use these endpoints to build performance charts, run backtests, or track share price over time.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | [/v2/historical/\{network\}/\{vaultId\}](/api-reference/historical/get-vault-historical-data) | Combined APY, TVL, and share price over a range |
-| `GET` | [/v2/historical/\{network\}/\{vaultId\}/apy](/api-reference/historical/get-historical-apy) | APY time-series for a vault |
-| `GET` | [/v2/historical/\{network\}/\{vaultId\}/tvl](/api-reference/historical/get-historical-tvl) | TVL time-series for a vault |
-| `GET` | [/v2/historical/\{network\}/\{vaultId\}/sharePrice](/api-reference/historical/get-historical-share-price) | Share price time-series for a vault |
-| `GET` | [/v2/historical/asset-prices/\{network\}/\{assetAddress\}](/api-reference/historical/get-historical-asset-prices) | Historical prices for an underlying asset |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Fetch combined APY, TVL, and share-price history | [`GET /v2/historical/{network}/{vaultId}`](/api-reference/historical/get-vault-historical-data) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
+| Fetch APY history only | [`GET /v2/historical/{network}/{vaultId}/apy`](/api-reference/historical/get-historical-apy) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
+| Fetch TVL history only | [`GET /v2/historical/{network}/{vaultId}/tvl`](/api-reference/historical/get-historical-tvl) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |
+| Fetch share-price history only | [`GET /v2/historical/{network}/{vaultId}/sharePrice`](/api-reference/historical/get-historical-share-price) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
+| Fetch historical underlying asset prices | [`GET /v2/historical/asset-prices/{network}/{assetAddress}`](/api-reference/historical/get-historical-asset-prices) | Path: `network`, `assetAddress`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |

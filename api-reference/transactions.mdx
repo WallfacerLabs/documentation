@@ -5,10 +5,29 @@ description: "Ready-to-sign transaction payloads for deposits, redemptions, and 
 
 Generates ready-to-sign transaction calldata for any supported vault action. Pass the output directly to your wallet provider — no ABI encoding required.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | [/v2/transactions/context/\{userAddress\}/\{network\}/\{vaultId\}](/api-reference/transactions/get-transaction-context) | Balances and limits before building a transaction |
-| `GET` | [/v2/transactions/\{action\}/\{userAddress\}/\{network\}/\{vaultId\}](/api-reference/transactions/get-transaction-payload) | Calldata for deposit, redeem, or claim |
-| `GET` | [/v2/transactions/rewards/context/\{userAddress\}](/api-reference/transactions/get-rewards-context) | Claimable rewards for a wallet |
-| `GET` | [/v2/transactions/rewards/claim/\{userAddress\}](/api-reference/transactions/claim-rewards) | Calldata to claim pending rewards |
-| `GET` | [/v2/transactions/suffix/\{userAddress\}/\{vaultId\}](/api-reference/transactions/get-transaction-suffix) | Onchain referral builder code to append to calldata |
+## Typical flow
+
+1. **Check what the user can do**
+
+   Call `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` to fetch the user's balances, limits, supported actions, required steps, and rewards context for that vault.
+
+2. **Build the transaction payload**
+
+   Call `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` with the action you want to prepare. Include `assetAddress` and either `amount` for a specific amount or `all=true` for a full redeem-style action.
+
+3. **Send the returned transaction with the user's wallet**
+
+   The response includes the target address, calldata, and value. You do not need to encode the vault contract call yourself.
+
+```bash
+curl "https://api.vaults.fyi/v2/transactions/deposit/0xUSER/base/0xVAULT?assetAddress=0xASSET&amount=1000000" \
+  -H "x-api-key: $VAULTS_FYI_API_KEY"
+```
+
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Check available vault actions | [`GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-context) | Path: `userAddress`, `network`, `vaultId` |
+| Build deposit, redeem, request, or claim calldata | [`GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-payload) | Path: `action`, `userAddress`, `network`, `vaultId`. Query: `assetAddress`, plus `amount` or `all=true` when the action requires an amount |
+| Check claimable rewards | [`GET /v2/transactions/rewards/context/{userAddress}`](/api-reference/transactions/get-rewards-context) | Path: `userAddress` |
+| Build rewards claim calldata | [`GET /v2/transactions/rewards/claim/{userAddress}`](/api-reference/transactions/claim-rewards) | Path: `userAddress`. Query: `claimIds` |
+| Add transaction attribution | [`GET /v2/transactions/suffix/{userAddress}/{vaultId}`](/api-reference/transactions/get-transaction-suffix) | Path: `userAddress`, `vaultId` |

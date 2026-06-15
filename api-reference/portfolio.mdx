@@ -5,12 +5,12 @@ description: "User positions, idle assets, deposit recommendations, transaction 
 
 Wallet-aware endpoints that return a user's vault positions, uninvested balances, personalized deposit suggestions, total returns, and transaction history.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | [/v2/portfolio/positions/\{userAddress\}](/api-reference/portfolio/list-portfolio-positions) | All vault positions for a wallet |
-| `GET` | [/v2/portfolio/positions/\{userAddress\}/\{network\}/\{vaultId\}](/api-reference/portfolio/get-portfolio-position) | Single vault position for a wallet |
-| `GET` | [/v2/portfolio/idle-assets/\{userAddress\}](/api-reference/portfolio/list-idle-assets) | Uninvested token balances |
-| `GET` | [/v2/portfolio/best-deposit-options/\{userAddress\}](/api-reference/portfolio/get-best-deposit-options) | Ranked deposit opportunities matching wallet holdings |
-| `GET` | [/v2/portfolio/best-vault/\{userAddress\}](/api-reference/portfolio/get-best-vault) | Single best-fit vault for a wallet |
-| `GET` | [/v2/portfolio/total-returns/\{userAddress\}/\{network\}/\{vaultId\}](/api-reference/portfolio/get-total-returns) | Earned yield for a position |
-| `GET` | [/v2/portfolio/events/\{userAddress\}/\{network\}/\{vaultId\}](/api-reference/portfolio/list-position-events) | Deposit, redeem, and claim history |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| List all vault positions for a wallet | [`GET /v2/portfolio/positions/{userAddress}`](/api-reference/portfolio/list-portfolio-positions) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `apyInterval`, and `minUsdAssetValueThreshold` |
+| Fetch one vault position for a wallet | [`GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-portfolio-position) | Path: `userAddress`, `network`, `vaultId`. Optional query: `apyInterval` |
+| List uninvested token balances | [`GET /v2/portfolio/idle-assets/{userAddress}`](/api-reference/portfolio/list-idle-assets) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `minUsdAssetValueThreshold`, `sortBy`, and `sortDirection` |
+| Rank deposit opportunities matching wallet holdings | [`GET /v2/portfolio/best-deposit-options/{userAddress}`](/api-reference/portfolio/get-best-deposit-options) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `minApy`, `apyInterval`, `alwaysReturnAssets`, and `maxVaultsPerAsset` |
+| Fetch the single best-fit vault for a wallet | [`GET /v2/portfolio/best-vault/{userAddress}`](/api-reference/portfolio/get-best-vault) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `minApy`, and `apyInterval` |
+| Calculate earned yield for one position | [`GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-total-returns) | Path: `userAddress`, `network`, `vaultId` |
+| List deposit, redeem, and claim history for one position | [`GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/list-position-events) | Path: `userAddress`, `network`, `vaultId` |

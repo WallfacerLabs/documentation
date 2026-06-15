@@ -5,7 +5,7 @@ description: "DeFi benchmark APY rates for USD and ETH strategies, including his
 
 Reference rates representing baseline DeFi yield for USD and ETH strategies. Use these to compare vault performance against the broader market.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | [/v2/benchmarks/\{network\}](/api-reference/benchmarks/get-benchmark-rate) | Current benchmark rate for a network |
-| `GET` | [/v2/historical-benchmarks/\{network\}](/api-reference/benchmarks/get-historical-benchmarks) | Historical benchmark rates for a network |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Fetch the current benchmark rate for a network | [`GET /v2/benchmarks/{network}`](/api-reference/benchmarks/get-benchmark-rate) | Path: `network`. Query: `code` |
+| Fetch historical benchmark rates for a network | [`GET /v2/historical-benchmarks/{network}`](/api-reference/benchmarks/get-historical-benchmarks) | Path: `network`. Query: `code`. Optional query: `fromTimestamp`, `toTimestamp`, `page`, `perPage` |

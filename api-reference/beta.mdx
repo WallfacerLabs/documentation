@@ -13,29 +13,29 @@ Beta features are accessible using your existing API key. The endpoints below co
 
 Build AMM-style vault integrations for Deep liquidity positions. These endpoints cover vault discovery, wallet positions, and ready-to-sign deposit or withdrawal transactions.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/beta/amm/deep/detailed-vaults` | List Deep detailed vaults |
-| `GET` | `/beta/amm/deep/positions/{userAddress}/{network}/{vaultId}` | Get a Deep position |
-| `GET` | `/beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}` | Create a Deep deposit transaction |
-| `GET` | `/beta/amm/deep/withdraw/{userAddress}/{network}/{vaultId}` | Create a Deep withdrawal transaction |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| List Deep detailed vaults | `GET /beta/amm/deep/detailed-vaults` | None. Optional query: `page`, `perPage` |
+| Fetch one Deep position | `GET /beta/amm/deep/positions/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId` |
+| Build a Deep deposit transaction | `GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId`. Query: `assetAddress0`, `amount0`. Optional query: `assetAddress1`, `amount1` |
+| Build a Deep withdrawal transaction | `GET /beta/amm/deep/withdraw/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId`. Query: `amount` or `all=true` |
 
 ## Fixed Term (Pendle)
 
 Add fixed-term yield market support for Pendle-backed opportunities. Use these endpoints to retrieve detailed market data, preview transaction context, and generate swap-in or swap-out transactions.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/beta/fixed-term/detailed/{network}/{vaultId}` | Get fixed-term detailed vault data |
-| `GET` | `/beta/fixed-term/context/{userAddress}/{network}/{vaultId}` | Get fixed-term transaction context |
-| `GET` | `/beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}` | Create a fixed-term transaction |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Fetch fixed-term detailed vault data | `GET /beta/fixed-term/detailed/{network}/{vaultId}` | Path: `network`, `vaultId` |
+| Preview balances and limits before building a fixed-term transaction | `GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId` |
+| Build a fixed-term transaction | `GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}` | Path: `action`, `userAddress`, `network`, `vaultId`. Query: `assetAddress`, `amount`. Optional query: `simulate` |
 
 ## Portfolio
 
 Measure user returns over a selected time window instead of only showing lifetime returns. This supports performance reporting, account history views, and user-specific analytics.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}` | Get partial returns for a user, network, and vault |
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Measure user returns over a selected time window | `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId`. Query: `fromTimestamp`. Optional query: `toTimestamp` |
 
 Beta endpoints require an API key. [Sign up](https://portal.vaults.fyi/signup) to get started, then watch the [changelog](/resources/changelog) for changes before general availability.
