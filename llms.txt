@@ -24,11 +24,13 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 ## Core Concepts
 
-- [Everything You Can Know About a Vault](https://docs.vaults.fyi/concepts/vault-data.md): Complete field reference — APY, TVL, fees, the Reputation Score, holders, historical time-series, near real-time metrics, and user positions.
-- [Market Data: APY, TVL, and Fees](https://docs.vaults.fyi/concepts/market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly onchain indexing.
-- [Portfolio Tracking](https://docs.vaults.fyi/concepts/portfolio.md): Track positions, detect idle assets, surface personalized deposit recommendations, and report PnL.
-- [Transaction Execution](https://docs.vaults.fyi/concepts/transactions.md): Non-custodial deposit, redeem, and claim payloads — no intermediary contracts.
+- [Vault Discovery](https://docs.vaults.fyi/concepts/vault-discovery.md): Find, filter, and understand DeFi vaults using normalized identity, performance, TVL, fee, risk, holder, and transaction support data.
+- [Yield & Market Data](https://docs.vaults.fyi/concepts/yield-and-market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly onchain indexing.
+- [Transaction Flows](https://docs.vaults.fyi/concepts/transaction-flows.md): Non-custodial deposit, redeem, and claim payloads — no intermediary contracts.
+- [Portfolio Tracking](https://docs.vaults.fyi/concepts/portfolio-tracking.md): Track positions, detect idle assets, surface personalized deposit recommendations, and report PnL.
+- [Borrowing](https://docs.vaults.fyi/concepts/borrowing.md): Early-access borrow market discovery, user supplied/borrowed positions, risk metrics, and ready-to-sign supply, withdraw, borrow, and repay flows.
 - [Supported Protocols & Networks](https://docs.vaults.fyi/concepts/supported-protocols.md): 80+ protocols on 20+ networks. Covers analytics-only vs. full transactional support tiers.
+- [TVL Attribution](https://docs.vaults.fyi/concepts/tvl-attribution.md): Track the deposits, withdrawals, and current TVL your app, wallet, or frontend drives into DeFi vaults.
 
 ## Methodology
 
@@ -49,7 +51,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 ## Use Cases
 
-- [Embed Yield in Wallets & Apps](https://docs.vaults.fyi/use-cases/for-wallets-and-apps.md): Add yield discovery, non-custodial deposits, and fee revenue to any wallet or consumer app.
+- [Embed Yield and Borrowing in Wallets & Apps](https://docs.vaults.fyi/use-cases/for-wallets-and-apps.md): Add yield discovery, borrowing views, non-custodial transactions, and fee revenue to any wallet or consumer app.
 - [DeFi Yield Data for Analysts](https://docs.vaults.fyi/use-cases/for-analysts.md): Normalized APY, TVL, the Reputation Score, and benchmark rates across 1,000+ vaults — no blockchain parsing.
 - [Get Your Vaults Discovered](https://docs.vaults.fyi/use-cases/for-protocols.md): List vaults on vaults.fyi to reach wallets, apps, and analysts. Monitor integration performance.
 

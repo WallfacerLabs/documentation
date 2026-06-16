@@ -1,7 +1,7 @@
 ---
-title: "Non-Custodial Transaction Preparation for DeFi Vaults"
+title: "Transaction Flows"
 description: "Generate ready-to-sign deposit, redeem, and claim payloads for hundreds of vaults without intermediary contracts or custodial risk."
-sidebarTitle: "Transactions"
+sidebarTitle: "Transaction Flows"
 ---
 
 The Vaults.fyi transaction API lets you integrate vault interactions — deposits, redemptions, and reward claims — across hundreds of protocols without writing any protocol-specific contract logic. You get back ready-to-sign transaction payloads that users submit directly to the protocol. No intermediary smart contracts sit between your users and their funds.
@@ -81,7 +81,7 @@ The same attribution layer can also support monetization through fee rebate prog
 
 If you use the Transactions API, no extra work is required — the returned payload already includes the tracking suffix.
 
-If you build transactions yourself, use the free attribution suffix endpoint and append the returned suffix to your calldata. See [TVL Tracking for Integrators](/concepts/tvl-tracking#generating-attribution-suffixes-for-existing-transaction-flows) for the full setup guide.
+If you build transactions yourself, use the free attribution suffix endpoint and append the returned suffix to your calldata. See [TVL Attribution](/concepts/tvl-attribution#generating-attribution-suffixes-for-existing-transaction-flows) for the full setup guide.
 
 <Warning>
 Always call the transaction context endpoint before generating a payload. Attempting to prepare a transaction for an unsupported action or insufficient balance will return an error.

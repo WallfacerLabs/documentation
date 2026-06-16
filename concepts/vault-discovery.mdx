@@ -1,10 +1,10 @@
 ---
-title: "Everything You Can Know About a Vault"
-description: "A complete reference for all vault data available through the Vaults.fyi API: identity, performance, TVL, fees, scores, holders, historical time-series, near real-time metrics, and user positions."
-sidebarTitle: "Vault Data"
+title: "Vault Discovery"
+description: "Find, filter, and understand DeFi vaults using normalized identity, performance, TVL, fee, risk, holder, and transaction support data."
+sidebarTitle: "Vault Discovery"
 ---
 
-The Vaults.fyi API surfaces more data about a DeFi vault than most applications ever need. This page documents everything you can retrieve — what each field means, which endpoint it comes from, and what you would use it for.
+The Vaults.fyi API surfaces more data about a DeFi vault than most applications ever need. Use it to discover opportunities, build vault detail pages, power filters, and decide which vaults are suitable for your users. This page documents what you can retrieve — what each field means, which endpoint it comes from, and what you would use it for.
 
 The primary source for static vault data is [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details). Additional endpoints extend that with time-series history, near real-time state, and per-user position data.
 
@@ -231,7 +231,7 @@ Active flags can reduce the vault's Reputation Score. Resolved flags may still a
 | `transactionalProperties.redeemStepsType` | `instant` or `complex`. |
 | `transactionalProperties.rewardsSupported` | Whether reward claim transactions are supported for this vault. |
 
-See [Transactions](/concepts/transactions) for full details on building deposit and withdrawal flows.
+See [Transaction Flows](/concepts/transaction-flows) for full details on building deposit and withdrawal flows.
 
 ---
 

@@ -1,0 +1,90 @@
+---
+title: "Borrowing"
+description: "Add borrow market discovery, user position tracking, and ready-to-sign supply, withdraw, borrow, and repay flows to your app."
+sidebarTitle: "Borrowing"
+---
+
+The Vaults.fyi borrowing API gives wallets and apps one integration for borrow market data, user-level lending and borrowing positions, market history, and ready-to-sign transaction payloads.
+
+Instead of building separate integrations for each lending protocol, you can use a normalized borrow market model across supported networks and protocols. This lets you show users what they have supplied, what they have borrowed, their risk metrics, and which actions are available before you build a transaction.
+
+<Note>
+  Borrowing is currently an early-access API surface. The endpoints are moving toward Beta and may still change before general availability. Check the [Alpha](/api-reference/alpha) and [Beta](/api-reference/beta) API Reference sections for the current endpoint namespace before integrating.
+</Note>
+
+## What you can build
+
+<CardGroup cols={2}>
+  <Card title="Borrow market discovery" icon="magnifying-glass">
+    List supported borrow markets, filter by network, and inspect supplied assets, borrowed assets, rates, utilization, and collateral configuration.
+  </Card>
+  <Card title="User borrow positions" icon="wallet">
+    Show a wallet's supplied and borrowed balances across supported markets, including position value and market-specific asset balances.
+  </Card>
+  <Card title="Risk metrics" icon="gauge">
+    Surface LTV, liquidation thresholds, health factor, and collateral data so users understand the state of their borrow positions.
+  </Card>
+  <Card title="Borrow transactions" icon="arrow-right-arrow-left">
+    Generate ready-to-sign supply, withdraw, borrow, and repay payloads after checking balances, limits, and available actions.
+  </Card>
+</CardGroup>
+
+## Integration flow
+
+<Steps>
+  <Step title="Discover markets">
+    List supported borrow markets, optionally scoped to one network. Use market details to render assets, rates, utilization, and collateral parameters in your product.
+  </Step>
+  <Step title="Fetch the user's positions">
+    Retrieve the wallet's borrow portfolio to show supplied assets, borrowed assets, position value, and risk metrics across markets.
+  </Step>
+  <Step title="Check transaction context">
+    Before rendering action buttons, fetch transaction context for the user, market, and asset. The response tells you which actions are available and which inputs are required.
+  </Step>
+  <Step title="Generate the transaction">
+    Build a ready-to-sign payload for the selected action: `supply`, `withdraw`, `borrow`, or `repay`. Pass the payload to the user's wallet for signing.
+  </Step>
+</Steps>
+
+## Borrow market data
+
+Borrow markets expose the normalized data needed to build market screens and position pages:
+
+- Market identity: network, market ID, protocol, and supported assets
+- Rates and utilization
+- Supplied and borrowed asset data
+- Collateral and liquidation parameters
+- Historical market data where available
+
+Use this data for borrow dashboards, market comparison views, and account-specific borrow screens.
+
+## Positions and events
+
+Borrow portfolio endpoints let you inspect a user's current positions and market-level history:
+
+- Supplied assets and balances
+- Borrowed assets and balances
+- LTV, health factor, and other risk metrics where available
+- Asset-level position views for a specific market
+- User events for a market and asset
+
+This is useful for wallets that want to show a complete lending and borrowing account view without maintaining protocol-specific indexers.
+
+## Transaction support
+
+Borrow transaction endpoints follow the same pattern as vault transaction flows:
+
+1. Fetch context for the user, market, asset, and network.
+2. Confirm which action is available.
+3. Generate the action payload with `amount` or `all=true` where required.
+4. Pass the returned transaction to the user's wallet.
+
+Supported actions depend on the market and user state, but the model covers supply, withdraw, borrow, and repay flows.
+
+<Warning>
+  Always fetch transaction context before generating a borrow transaction. Borrow actions depend on collateral, balances, market limits, and protocol-specific constraints.
+</Warning>
+
+## API reference
+
+See the current endpoint guide in [Alpha](/api-reference/alpha#borrow-markets). As the borrowing surface moves to Beta, the [Beta](/api-reference/beta) section will become the primary reference.

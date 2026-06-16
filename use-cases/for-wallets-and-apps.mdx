@@ -1,10 +1,10 @@
 ---
-title: "Embed Yield in Any Wallet or Consumer App"
-description: "Add real-time yield discovery, non-custodial deposits, and customizable fee revenue to your wallet or app with a single API integration."
+title: "Embed Yield and Borrowing in Any Wallet or Consumer App"
+description: "Add real-time yield discovery, borrowing views, non-custodial transactions, and customizable fee revenue to your wallet or app with a single API integration."
 sidebarTitle: "For Wallets & Apps"
 ---
 
-A single Vaults.fyi integration gives your wallet or consumer app access to hundreds of audited yield vaults across 80\+ protocols and 20\+ chains. You get live market data, ready-to-sign transaction payloads, and portfolio tracking — without building protocol-specific integrations or running custodial infrastructure.
+A single Vaults.fyi integration gives your wallet or consumer app access to hundreds of audited yield vaults across 80\+ protocols and 20\+ chains. You get live market data, ready-to-sign transaction payloads, portfolio tracking, and early-access borrowing support — without building protocol-specific integrations or running custodial infrastructure.
 
 ## What you can build
 
@@ -19,6 +19,10 @@ A single Vaults.fyi integration gives your wallet or consumer app access to hund
 
   <Card title="Portfolio tracking" icon="wallet">
     Show users their current positions, accrued returns, and PnL across all yield strategies they've entered through your app.
+  </Card>
+
+  <Card title="Borrowing" icon="gauge" href="/concepts/borrowing">
+    Show borrow markets, supplied and borrowed positions, risk metrics, and supported supply, withdraw, borrow, and repay actions.
   </Card>
 
   <Card title="TVL attribution" icon="chart-line">
@@ -43,10 +47,13 @@ A single Vaults.fyi integration gives your wallet or consumer app access to hund
     Pass the payload to the user's wallet for signing. Your app broadcasts the transaction. The user interacts directly with the target protocol.
   </Step>
   <Step title="Track attributed TVL">
-    Transactions generated through Vaults.fyi include TVL tracking automatically, so you can measure retained balances and vault-level flows in portal.vaults.fyi. If you build vault transactions yourself, append a free attribution suffix instead. Learn more in [TVL Tracking](/concepts/tvl-tracking).
+    Transactions generated through Vaults.fyi include TVL tracking automatically, so you can measure retained balances and vault-level flows in portal.vaults.fyi. If you build vault transactions yourself, append a free attribution suffix instead. Learn more in [TVL Attribution](/concepts/tvl-attribution).
   </Step>
   <Step title="Track positions">
     Use the portfolio endpoints to display the user's current balance in each vault, yield earned since deposit, and estimated annual return.
+  </Step>
+  <Step title="Optional: add borrowing views">
+    Use the borrowing API to show supported borrow markets, supplied and borrowed positions, risk metrics, and available supply, withdraw, borrow, or repay actions. Borrowing is currently an early-access surface moving toward Beta, so check the API Reference for the current endpoint namespace.
   </Step>
 </Steps>
 

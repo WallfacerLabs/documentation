@@ -36,12 +36,13 @@
           {
             "group": "Core Concepts",
             "pages": [
-              "concepts/vault-data",
-              "concepts/market-data",
-              "concepts/transactions",
-              "concepts/portfolio",
+              "concepts/vault-discovery",
+              "concepts/yield-and-market-data",
+              "concepts/transaction-flows",
+              "concepts/portfolio-tracking",
+              "concepts/borrowing",
               "concepts/supported-protocols",
-              "concepts/tvl-tracking"
+              "concepts/tvl-attribution"
             ]
           },
           {
@@ -309,7 +310,7 @@
     },
     {
       "source": "/api/api-overview/market-data",
-      "destination": "/concepts/market-data"
+      "destination": "/concepts/yield-and-market-data"
     },
     {
       "source": "/api/api-overview/market-data/insights-api-endpoints",
@@ -377,7 +378,7 @@
     },
     {
       "source": "/api/api-overview/transactional-support",
-      "destination": "/concepts/transactions"
+      "destination": "/concepts/transaction-flows"
     },
     {
       "source": "/api/api-overview/transactional-support/earn-api-endpoints",
@@ -385,15 +386,35 @@
     },
     {
       "source": "/api/api-overview/transactional-support/product-demo",
-      "destination": "/concepts/transactions"
+      "destination": "/concepts/transaction-flows"
     },
     {
       "source": "/api/api-overview/transactional-support/flow-diagrams",
-      "destination": "/concepts/transactions"
+      "destination": "/concepts/transaction-flows"
     },
     {
       "source": "/api/api-overview/position-tracking",
-      "destination": "/concepts/portfolio"
+      "destination": "/concepts/portfolio-tracking"
+    },
+    {
+      "source": "/concepts/vault-data",
+      "destination": "/concepts/vault-discovery"
+    },
+    {
+      "source": "/concepts/market-data",
+      "destination": "/concepts/yield-and-market-data"
+    },
+    {
+      "source": "/concepts/transactions",
+      "destination": "/concepts/transaction-flows"
+    },
+    {
+      "source": "/concepts/portfolio",
+      "destination": "/concepts/portfolio-tracking"
+    },
+    {
+      "source": "/concepts/tvl-tracking",
+      "destination": "/concepts/tvl-attribution"
     },
     {
       "source": "/api/api-overview/supported-protocols-and-networks",
