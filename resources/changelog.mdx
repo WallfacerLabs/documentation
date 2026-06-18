@@ -36,7 +36,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - Improved **partial returns** in Beta so time-window return calculations use stored historical vault data points more reliably. This makes period-specific user return views more dependable, especially when the requested start or end timestamp does not line up exactly with an indexed event.
 
-- Expanded **borrow transaction support** for Morpho markets through the shared Alpha borrow transaction surface. Integrators can build borrow-market transaction flows against the same model used for generalized borrow integrations, instead of wiring protocol-specific transaction logic. Use `GET /alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` for transaction context and action payloads.
+- Expanded **borrow transaction support** for Morpho markets through the shared Beta borrow transaction surface. Integrators can build borrow-market transaction flows against the same model used for generalized borrow integrations, instead of wiring protocol-specific transaction logic. Use `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` for transaction context and action payloads.
 
 - Updated x402 handling for historical endpoints to support `upto` payment requirements. Payment-aware clients can now handle variable-sized historical queries more cleanly across historical vault data, APY, TVL, share price, asset prices, and benchmarks.
 
@@ -64,7 +64,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - Added **withdrawal pause ratio** as an advanced analytics selector. This gives integrators a structured way to screen how often vault withdrawals have been paused over the tracked window, returning `null` when the protocol or event source does not support the metric yet.
 
-- Cleaned up the Alpha borrow API by removing older protocol-specific Aave and Morpho borrow routes from the OpenAPI surface. Integrators should use the generalized borrow market and borrow portfolio endpoints under `/alpha/borrow/markets/...` and `/alpha/borrow/portfolio/...` instead.
+- Cleaned up the Beta borrow API by removing older protocol-specific Aave and Morpho borrow routes from the OpenAPI surface. Integrators should use the generalized borrow market and borrow portfolio endpoints under `/beta/borrow/markets/...` and `/beta/borrow/portfolio/...` instead.
 
 - Updated x402 payment response schemas across V2 and Alpha documentation to use structured payment-resource metadata and amount fields, improving compatibility with payment-aware clients and generated SDKs.
 
@@ -86,7 +86,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - Added **historical user positions** with `GET /alpha/historical-positions/{userAddress}`. The endpoint returns vaults a user held during a selected time window, including positions that existed at the start of the window or were opened during it. This helps apps reconstruct previous user exposure, not just current balances.
 
-- Added **borrow portfolio positions** to the Alpha API, including list, market-level, and asset-level views via `GET /alpha/borrow/portfolio/positions/{userAddress}`, `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`, and `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}`. These endpoints expose supplied and borrowed asset positions, LTV, health factor, and optional filters for networks, assets, value thresholds, and sorting.
+- Added **borrow portfolio positions** to the Beta API, including list, market-level, and asset-level views via `GET /beta/borrow/portfolio/positions/{userAddress}`, `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`, and `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}`. These endpoints expose supplied and borrowed asset positions, LTV, health factor, and optional filters for networks, assets, value thresholds, and sorting.
 
 - Added **daily vault flow history** with `GET /alpha/historical/{network}/{vaultId}/daily-flows`, exposing UTC daily deposit and redemption totals for a vault over a date range.
 
@@ -110,11 +110,11 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 **API**
 
-- **Alpha borrow market transactions** now support context and action payloads for supply, withdraw, borrow, and repay flows via `GET /alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}`.
+- **Beta borrow market transactions** now support context and action payloads for supply, withdraw, borrow, and repay flows via `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` and `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}`.
 
-- Added **borrow market portfolio events** with `GET /alpha/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}`, giving integrators user-level event history for a specific borrow market and asset.
+- Added **borrow market portfolio events** with `GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}`, giving integrators user-level event history for a specific borrow market and asset.
 
-- Added protocol-specific borrow transaction payloads for **Aave** Alpha borrow integrations, including deposit/redeem/borrow/repay actions. Morpho borrow transaction flows are still in progress and are not ready for production use yet.
+- Added protocol-specific borrow transaction payloads for **Aave** Beta borrow integrations, including deposit/redeem/borrow/repay actions. Morpho borrow transaction flows are still in progress and are not ready for production use yet.
 
 - Improved API-key flows: invite codes are no longer required for Portal signup, so users can now sign up and generate API keys directly at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup). Credit top-up and exhausted-credit messages now point users back to the Portal.
 
@@ -140,7 +140,7 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - Added **Liquity** protocol coverage and 52 new vaults, bringing total tracked coverage to 1,525 vaults across 20 networks.
 
-- Expanded **Alpha borrow markets** with historical market data and portfolio event tracking for borrow positions.
+- Expanded **Beta borrow markets** with historical market data and portfolio event tracking for borrow positions.
 
 **App**
 
@@ -162,11 +162,11 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 - **New `GET /v2/transactions/suffix/{userAddress}/{vaultId}` [endpoint](/api-reference/transactions)** — returns a raw hex suffix to append to transaction calldata, enabling onchain attribution of deposits and withdrawals back to your API key.
 
-- **New borrow markets endpoints ([Alpha](/api-reference/alpha))** — four new endpoints for discovering and analyzing borrowing opportunities:
-  - `GET /alpha/borrow/markets/` — all supported borrow markets across networks
-  - `GET /alpha/borrow/markets/{network}` — filter by network
-  - `GET /alpha/borrow/markets/{network}/{marketId}` — detailed data for a single market, including rates, utilization, and collateral
-  - `GET /alpha/borrow/markets/historical/{network}/{marketId}/{assetAddress}` — historical rates and utilization over time for a specific asset within a market
+- **New borrow markets endpoints ([Beta](/api-reference/beta#borrow-markets))** — four endpoints for discovering and analyzing borrowing opportunities:
+  - `GET /beta/borrow/markets/` — all supported borrow markets across networks
+  - `GET /beta/borrow/markets/{network}` — filter by network
+  - `GET /beta/borrow/markets/{network}/{marketId}` — detailed data for a single market, including rates, utilization, and collateral
+  - `GET /beta/borrow/markets/historical/{network}/{marketId}/{assetAddress}` — historical rates and utilization over time for a specific asset within a market
 
 - **StakeWise V3 transactional support** — deposit and withdrawal flows now available for StakeWise V3 vaults. See the [transactions reference](/api-reference/transactions).
 

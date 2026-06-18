@@ -28,7 +28,7 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 - [Yield & Market Data](https://docs.vaults.fyi/concepts/yield-and-market-data.md): How standardized yield metrics work across 1,000+ vaults via hourly onchain indexing.
 - [Transaction Flows](https://docs.vaults.fyi/concepts/transaction-flows.md): Non-custodial deposit, redeem, and claim payloads — no intermediary contracts.
 - [Portfolio Tracking](https://docs.vaults.fyi/concepts/portfolio-tracking.md): Track positions, detect idle assets, surface personalized deposit recommendations, and report PnL.
-- [Borrowing](https://docs.vaults.fyi/concepts/borrowing.md): Early-access borrow market discovery, user supplied/borrowed positions, risk metrics, and ready-to-sign supply, withdraw, borrow, and repay flows.
+- [Borrowing](https://docs.vaults.fyi/concepts/borrowing.md): Beta borrow market discovery, user supplied/borrowed positions, risk metrics, and ready-to-sign supply, withdraw, borrow, and repay flows.
 - [Supported Protocols & Networks](https://docs.vaults.fyi/concepts/supported-protocols.md): 80+ protocols on 20+ networks. Covers analytics-only vs. full transactional support tiers.
 - [TVL Attribution](https://docs.vaults.fyi/concepts/tvl-attribution.md): Track the deposits, withdrawals, and current TVL your app, wallet, or frontend drives into DeFi vaults.
 
@@ -75,8 +75,8 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 ## Optional
 
-- [Beta Endpoints](https://docs.vaults.fyi/api-reference/beta.md): Features in testing — Deep AMM (liquidity vaults) and Pendle fixed-term markets. More stable than alpha, may still change.
-- [Alpha Endpoints](https://docs.vaults.fyi/api-reference/alpha.md): Early access — Borrow (Aave/Morpho positions and transactions), Solana vaults (SVM), cross-chain intents, and vault holders. May change without notice.
+- [Beta Endpoints](https://docs.vaults.fyi/api-reference/beta.md): Features in testing — Borrow markets, Deep AMM liquidity vaults, Pendle fixed-term markets, and partial returns. More stable than alpha, may still change.
+- [Alpha Endpoints](https://docs.vaults.fyi/api-reference/alpha.md): Early access — Solana vaults (SVM), cross-chain intents, CCTP bridge flows, advanced analytics, historical flows, historical positions, and vault holders. May change without notice.
 
 ## OpenAPI Specs
 

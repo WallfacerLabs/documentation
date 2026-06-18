@@ -9,6 +9,23 @@ description: "Features in testing. More stable than Alpha, but may still change 
 
 Beta features are accessible using your existing API key. The endpoints below cover product areas that are being validated before general availability.
 
+## Borrow markets
+
+Build borrow dashboards and account-health views against one borrow market model instead of wiring separate protocol-specific routes. Use these endpoints for market discovery, historical rates, user positions, user events, and ready-to-sign borrow transaction payloads.
+
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| List all borrow markets | `GET /beta/borrow/markets/` | None |
+| List borrow markets on one network | `GET /beta/borrow/markets/{network}` | Path: `network` |
+| Fetch one borrow market | `GET /beta/borrow/markets/{network}/{marketId}` | Path: `network`, `marketId` |
+| Fetch historical borrow market data | `GET /beta/borrow/markets/historical/{network}/{marketId}/{assetAddress}` | Path: `network`, `marketId`, `assetAddress` |
+| List borrow positions for a wallet | `GET /beta/borrow/portfolio/positions/{userAddress}` | Path: `userAddress` |
+| Fetch one borrow market position | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}` | Path: `userAddress`, `network`, `marketId` |
+| Fetch one asset-level borrow market position | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
+| List borrow market events | `GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
+| Check balances and limits before building a borrow transaction | `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
+| Build a ready-to-sign borrow market transaction | `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `action`, `userAddress`, `network`, `marketId`, `assetAddress`. Query: `amount` or `all=true` when the action requires an amount |
+
 ## The Deep
 
 Build AMM-style vault integrations for Deep liquidity positions. These endpoints cover vault discovery, wallet positions, and ready-to-sign deposit or withdrawal transactions.

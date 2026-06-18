@@ -9,23 +9,6 @@ description: "Early access features. These endpoints may change without notice a
 
 Alpha features are accessible using your existing API key. The endpoints below cover upcoming product areas that are still in active development.
 
-## Borrow markets
-
-Build borrow dashboards and account-health views against one borrow market model instead of wiring separate protocol-specific routes. Use these endpoints for market discovery, historical rates, user positions, user events, and ready-to-sign borrow transaction payloads.
-
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List all borrow markets | `GET /alpha/borrow/markets/` | None |
-| List borrow markets on one network | `GET /alpha/borrow/markets/{network}` | Path: `network` |
-| Fetch one borrow market | `GET /alpha/borrow/markets/{network}/{marketId}` | Path: `network`, `marketId` |
-| Fetch historical borrow market data | `GET /alpha/borrow/markets/historical/{network}/{marketId}/{assetAddress}` | Path: `network`, `marketId`, `assetAddress` |
-| List borrow positions for a wallet | `GET /alpha/borrow/portfolio/positions/{userAddress}` | Path: `userAddress` |
-| Fetch one borrow market position | `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}` | Path: `userAddress`, `network`, `marketId` |
-| Fetch one asset-level borrow market position | `GET /alpha/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
-| List borrow market events | `GET /alpha/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
-| Check balances and limits before building a borrow transaction | `GET /alpha/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
-| Build a ready-to-sign borrow market transaction | `GET /alpha/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `action`, `userAddress`, `network`, `marketId`, `assetAddress`. Query: `amount` or `all=true` when the action requires an amount |
-
 ## Solana vaults
 
 Explore SVM vault support alongside the EVM vault API surface. These endpoints cover Solana vault discovery, detailed vault data, idle assets, wallet positions, and transaction construction.
