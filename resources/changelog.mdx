@@ -8,6 +8,34 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 25, 2026 — Jun 16–22
+
+**API**
+
+- Moved borrow endpoints into **Beta**. Borrow market discovery, historical market data, portfolio positions, portfolio events, and transaction/context routes now live under `/beta/borrow/...`, matching the current stability level of the borrowing API.
+
+- Added pagination to borrow market discovery and borrow event history. `GET /beta/borrow/markets` and `GET /beta/borrow/markets/{network}` now return paginated responses with `itemsOnPage`, `nextPage`, and `data`, making large borrow-market lists easier to consume reliably.
+
+- Added **historical balances** in Alpha with `GET /alpha/historical-balances/{userAddress}/{timestamp}`. Integrators can now reconstruct a user's vault positions and balances at a specific historical timestamp, with the same filtering model used across portfolio-style endpoints.
+
+- Added **SVM portfolio events** in Alpha. `GET /alpha/svm/portfolio/events/{userAddress}` returns Solana/SVM vault activity across supported vaults, while `GET /alpha/svm/portfolio/events/{userAddress}/{vaultAddress}` scopes the result to a single vault.
+
+- Improved transaction support for **Veda / BoringVault** redeem flows by enabling instant redeems where the vault configuration supports them.
+
+- Improved x402 payment handling, including CDP facilitator authentication, `upto` settlement support, and Bazaar-compatible x402 validation.
+
+- Added automatic redirects for older API version paths during version moves, reducing breakage for clients still calling recently moved Alpha/Beta routes.
+
+**App**
+
+- Added a public widget showcase for embedded vault experiences, with follow-up UI refinements shipped during the week.
+
+- Added chart brushing / zoom controls across analytics and vault performance charts, making dense historical data easier to inspect.
+
+- Added vaults.fyi watermarks to app charts and refined their placement so exported/shared charts carry clearer product attribution without covering the data.
+
+---
+
 ## Week 24, 2026 — Jun 9–15
 
 **API**
