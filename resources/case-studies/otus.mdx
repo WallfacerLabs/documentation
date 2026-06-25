@@ -1,0 +1,49 @@
+---
+title: "Otus: Smart Yield Account Powered by vaults.fyi"
+description: "How Otus uses the vaults.fyi API to power Smart Yield, an agent-managed stablecoin account backed by DeFi yield infrastructure."
+sidebarTitle: "Otus"
+---
+
+[Otus](https://www.otus.io/) is building a consumer finance app around one account that can access DeFi yield. Users deposit stablecoins, and Otus manages allocation and rebalancing across an approved set of yield sources.
+
+Otus uses vaults.fyi as the yield infrastructure behind that experience. The Otus team can focus on agent logic, embedded wallets, and consumer UX while vaults.fyi handles vault discovery, risk signals, transaction payloads, position tracking, and attribution across supported DeFi protocols.
+
+## How it works
+
+Smart Yield combines embedded wallets, agent decisioning, and vaults.fyi transaction infrastructure:
+
+1. A user opens a Smart Yield account and deposits stablecoins.
+2. The Otus agent evaluates a whitelisted set of yield sources.
+3. vaults.fyi provides vault metadata, market data, and Reputation Scores to help narrow the approved universe.
+4. vaults.fyi returns ready-to-sign transaction payloads for deposits, rebalances, and withdrawals.
+5. Otus signs and submits transactions through its Privy-powered wallet experience.
+6. vaults.fyi portfolio endpoints track where funds sit and what each user has earned.
+
+The result is a single user-facing balance backed by multiple DeFi vaults, with the custody and signing experience kept separate from the yield infrastructure.
+
+## API capabilities used
+
+The Otus integration uses several vaults.fyi API categories:
+
+- **Vault discovery:** Live and historical APY, TVL, protocol, asset, fee, and metadata across supported EVM vaults.
+- **Reputation Scores:** Protocol, network, and vault-level signals used to narrow the agent's approved universe.
+- **Transaction payloads:** Ready-to-sign deposit, redeem, and claim transactions that Otus routes through its wallet stack.
+- **Portfolio tracking:** Unified position and return data across the underlying protocols a user may be allocated to.
+- **TVL attribution:** Reporting on deposits routed through Otus, with vault-level and address-level detail for reconciliation.
+- **Referral and rebate support:** Attribution data that can support referral and rebate programs where available.
+
+## Risk scoring and curation
+
+Otus does not expose the full DeFi yield universe directly to users. It filters vaults into a conservative set focused on established lending and savings protocols, including over-collateralized money markets. Reputation Scores help the Otus agent evaluate protocol health, network health, and vault history before a strategy can enter the approved set.
+
+Otus focuses on saver-style yields from established markets and treats unusually high-risk sources as out of scope.
+
+## Why Otus built this with vaults.fyi
+
+Smart Yield depends on breadth and reliability. The agent needs current data, risk context, transaction execution, and position tracking across many protocols, not a single hardcoded vault. Building that in-house would mean maintaining protocol-specific integrations, monitoring rate changes, normalizing portfolio data, and building attribution workflows across multiple DeFi systems.
+
+With vaults.fyi, Otus gets one API layer for discovery, risk filtering, transactions, portfolio tracking, attribution, and referral or rebate support. That lets the team keep its engineering focus on the agent and account experience.
+
+---
+
+Ready to build an agent-managed yield account? [Get API access](https://portal.vaults.fyi/signup) to start integrating.
