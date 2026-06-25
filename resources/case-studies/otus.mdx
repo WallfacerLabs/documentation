@@ -10,14 +10,31 @@ Otus uses vaults.fyi as the yield infrastructure behind that experience. The Otu
 
 ## How it works
 
-Smart Yield combines embedded wallets, agent decisioning, and vaults.fyi transaction infrastructure:
+Smart Yield combines embedded wallets, agent decisioning, and vaults.fyi transaction infrastructure.
 
-1. A user opens a Smart Yield account and deposits stablecoins.
-2. The Otus agent evaluates a whitelisted set of yield sources.
-3. vaults.fyi provides vault metadata, market data, and Reputation Scores to help narrow the approved universe.
-4. vaults.fyi returns ready-to-sign transaction payloads for deposits, rebalances, and withdrawals.
-5. Otus signs and submits transactions through its Privy-powered wallet experience.
-6. vaults.fyi portfolio endpoints track where funds sit and what each user has earned.
+<Columns cols={2}>
+  <Column>
+    **Example User Flow**
+
+    1. A user opens a Smart Yield account and deposits stablecoins.
+    2. The Otus agent evaluates a whitelisted set of yield sources.
+    3. vaults.fyi provides vault metadata, market data, and Reputation Scores to help narrow the approved universe.
+    4. vaults.fyi returns ready-to-sign transaction payloads for deposits, rebalances, and withdrawals.
+    5. Otus signs and submits transactions through its Privy-powered wallet experience.
+    6. vaults.fyi portfolio endpoints track where funds sit and what each user has earned.
+  </Column>
+  <Column>
+    <Frame>
+      <img
+        src="/images/otus_case_study_screenshot.png"
+        alt="Otus Case Study Screenshot 1"
+        title="Otus Case Study Screenshot 1"
+        className="mx-auto"
+        style={{ width:"77%" }}
+      />
+    </Frame>
+  </Column>
+</Columns>
 
 The result is a single user-facing balance backed by multiple DeFi vaults, with the custody and signing experience kept separate from the yield infrastructure.
 
