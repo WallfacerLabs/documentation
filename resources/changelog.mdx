@@ -8,6 +8,36 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 26, 2026 — Jun 23–29
+
+**API**
+
+- Moved **SVM / Solana vault endpoints into Beta**. Solana vault discovery, detailed vaults, portfolio positions, portfolio events, idle assets, transaction context, and transaction payloads now live under `/beta/svm/...`, matching their current stability level in the API Reference.
+
+- Added **SVM idle asset tracking** for Solana portfolios. `GET /beta/svm/portfolio/idle-assets/{userAddress}` returns idle token balances for a user, while `GET /beta/svm/portfolio/idle-assets/{userAddress}/{assetAddress}` scopes the result to a single asset.
+
+- Added optional **SVM transaction simulation** with `simulate=true` on `GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}`. Responses can now include simulation status plus token amounts expected to be spent or received, helping integrators preview Solana vault actions before signing.
+
+- Expanded SVM detailed-vault filtering. `GET /beta/svm/detailed-vaults` now supports filters such as `allowedAssets`, `allowedProtocols`, and `minTvl`, making Solana vault discovery easier to narrow down programmatically.
+
+- Expanded V2 vault and portfolio recommendation filters. `GET /v2/detailed-vaults`, `GET /v2/portfolio/best-vault/{userAddress}`, and `GET /v2/portfolio/best-deposit-options/{userAddress}` now expose additional filtering options including `maxApy`, `maxTvl`, `tags`, and `curators`. Portfolio recommendation endpoints now default toward app-featured vaults and exclude warning-flagged vaults unless requested.
+
+- Added vault **composition** to Alpha advanced analytics. `POST /alpha/advanced-analytics` can now request `select.composition`, returning the vault's underlying investments and allocation percentages where available.
+
+- Expanded Beta borrow market coverage with **Compound V3** and **Spark** market support, and improved borrow position handling so live oracle issues on a market do not hide otherwise available user position data.
+
+- Improved x402 payment infrastructure with batch settlement support and Bazaar-compatible bigint handling for payment validation flows.
+
+**App**
+
+- Updated app vault routes and internal links to use stable `vaultId` values instead of raw vault addresses. This improves support for non-address vault identifiers and keeps app links aligned with API identity fields.
+
+- Stabilized the best-performing vaults cache warmup used by analytics views, reducing stale or missing chart data during cache refreshes.
+
+- Added a shorter one-line MCP setup path on the hosted MCP landing page, making agent setup easier to copy directly into a terminal.
+
+---
+
 ## Week 25, 2026 — Jun 16–22
 
 **API**
