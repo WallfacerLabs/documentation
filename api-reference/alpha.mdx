@@ -9,20 +9,6 @@ description: "Early access features. These endpoints may change without notice a
 
 Alpha features are accessible using your existing API key. The endpoints below cover upcoming product areas that are still in active development.
 
-## Solana vaults
-
-Explore SVM vault support alongside the EVM vault API surface. These endpoints cover Solana vault discovery, detailed vault data, idle assets, wallet positions, and transaction construction.
-
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List SVM vault identifiers | `GET /alpha/svm/vaults` | None |
-| List SVM detailed vaults | `GET /alpha/svm/detailed-vaults` | None |
-| Fetch one SVM detailed vault | `GET /alpha/svm/detailed-vaults/{vaultAddress}` | Path: `vaultAddress` |
-| Fetch one idle SVM asset | `GET /alpha/svm/idleAsset/{userId}/{assetId}` | Path: `userId`, `assetId` |
-| List SVM positions for a wallet | `GET /alpha/svm/positions/{userId}` | Path: `userId` |
-| Check balances and limits before building an SVM transaction | `GET /alpha/svm/transactions/context/{userAddress}/{vaultAddress}` | Path: `userAddress`, `vaultAddress` |
-| Build a ready-to-sign SVM transaction | `GET /alpha/svm/transactions/{action}/{userAddress}/{vaultAddress}` | Path: `action`, `userAddress`, `vaultAddress`. Query: `assetAddress`, plus `amount` when the action requires an amount |
-
 ## Cross-chain intents
 
 Quote, execute, and track intent-based cross-chain position changes. This is the higher-level cross-chain transaction flow for products that want to move users into vault positions without building every bridge and execution step themselves.
@@ -67,6 +53,14 @@ Fetch a wallet's historical vault positions for account history, retention analy
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List historical positions for a wallet | `GET /alpha/historical-positions/{userAddress}` | Path: `userAddress`. Optional query: `fromTimestamp`, `toTimestamp` |
+
+## Historical balances
+
+Reconstruct a wallet's vault balances at a specific point in time. This is useful for historical account snapshots, period reporting, retention analysis, and backtesting portfolio views against previous user exposure.
+
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| Fetch historical balances for a wallet | `GET /alpha/historical-balances/{userAddress}/{timestamp}` | Path: `userAddress`, `timestamp`. Optional query filters include `allowedNetworks`, `disallowedNetworks`, `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `maxTvl`, `minApy`, `maxApy`, `minVaultScore`, `tags`, `curators`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `minUsdAssetValueThreshold`, `apyInterval`, `sortBy`, and `sortOrder` |
 
 ## Holders
 

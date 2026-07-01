@@ -9,17 +9,36 @@ description: "Features in testing. More stable than Alpha, but may still change 
 
 Beta features are accessible using your existing API key. The endpoints below cover product areas that are being validated before general availability.
 
+## Solana vaults
+
+Build Solana/SVM vault integrations alongside the EVM vault API surface. These endpoints cover Solana vault discovery, detailed vault data, wallet positions and events, idle assets, and ready-to-sign transaction construction.
+
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| List SVM vault identifiers | `GET /beta/svm/vaults` | None |
+| List SVM detailed vaults | `GET /beta/svm/detailed-vaults` | None. Optional query: `page`, `perPage`, `assetSymbol`, `allowedAssets`, `allowedProtocols`, `minTvl` |
+| Fetch one SVM detailed vault | `GET /beta/svm/detailed-vaults/{vaultAddress}` | Path: `vaultAddress` |
+| List SVM positions for a wallet | `GET /beta/svm/portfolio/positions/{userAddress}` | Path: `userAddress` |
+| List SVM portfolio events for a wallet | `GET /beta/svm/portfolio/events/{userAddress}` | Path: `userAddress` |
+| List SVM portfolio events for one vault | `GET /beta/svm/portfolio/events/{userAddress}/{vaultAddress}` | Path: `userAddress`, `vaultAddress` |
+| List idle SVM assets for a wallet | `GET /beta/svm/portfolio/idle-assets/{userAddress}` | Path: `userAddress` |
+| Fetch one idle SVM asset | `GET /beta/svm/portfolio/idle-assets/{userAddress}/{assetAddress}` | Path: `userAddress`, `assetAddress` |
+| Check balances and limits before building an SVM transaction | `GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}` | Path: `userAddress`, `vaultAddress` |
+| Build a ready-to-sign SVM transaction | `GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}` | Path: `action`, `userAddress`, `vaultAddress`. Query: `assetAddress`, plus `amount` when the action requires an amount. Optional query: `simulate` |
+
+SVM transaction responses return one or more actions with a Solana transaction object at `actions[].tx.transaction`. The value is a base64-encoded serialized Solana transaction ready for wallet signing. Passing `simulate=true` can add a `simulation` object with status plus token amounts expected to be spent or received.
+
 ## Borrow markets
 
 Build borrow dashboards and account-health views against one borrow market model instead of wiring separate protocol-specific routes. Use these endpoints for market discovery, historical rates, user positions, user events, and ready-to-sign borrow transaction payloads.
 
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
-| List all borrow markets | `GET /beta/borrow/markets/` | None |
-| List borrow markets on one network | `GET /beta/borrow/markets/{network}` | Path: `network` |
+| List all borrow markets | `GET /beta/borrow/markets/` | None. Optional query: `page`, `perPage` |
+| List borrow markets on one network | `GET /beta/borrow/markets/{network}` | Path: `network`. Optional query: `page`, `perPage` |
 | Fetch one borrow market | `GET /beta/borrow/markets/{network}/{marketId}` | Path: `network`, `marketId` |
 | Fetch historical borrow market data | `GET /beta/borrow/markets/historical/{network}/{marketId}/{assetAddress}` | Path: `network`, `marketId`, `assetAddress` |
-| List borrow positions for a wallet | `GET /beta/borrow/portfolio/positions/{userAddress}` | Path: `userAddress` |
+| List borrow positions for a wallet | `GET /beta/borrow/portfolio/positions/{userAddress}` | Path: `userAddress`. Optional query: `allowedNetworks`, `disallowedNetworks`, `allowedAssets`, `disallowedAssets`, `minUsdAssetValueThreshold`, `sortBy`, `sortOrder` |
 | Fetch one borrow market position | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}` | Path: `userAddress`, `network`, `marketId` |
 | Fetch one asset-level borrow market position | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
 | List borrow market events | `GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetAddress}` | Path: `userAddress`, `network`, `marketId`, `assetAddress` |
