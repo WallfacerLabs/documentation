@@ -8,6 +8,30 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 27, 2026 — Jun 30–Jul 6
+
+**API**
+
+- Added **Robinhood** network support across V2 network-aware endpoints. `GET /v2/networks` now includes `robinhood` / `eip155:4663`, and Robinhood vaults can be discovered through standard V2 vault filters such as `allowedNetworks=robinhood`.
+
+- Added initial **Morpho vault coverage on Robinhood**. V2 detailed vault responses now include Robinhood Morpho opportunities with the same vault metadata, APY, TVL, capacity, transaction-readiness, and app links used on other supported networks.
+
+- Added protocol **display names** to API responses. Protocol objects now include `displayName` where available, giving integrators user-facing labels such as `Morpho`, `Aave`, or `Ether.fi` while preserving the canonical `name` field for filtering and stable identifiers.
+
+- Expanded withdrawal-pause analytics coverage in Alpha. `POST /alpha/advanced-analytics` can now calculate `withdrawalPauseRatio` for more protocols that expose pause/unpause events, and only returns the metric when all required event topics have been indexed and backfilled.
+
+- Improved x402 payment metadata for API clients. Payment-required responses now use the externally forwarded HTTPS URL when building the payment resource, include `USDC` in payment asset metadata, and can return the x402 flow for eligible endpoints without requiring a separate opt-in header.
+
+- Improved Portal API-key activation. Newly created API keys now trigger an API-key cache refresh, reducing the delay between creating a key in the Portal and using it against the API.
+
+**App**
+
+- Updated protocol labels across vault discovery, dashboard positions, analytics breakdowns, opportunity pages, and protocol filters to use display names instead of raw protocol slugs.
+
+- Improved protocol search and filtering so users can find protocols by either their canonical slug or their display name.
+
+---
+
 ## Week 26, 2026 — Jun 23–29
 
 **API**
