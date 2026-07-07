@@ -1,28 +1,35 @@
 ---
-title: "Embed Yield and Borrowing in Any Wallet or Consumer App"
-description: "Add real-time yield discovery, borrowing views, non-custodial transactions, and customizable fee revenue to your wallet or app with a single API integration."
+title: "Embed Yield and Borrowing in Wallets and Consumer Apps"
+description: "Give users earn and borrow features with the data, risk context, transaction payloads, portfolio tracking, attribution, and fee logic your team needs."
 sidebarTitle: "For Wallets & Apps"
 ---
 
-A single Vaults.fyi integration gives wallets, exchanges, neobanks, fintech apps, portfolio tools, and aggregators access to hundreds of audited yield vaults across 80\+ protocols and 20\+ chains. You get live market data, ready-to-sign transaction payloads, portfolio tracking, and early-access borrowing support — without building protocol-specific integrations or running custodial infrastructure.
+Vaults.fyi gives wallets, exchanges, neobanks, fintech apps, portfolio tools, and aggregators the building blocks for embedded earn and borrow experiences across 80\+ protocols and 20\+ chains. Use normalized vault and market data as the foundation, then add transaction payloads, portfolio tracking, borrowing views, attribution, or fee logic as your product evolves.
 
 ## Why it matters
 
-Earn products need three layers to work well: discovery before deposit, execution at the moment of intent, and reporting after capital moves. Vaults.fyi covers all three in one integration, so your team can ship the product experience without maintaining per-protocol data pipelines or transaction logic.
+Consumer platforms already have the user relationship, asset context, and trust surface for earn and borrow features. The hard part is turning fragmented DeFi markets into product-safe options: which opportunities to show, how to explain them, how to route the user, and how to track what happens after capital moves.
+
+Vaults.fyi gives your team the components to do that without rebuilding the market stack. Start with ranked vaults, APY windows, TVL, protocol metadata, rewards, fees, capacity, and risk/return context. Then add the workflows that matter for your roadmap: non-custodial execution, portfolio tracking, TVL attribution, borrowing views, and monetization.
 
 Use Vaults.fyi to:
 
 - Match yield opportunities to the assets a user already holds.
 - Filter out vaults that do not meet your risk/return policy.
-- Prepare non-custodial transactions for deposits, withdrawals, and reward claims.
-- Show position balances, returns, and history after deposit.
-- Measure the TVL your product drives.
+- Compare APY, TVL, fees, rewards, capacity, curators, networks, and protocols with one schema.
+- Prepare non-custodial transactions for deposits, withdrawals, and reward claims when you want execution.
+- Show position balances, returns, and history when you want portfolio tracking.
+- Measure retained TVL when you want partner reporting, rebates, or commercial attribution.
 
 ## What you can build
 
 <CardGroup cols={2}>
   <Card title="Yield discovery" icon="magnifying-glass" href="/concepts/vault-discovery">
     Surface ranked vault opportunities filtered by asset, network, APY, and reputation score. Users see exactly where their idle funds can earn.
+  </Card>
+
+  <Card title="Data-only yield views" icon="table" href="/api-reference/endpoint/get-detailed-vaults">
+    Build discovery screens, internal allowlists, comparison tables, or routing logic from normalized vault data without adding transactions.
   </Card>
 
   <Card title="1-click deposits and withdrawals" icon="arrow-right-arrow-left" href="/concepts/transaction-flows">
@@ -48,20 +55,22 @@ Use Vaults.fyi to:
 
 ## How integration works
 
+Most teams start by fetching vault data. The later steps are optional modules you can add when your product needs execution, attribution, portfolio tracking, or borrowing.
+
 <Steps>
   <Step title="Fetch vaults">
     Call `GET /v2/detailed-vaults` to retrieve a filtered, ranked list of vaults with APY, TVL, the Reputation Score, and protocol metadata. Apply filters for asset, network, or minimum reputation score to match your users' needs.
   </Step>
-  <Step title="Generate a transaction payload">
-    Call the transactions endpoint with the vault address, user wallet, and deposit amount. The API returns a ready-to-sign payload — no intermediary contracts involved.
+  <Step title="Optional: generate a transaction payload">
+    Call the transactions endpoint with the vault address, user wallet, and deposit amount. The API returns a ready-to-sign payload with no intermediary contracts involved.
   </Step>
-  <Step title="Sign and submit">
+  <Step title="Optional: sign and submit">
     Pass the payload to the user's wallet for signing. Your app broadcasts the transaction. The user interacts directly with the target protocol.
   </Step>
-  <Step title="Track attributed TVL">
+  <Step title="Optional: track attributed TVL">
     Transactions generated through Vaults.fyi include TVL tracking automatically, so you can measure retained balances and vault-level flows in portal.vaults.fyi. If you build vault transactions yourself, append a free attribution suffix instead. Learn more in [TVL Attribution](/concepts/tvl-attribution).
   </Step>
-  <Step title="Track positions">
+  <Step title="Optional: track positions">
     Use the portfolio endpoints to display the user's current balance in each vault, yield earned since deposit, and estimated annual return.
   </Step>
   <Step title="Optional: add borrowing views">
@@ -95,7 +104,7 @@ You can attach fees to any deposit or withdrawal routed through your app. The AP
   </Card>
 </CardGroup>
 
-Fee logic is implemented directly in the API payload — no custom smart contract development required. For bespoke fee modules, the Vaults.fyi team works with you to design and validate the implementation.
+Fee logic is implemented directly in the API payload. No custom smart contract development required. For bespoke fee modules, the Vaults.fyi team works with you to design and validate the implementation.
 
 <Tip>
   With EIP-7702, you can implement fee flows for traditional EOAs without requiring users to migrate to a smart wallet. This expands your monetization reach across all wallet types.
@@ -106,5 +115,5 @@ Fee logic is implemented directly in the API payload — no custom smart contrac
 [Arbitrum Earn](/resources/case-studies/arbitrum) uses Vaults.fyi to bring native yield discovery and execution into the Arbitrum Portal. [Kraken Wallet](https://www.kraken.com/wallet) surfaces yield opportunities directly inside the wallet interface, while [Jumper Earn](https://jumper.exchange/) integrates the same API to power its cross-chain yield aggregation experience.
 
 <Info>
-  [Sign up](https://portal.vaults.fyi/signup) to get API access — pricing details are on the [Plans](/plans/overview) page.
+  [Sign up](https://portal.vaults.fyi/signup) to get API access. Pricing details are on the [Plans](/plans/overview) page.
 </Info>
