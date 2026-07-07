@@ -1,0 +1,111 @@
+---
+title: "Why use Vaults.fyi?"
+description: "Use one API for DeFi yield data, risk context, transaction preparation, portfolio tracking, TVL attribution, and agent workflows."
+sidebarTitle: "Why Vaults.fyi?"
+---
+
+Vaults.fyi is the data and execution layer for onchain yield. One integration gives you standardized vault data, risk/return context, non-custodial transaction preparation, portfolio tracking, TVL attribution, and agent-ready access across 1,000\+ strategies, 80\+ protocols, and 20\+ chains.
+
+Use Vaults.fyi when you need more than a list of APYs. The API is built for products and teams that need to decide which vaults to show, explain why they are relevant, execute deposits and withdrawals, and report what happened after capital moved.
+
+## What Vaults.fyi replaces
+
+<CardGroup cols={2}>
+  <Card title="Protocol-by-protocol integrations" icon="code">
+    Query one schema instead of maintaining custom adapters, transaction builders, and data pipelines for every protocol.
+  </Card>
+
+  <Card title="Inconsistent yield data" icon="chart-line">
+    Compare APY, TVL, fees, rewards, capacity, and vault metadata using a normalized methodology across protocols and chains.
+  </Card>
+
+  <Card title="Manual risk screening" icon="shield-check">
+    Use reputation scores, warnings, flags, holder data, curator metadata, and benchmark context before showing or allocating to a vault.
+  </Card>
+
+  <Card title="Post-deposit blind spots" icon="wallet">
+    Track positions, returns, reward balances, history, idle assets, and attributed TVL after users deposit.
+  </Card>
+</CardGroup>
+
+## Value by user
+
+<Tabs>
+  <Tab title="Consumer platforms">
+    Add yield to products with users, wallets, and idle balances: wallets, exchanges, neobanks, fintech apps, portfolio tools, and aggregators.
+
+    - Show relevant vaults for the assets a user already holds.
+    - Rank opportunities by APY window, TVL, asset, network, protocol, curator, or reputation score.
+    - Generate ready-to-sign deposit, redeem, withdraw, and claim payloads.
+    - Keep the flow non-custodial. Users sign with their wallet and funds move directly to the underlying protocol.
+    - Track positions and returns after deposit, including rewards and historical activity.
+    - Measure retained TVL by vault, protocol, curator, network, and asset.
+
+    [See the wallets and apps guide](/use-cases/for-wallets-and-apps).
+  </Tab>
+
+  <Tab title="Analysts and data teams">
+    Use clean DeFi yield data without building an indexing stack.
+
+    - Query standardized APY, TVL, fees, rewards, and vault metadata across the market.
+    - Separate base yield from reward APY across 1 hour, 1 day, 7 day, and 30 day windows.
+    - Pull historical APY, TVL, and share-price data for analysis, dashboards, and reporting.
+    - Compare vaults against USD and ETH benchmark rates.
+    - Filter by reputation score, warnings, asset, network, protocol, curator, TVL, or capacity.
+
+    [See the analysts guide](/use-cases/for-analysts).
+  </Tab>
+
+  <Tab title="Protocols and curators">
+    Make vaults easier for wallets, apps, and analysts to discover and measure.
+
+    - Surface vaults through API integrations used by wallets, apps, and dashboards.
+    - Provide standardized vault metadata, APY, TVL, fees, rewards, and risk context to integrators.
+    - Track attributed deposits, withdrawals, and retained TVL from partner surfaces.
+    - Show performance against market benchmarks.
+    - Give partners the data they need to explain the vault before a user deposits.
+
+    [See the protocols guide](/use-cases/for-protocols).
+  </Tab>
+
+  <Tab title="AI agents">
+    Give agents a structured yield toolset instead of a pile of protocol docs.
+
+    - Discover vaults and compare risk/return with structured filters.
+    - Fetch vault detail, history, benchmarks, portfolio state, and transaction context.
+    - Prepare transaction payloads for user approval.
+    - Use the hosted MCP server for tool-based workflows.
+    - Use x402 for keyless, pay-per-request access.
+
+    [See the AI and agents guide](/ai-agents/overview).
+  </Tab>
+</Tabs>
+
+## Core capabilities
+
+| Capability | What you get |
+| --- | --- |
+| Market data | APY, TVL, fees, rewards, capacity, assets, protocols, curators, networks, and vault metadata. |
+| Risk/return context | Reputation scores, component scores, warnings, flags, holder data, benchmarks, and historical context. |
+| Transactions | Ready-to-sign payloads for deposits, redemptions, withdrawals, and reward claims with no Vaults.fyi wrapper contract. |
+| Portfolio | Wallet-level positions, returns, history, idle assets, and recommendations. |
+| Attribution | Partner-level tracking for deposits, withdrawals, retained TVL, vaults, protocols, curators, networks, and assets. |
+| Agent access | Hosted MCP server and x402 access for autonomous workflows. |
+
+<Tip>
+  For user-facing APY displays, label the window, such as 7 day or 30 day, and state whether rewards are included. Use base APY when you want to show organic yield without token incentives.
+</Tip>
+
+## Trusted integrations
+
+Vaults.fyi powers yield analytics, dashboards, and transaction flows for [Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper Earn](/resources/case-studies/jumper-earn), [Kraken Wallet](/resources/case-studies/kraken-wallet), [Gauntlet](/resources/case-studies/gauntlet), [Maple Finance](/resources/case-studies/maple-finance), [KPK](/resources/case-studies/kpk), and more.
+
+<CardGroup cols={2}>
+  <Card title="Start with the API" icon="code" href="/api-reference/overview">
+    Review the endpoint groups for vault data, transactions, portfolios, benchmarks, and near real-time state.
+  </Card>
+
+  <Card title="Use the SDK" icon="rocket" href="/sdk/quickstart">
+    Install the TypeScript or Python SDK and make your first request in minutes.
+  </Card>
+</CardGroup>

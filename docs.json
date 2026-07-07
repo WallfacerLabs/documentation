@@ -28,6 +28,7 @@
             "group": "Overview",
             "pages": [
               "introduction",
+              "why-vaultsfyi",
               "use-cases/for-wallets-and-apps",
               "use-cases/for-analysts",
               "use-cases/for-protocols"
