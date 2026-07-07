@@ -1,6 +1,6 @@
 ---
 title: "API Credits & Compute Units Explained"
-description: "Learn how vaults.fyi Credits (Compute Units) work, and see the full table of base costs and per-datapoint costs for every v2 endpoint."
+description: "Learn how vaults.fyi Credits (Compute Units) work, and see the full table of base costs and per-datapoint costs for v2 and beta endpoints."
 sidebarTitle: "Credits"
 ---
 
@@ -10,6 +10,7 @@ import BenchmarksCreditCosts from "./data/v2-benchmarks-credit-costs.mdx";
 import HistoricalCreditCosts from "./data/v2-historical-credit-costs.mdx";
 import PortfolioCreditCosts from "./data/v2-portfolio-credit-costs.mdx";
 import TransactionsCreditCosts from "./data/v2-transactions-credit-costs.mdx";
+import BetaCreditCosts from "./data/beta-credit-costs.mdx";
 import LegacyV1CreditCosts from "./data/v1-credit-costs.mdx";
 
 Every vaults.fyi API request consumes Credits. Credits — also called Compute Units (CUs) — measure the compute resources consumed by each request. Subscription plans include a monthly Credit budget, while pay as you go charges a flat **$0.002 per credit**. This model lets you pay proportionally for what you actually use, rather than treating a simple lookup the same as a rich multi-vault data pull.
@@ -58,6 +59,12 @@ All plans can access portfolio endpoints.
 All plans can access transaction endpoints.
 
 <TransactionsCreditCosts />
+
+## Beta Endpoint Credit Costs
+
+Beta endpoints use the same base-cost and per-datapoint model as v2 endpoints.
+
+<BetaCreditCosts />
 
 ## Legacy v1 API Credits
 
