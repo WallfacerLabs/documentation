@@ -14,7 +14,7 @@ The full API reference optimized for LLM consumption is available at [llms.txt](
 - **Evaluate risk** — Use the Reputation Score and benchmark rates to compare vaults against money-market baselines and assess protocol risk without custom logic.
 - **Execute transactions** — Receive ready-to-sign deposit, redeem, and reward-claim payloads. No intermediary contracts, fully non-custodial.
 - **Handle advanced protocols** — The API abstracts deferred deposits, delayed withdrawals, and multi-step flows so your agent doesn't need to model each protocol's behavior.
-- **Claim rewards** — Merkl reward claiming is supported via `/v2/transactions/rewards/claim/{address}`.
+- **Claim rewards** — Merkl reward claiming is supported via `/v2/transactions/rewards/claim/{userAddress}`.
 - **Manage portfolios** — Track user positions, detect idle assets, and surface personalized opportunities matched to wallet holdings via portfolio endpoints.
 
 ## Key advantages
@@ -29,7 +29,7 @@ The full API reference optimized for LLM consumption is available at [llms.txt](
 
 **Reward claiming via Merkl.** The API integrates Merkl reward data and generates ready-to-submit claim transactions, so agents can manage the full yield lifecycle including harvesting.
 
-**Portfolio management endpoints.** Endpoints like `/v2/positions/{address}`, `/v2/idle-assets/{address}`, and `/v2/best-vault/{address}` give agents the full context they need to make allocation decisions for a given wallet.
+**Portfolio management endpoints.** Endpoints like `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, and `/v2/portfolio/best-vault/{userAddress}` give agents the full context they need to make allocation decisions for a given wallet.
 
 ## Integration options
 

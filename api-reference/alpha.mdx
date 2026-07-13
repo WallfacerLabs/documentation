@@ -37,6 +37,7 @@ Request heavier per-vault analytics only when your product needs them, rather th
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List advanced vault analytics using selected analytics sections | `POST /alpha/advanced-analytics` | JSON body: `select`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `page`, and `perPage` |
+| Fetch advanced analytics for one vault | `POST /alpha/advanced-analytics/{network}/{vaultId}` | Path: `network`, `vaultId`. JSON body: `select` |
 
 ## Historical flows
 

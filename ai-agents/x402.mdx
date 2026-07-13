@@ -65,10 +65,10 @@ All prices are in USDC on Base, charged per request. Payment is in USDC raw unit
 | Price  | Endpoints |
 | ------ | --------- |
 | $0.005 | `/v2/networks`, `/v2/vaults`, `/v2/tags`, `/v2/assets`, `/v2/curators` |
-| $0.01  | `/v2/vaults/{network}/{address}`, `/v2/vaults/{network}/{address}/performance` |
-| $0.02  | `/v2/detailed-vaults/{network}/{address}`, `/v2/positions/{address}` |
-| $0.025 | `/v2/deposit-options/{address}`, `/v2/idle-assets/{address}`, `/v2/best-vault/{address}` |
-| $0.05  | `/v2/transactions/*`, `/v2/transactions/rewards/claim/{address}` |
+| $0.01  | `/v2/detailed-vaults/{network}/{vaultId}/apy`, `/v2/detailed-vaults/{network}/{vaultId}/tvl` |
+| $0.02  | `/v2/detailed-vaults/{network}/{vaultId}`, `/v2/portfolio/positions/{userAddress}` |
+| $0.025 | `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}` |
+| $0.05  | `/v2/transactions/*`, `/v2/transactions/rewards/claim/{userAddress}` |
 | $0.75  | `/v2/detailed-vaults` (paginated list of all vaults) |
 | Free   | `/v2/health` |
 
