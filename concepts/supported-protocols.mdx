@@ -1,10 +1,10 @@
 ---
 title: "Supported DeFi Protocols and Networks on Vaults.fyi"
-description: "Vaults.fyi covers 80+ DeFi protocols on 20+ networks including Aave, Morpho, Lido, and Yearn. Learn about analytics vs. transactional support tiers."
+description: "Vaults.fyi covers 80+ DeFi protocols on 20+ EVM networks plus Solana/SVM Beta coverage, including Aave, Morpho, Kamino, Drift, Jupiter, Jito, Lido, and Yearn."
 sidebarTitle: "Supported Protocols"
 ---
 
-Vaults.fyi covers over 80 DeFi protocols across more than 20 networks. For each supported protocol, you get standardized market data — APY, TVL, fees, and the Reputation Score — through the same API endpoints, regardless of how each protocol is implemented under the hood.
+Vaults.fyi covers over 80 DeFi protocols across more than 20 EVM networks, plus Solana/SVM vault coverage in Beta. For each supported protocol, you get standardized market data — APY, TVL, fees, and the Reputation Score — through one API surface, regardless of how each protocol is implemented under the hood.
 
 ## Analytics vs. transactional support
 
@@ -35,16 +35,17 @@ The following protocols are among the most widely used on Vaults.fyi:
 - **Lido** — liquid staking for ETH with broad DeFi integrations
 - **Compound** — one of the original onchain money markets
 - **Yearn** — automated yield aggregation with multi-strategy vaults
+- **Kamino, Drift, Jupiter, and Jito** — Solana/SVM vault coverage available through the Beta API
 
-These protocols represent a cross-section of the 80\+ covered. For the authoritative list, query `GET /v2/protocols` directly.
+These protocols represent a cross-section of the 80\+ covered. For the authoritative V2 EVM protocol list, query `GET /v2/protocols` directly. For Solana/SVM coverage, use the Beta SVM endpoints.
 
 ## Full protocol list
 
-The following protocols are supported as of April 2026:
+The following protocols are supported as of July 2026:
 
 <AccordionGroup>
   <Accordion title="View all 80+ supported protocols">
-    40acres, Aave, Aera, Ajna, Angle, Ankr, APYx, Arcadia, Avantis, Avon, Backed, Beefy, Cap, Centrifuge, Coinbase cbETH, Compound, Concrete, Convex, Dolomite, Ember, Ethena, Ether.Fi, Ethx, Euler, Extrafi, Fluid, Frax, Gearbox, Harvest Finance, Hop, Hyperbeat, Hyperlend, Infinifi, Inverse Finance, IPOR, Kelp, Lagoon, Level, Lido, ListaDAO, Maker, Matrixdock, Mellow, Midas, Moonwell, Morpho, Mountain, Nashpoint, Notional, Ondo, Open Eden, OpenCover, Origin, Overnight Finance, Reservoir, Resolv, Revert.Finance, Rocket Pool, Seamless, Silo, Sky, Spark, Stader Ethx, Stakewise, Stargate, Summer.Fi, Superform, Swell, Syrup, Term, Tokemak, Tydro, Ultrayield, Upshift Finance, Veda, Venus, Wildcat, Yearn, Yearn yEth, Yo
+    40acres, Aave, Aera, Ajna, Angle, Ankr, APYx, Arcadia, Avantis, Avon, Backed, Beefy, Cap, Centrifuge, Coinbase cbETH, Compound, Concrete, Convex, Dolomite, Drift, Ember, Ethena, Ether.Fi, Ethx, Euler, Extrafi, Fluid, Frax, Gearbox, Harvest Finance, Hop, Hyperbeat, Hyperlend, Infinifi, Inverse Finance, IPOR, Jito, Jupiter, Kamino, Kelp, Lagoon, Level, Lido, ListaDAO, Maker, Matrixdock, Mellow, Midas, Moonwell, Morpho, Mountain, Nashpoint, Notional, Ondo, Open Eden, OpenCover, Origin, Overnight Finance, Reservoir, Resolv, Revert.Finance, Rocket Pool, Seamless, Silo, Sky, Spark, Stader Ethx, Stakewise, Stargate, Summer.Fi, Superform, Swell, Syrup, Term, Tokemak, Tydro, Ultrayield, Upshift Finance, Veda, Venus, Wildcat, Yearn, Yearn yEth, Yo
   </Accordion>
 </AccordionGroup>
 
@@ -90,6 +91,10 @@ Vaults.fyi currently supports the following networks:
 
     Plasma
 
+    Robinhood
+
+    Solana (SVM, Beta)
+
     Swellchain
 
     Unichain
@@ -99,7 +104,7 @@ Vaults.fyi currently supports the following networks:
 </AccordionGroup>
 
 <Tip>
-  Query `GET /v2/networks` to get the live list of supported networks with their chain IDs. Use the chain IDs when filtering vault queries by network.
+  Query `GET /v2/networks` to get the live list of V2 EVM networks with their chain IDs. Solana/SVM endpoints are available in [Beta](/api-reference/beta#solana-vaults).
 </Tip>
 
 ## How coverage expands
@@ -108,7 +113,8 @@ Vaults.fyi continuously adds new protocols and networks. When a new protocol lau
 
 To check the current state of any protocol or network programmatically, use the reference endpoints:
 
-- `GET /v2/protocols` — returns protocol names, products, and versions
-- `GET /v2/networks` — returns supported networks with chain IDs
+- `GET /v2/protocols` — returns protocol names, products, and versions for the V2 EVM API
+- `GET /v2/networks` — returns supported V2 EVM networks with chain IDs
+- `GET /beta/svm/detailed-vaults` — returns Solana/SVM vault coverage in Beta
 
 These endpoints always reflect the live state of the API, so they are more reliable than any static list.

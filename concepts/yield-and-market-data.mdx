@@ -4,7 +4,7 @@ description: "Query standardized APY, TVL, fees, the Reputation Score, and rewar
 sidebarTitle: "Yield & Market Data"
 ---
 
-The Vaults.fyi API gives you standardized market data for over 1,000 DeFi yield vaults across 80+ protocols and 20+ chains. Instead of building and maintaining one-off integrations per protocol, you get a single endpoint that returns consistent, comparable data for every supported vault.
+The Vaults.fyi API gives you standardized market data for over 1,000 DeFi yield vaults across 80+ protocols, 20+ EVM chains, and Solana/SVM vault coverage in Beta. Instead of building and maintaining one-off integrations per protocol, you get a single endpoint family that returns consistent, comparable data for supported vaults.
 
 Data is indexed onchain on an hourly basis, so you always have current metrics alongside the full historical record you need for backtesting and trend analysis.
 
@@ -35,7 +35,7 @@ For a complete field-by-field reference covering everything the API can tell you
   </Card>
 </CardGroup>
 
-You can also query reference data — supported networks, tokens, and protocols — using `GET /v2/networks`, `GET /v2/tokens`, and `GET /v2/protocols`. These are useful for building filter dropdowns and validating user input.
+You can also query reference data — supported networks, assets, and protocols — using `GET /v2/networks`, `GET /v2/assets`, and `GET /v2/protocols`. These are useful for building filter dropdowns and validating user input.
 
 ## How data is sourced
 
@@ -51,4 +51,4 @@ Use the `apy7d` or `apy30d` fields rather than `apy` when you want to smooth out
 
 ## Coverage
 
-One integration gives you data across 1,000+ vaults, 80+ protocols, and 20+ chains. For the full list of supported protocols and networks, see [Supported Protocols and Networks](/concepts/supported-protocols).
+One integration gives you data across 1,000+ vaults, 80+ protocols, 20+ EVM chains, and Solana/SVM vault coverage in Beta. For the full list of supported protocols and networks, see [Supported Protocols and Networks](/concepts/supported-protocols).

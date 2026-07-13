@@ -4,7 +4,7 @@ description: "Use the Vaults.fyi API to build AI agents that discover, evaluate,
 sidebarTitle: "Overview"
 ---
 
-Vaults.fyi gives AI agents and LLMs a single, structured interface to the entire onchain yield market. Instead of writing protocol-specific integrations for each of the 80+ supported protocols, you call one API that handles discovery, evaluation, transaction preparation, and portfolio management — and returns data in a consistent format your agent can reason over directly.
+Vaults.fyi gives AI agents and LLMs a single, structured interface to the onchain yield market. Instead of writing protocol-specific integrations for each of the 80+ supported protocols, including Solana protocols available through the Beta SVM API, you call one API that handles discovery, evaluation, transaction preparation, and portfolio management — and returns data in a consistent format your agent can reason over directly.
 
 The full API reference optimized for LLM consumption is available at [llms.txt](https://api.vaults.fyi/llms.txt). This file contains endpoint specifications, SDK usage, and best practices for credit-efficient development.
 
@@ -19,7 +19,7 @@ The full API reference optimized for LLM consumption is available at [llms.txt](
 
 ## Key advantages
 
-**Single API, no protocol-specific logic.** One integration covers 1,000+ vaults across 80+ protocols. You don't need to maintain separate adapters or ABIs per protocol.
+**Single API, no protocol-specific logic.** One integration covers 1,000+ vaults across 80+ protocols, including Solana/SVM vault coverage in Beta. You don't need to maintain separate adapters or ABIs per protocol.
 
 **Ready-to-sign transaction payloads.** Deposit and redeem endpoints return fully formed, signable transaction objects. Your agent submits them directly — no transaction construction required.
 

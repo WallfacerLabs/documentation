@@ -1,7 +1,7 @@
 ---
 title: "Vaults.fyi API Overview"
 sidebarTitle: "Overview"
-description: "The vaults.fyi V2 API — comprehensive DeFi vault data and transaction execution across 20+ networks."
+description: "The vaults.fyi V2 API — comprehensive DeFi vault data and transaction execution across 20+ EVM networks, with Solana/SVM endpoints in Beta."
 ---
 
 ## Base URL
@@ -22,7 +22,7 @@ All API keys have access to all endpoints. Rate limits depend on your plan — s
 
 ## Networks
 
-The API tracks vaults across 20+ EVM-compatible networks. Networks can be identified by name or CAIP-2 identifier:
+The V2 API tracks vaults across 20+ EVM-compatible networks. Networks can be identified by name or CAIP-2 identifier:
 
 | Name | Chain ID | CAIP-2 |
 |------|----------|--------|
@@ -44,11 +44,12 @@ The API tracks vaults across 20+ EVM-compatible networks. Networks can be identi
 | `optimism` | 10 | `eip155:10` |
 | `plasma` | 9745 | `eip155:9745` |
 | `polygon` | 137 | `eip155:137` |
+| `robinhood` | 4663 | `eip155:4663` |
 | `swellchain` | 1923 | `eip155:1923` |
 | `unichain` | 130 | `eip155:130` |
 | `worldchain` | 480 | `eip155:480` |
 
-Use `GET /v2/networks` for the complete current list.
+Use `GET /v2/networks` for the complete current list of V2 EVM networks. Solana/SVM vault discovery, portfolio, idle-asset, and transaction endpoints are available separately in [Beta](/api-reference/beta#solana-vaults).
 
 ## APY values
 
