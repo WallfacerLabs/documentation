@@ -8,7 +8,7 @@ sidebarTitle: "Vault Discovery"
 
 The Vaults.fyi API surfaces more data about a DeFi vault than most applications ever need. Use it to discover opportunities, build vault detail pages, power filters, and decide which vaults are suitable for your users. This page documents what you can retrieve — what each field means, which endpoint it comes from, and what you would use it for.
 
-The primary source for static vault data is [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details). Additional endpoints extend that with time-series history, near real-time state, and per-user position data.
+The primary source for static vault data is [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details). Additional endpoints extend that with advanced analytics, time-series history, near real-time state, and per-user position data.
 
 <Note>
   The auto-generated [API Reference endpoint pages](/api-reference/detailed-vaults) are the authoritative source for exact field names, types, and required/optional status — they update automatically from the OpenAPI spec on every release. This page is the narrative layer: what each field means and when to use it. If you spot a discrepancy, the endpoint page is correct.
@@ -157,6 +157,49 @@ When a vault's underlying asset is itself another vault's LP token (e.g. a vault
 | --- | --- |
 | `tvl.usd` | Total value locked, denominated in USD. |
 | `tvl.native` | Total value locked, denominated in the vault's native asset. |
+
+---
+
+## Advanced Analytics
+
+For deeper vault discovery and diligence workflows, use the Alpha Advanced Analytics endpoints:
+
+| Endpoint | Use case |
+| --- | --- |
+| `POST /alpha/advanced-analytics` | Screen a filtered list of vaults with selected analytics fields. |
+| `POST /alpha/advanced-analytics/{network}/{vaultId}` | Fetch selected analytics fields for one known vault. |
+
+Advanced Analytics uses a `select` request body so applications only request the sections they need:
+
+```json
+{
+  "select": {
+    "maxDrawdown": true,
+    "withdrawalPauseRatio": true,
+    "composition": true,
+    "detailedVault": true
+  }
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `maxDrawdown.mdd30days` | Maximum drawdown (MDD): the largest observed peak-to-trough drop in vault price per share over the last 30 days, reported as a decimal. |
+| `maxDrawdown.mdd90days` | Maximum drawdown (MDD) over the last 90 days. |
+| `maxDrawdown.mdd365days` | Maximum drawdown (MDD) over the last 365 days. |
+| `withdrawalPauseRatio` | Ratio from `0` to `1` representing how much time withdrawals were paused over the last two years. Returns `null` when the protocol does not expose a supported pause-event source or the event history has not been backfilled. |
+| `composition[]` | Vault allocation or investment composition where available. Useful for showing what a vault is allocated into, especially allocator-style products. |
+| `composition[].id` | Identifier for the investment or market. |
+| `composition[].supplyAssets` | Amount of underlying assets supplied to that investment. |
+| `composition[].allocation` | Share of the vault allocated to that investment, as a decimal. |
+| `composition[].name` | Human-readable name for the investment or market. |
+| `detailedVault` | Full V2 detailed vault payload embedded alongside the selected analytics fields. Useful when building one combined discovery response. |
+
+<Note>
+  Advanced Analytics is currently in Alpha. Field availability depends on protocol support and data coverage. Build integrations so nullable fields can be hidden or explained instead of treated as failures.
+</Note>
+
+See [Alpha API Reference](/api-reference/alpha#advanced-analytics) for filters, request shape, and endpoint details.
 
 ---
 
