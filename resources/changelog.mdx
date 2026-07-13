@@ -8,6 +8,32 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 28, 2026 — Jul 7–13
+
+**API**
+
+- Added single-vault **advanced analytics** in Alpha. Integrators can now call `POST /alpha/advanced-analytics/{network}/{vaultId}` to request analytics for one vault directly, instead of filtering through the paginated list endpoint. The same `select` model applies for `maxDrawdown`, `withdrawalPauseRatio`, `composition`, and `detailedVault`.
+
+- Expanded **Morpho composition** coverage in Alpha advanced analytics. `select.composition` now supports MetaMorpho-style vaults in addition to Morpho Vault V2 adapter-based vaults, returning market-level allocations where available.
+
+- Added richer **Beta borrow market filtering**. `GET /beta/borrow/markets` and `GET /beta/borrow/markets/{network}` now support filters for borrow assets, collateral assets, included/excluded networks, and `minTvl`, making it easier to build focused borrow-market discovery views.
+
+- Standardized borrow-market asset identifiers. Borrow market historical, transaction, portfolio-event, and asset-position routes now use `{assetId}` in the path, and borrow market responses expose `assetsData[].marketAssetId` for market-specific asset lookups.
+
+- Improved Aave transaction/event handling so rebasing-interest `Burn` events are only treated as withdrawals when they belong to the user. This reduces false withdrawal entries in Aave portfolio history and return calculations.
+
+**App**
+
+- Added the **Borrow** page to the main app navigation.
+
+- Improved borrow-market discovery by defaulting the page toward markets above $100k TVL, tightening filter options around the visible market set, and showing result counts after filters are applied.
+
+- Refined borrow and discovery filter menus so long option lists scroll more cleanly without pushing the rest of the interface around.
+
+- Updated category icons and colors across the app for clearer visual grouping of vault categories.
+
+---
+
 ## Week 27, 2026 — Jun 30–Jul 6
 
 **API**
