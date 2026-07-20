@@ -8,6 +8,34 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 29, 2026 — Jul 14–20
+
+**API**
+
+- Added near-real-time **borrow market data** in Beta. Integrators can now call `GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}` to fetch current market-asset values such as oracle price, supply rate, borrow rate, utilization, total supplied, total borrowed, and available liquidity.
+
+- Expanded borrow market liquidity fields. Beta borrow market responses now expose `availableLiquidity` and `availableToBorrow` where available, alongside supplied and borrowed balances, making it easier to show whether a borrow asset has usable capacity now, not just whether the market exists.
+
+- Improved borrow market detail lookups and vault aliasing. `GET /beta/borrow/markets/{network}/{marketId}` now returns richer market metadata and asset-level data, and detailed-vault market aliases are more consistent with borrow market identifiers.
+
+- Improved borrow market freshness. Borrow endpoints now use the most recent historical market data available, and `minTvl` filtering is calculated from aggregation asset prices so borrow-market discovery behaves more predictably across assets.
+
+- Improved **Morpho composition** analytics. Alpha advanced analytics now includes idle assets in `select.composition` results, so allocation breakdowns can account for both deployed markets and undeployed vault assets.
+
+- Fixed Aave withdrawal-pause event handling for advanced analytics, improving `withdrawalPauseRatio` accuracy for Aave-based vaults.
+
+**App**
+
+- Added **borrow positions** to the dashboard. Users can now see supplied and borrowed positions from supported borrow markets directly in their portfolio view, with borrow debt reflected in the header portfolio total.
+
+- Added **vault composition** to opportunity pages. Vault detail pages can now show current allocations for supported vaults, giving users a clearer view of where deposited assets are deployed.
+
+- Improved borrow and transaction messaging. Unsupported and not-eligible transaction states now have clearer copy, reducing confusion when a vault action is unavailable.
+
+- Improved discovery result visibility by showing the filtered vault count in search/filter surfaces.
+
+---
+
 ## Week 28, 2026 — Jul 7–13
 
 **API**
