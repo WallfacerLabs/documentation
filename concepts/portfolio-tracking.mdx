@@ -1,10 +1,12 @@
 ---
 title: "Portfolio Tracking"
-description: "Track user positions across protocols, detect idle assets, surface personalized deposit recommendations, and report PnL — all from one API."
+description: "Track user positions across protocols, detect idle assets, surface personalized deposit options, and report PnL — all from one API."
 sidebarTitle: "Portfolio Tracking"
 ---
 
-The Vaults.fyi portfolio API gives you a unified view of a user's DeFi yield activity across all supported protocols and networks. Instead of querying each protocol separately and normalizing the results yourself, you get aggregated position data, transaction history, and yield recommendations for any wallet address in a single integration.
+The Vaults.fyi portfolio API gives you a unified view of a user's DeFi yield activity across all supported protocols and networks. Instead of querying each protocol separately and normalizing the results yourself, you get aggregated position data, transaction history, and deposit options for any wallet address in a single integration.
+
+If you want a packaged position view instead of building the UI yourself, the [embeddable widget](/use-cases/embeddable-widget) can combine discovery, user positions, and transaction-ready flows in a branded Earn surface.
 
 ## Position tracking
 
@@ -24,9 +26,9 @@ One integration covers positions across hundreds of vaults. You don't need to wr
 
 The portfolio endpoint surfaces tokens sitting in a user's wallet that are not currently earning yield. You can use this signal to prompt users with relevant deposit opportunities — for example, showing a banner when a user holds USDC on Base with no active position.
 
-This is the same data that powers the personalized deposit recommendations described below.
+This is the same data that powers the personalized deposit options described below.
 
-## Personalized deposit recommendations
+## Personalized deposit options
 
 <CardGroup cols={2}>
   <Card title="Best deposit options" icon="list-check" href="/api-reference/portfolio">
@@ -37,10 +39,10 @@ This is the same data that powers the personalized deposit recommendations descr
   </Card>
 </CardGroup>
 
-Recommendations are computed from the user's actual wallet holdings, so you surface only relevant opportunities. A user holding WETH on Arbitrum won't see USDC vaults on mainnet.
+Deposit options are computed from the user's actual wallet holdings, so you surface only relevant opportunities. A user holding WETH on Arbitrum won't see USDC vaults on mainnet.
 
 <Tip>
-Use the `minimumTvl` and `protocols` filters on the best-deposit-options endpoint to enforce your own quality bar before showing recommendations to users.
+Use filters such as `minTvl` and `allowedProtocols` on the best-deposit-options endpoint to enforce your own quality bar before showing deposit options to users.
 </Tip>
 
 ## PnL and returns tracking

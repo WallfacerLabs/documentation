@@ -9,31 +9,41 @@ The vaults.fyi widget gives wallets, exchanges, and consumer apps a configurable
   The widget is currently available to select partners. [Contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to learn more.
 </Note>
 
+## Widget vs. API or SDK
+
+Use the widget when you want a branded Earn experience without designing every vault list, deposit form, position view, and transaction state yourself. Use the API or SDK when you want full control over the interface and business logic.
+
+| Integration path | Best for |
+|------------------|----------|
+| Embeddable widget | Branded Earn surfaces, partner launches, curated vault lists, portfolio views, and transaction-ready flows with less product and frontend work |
+| API or SDK | Fully custom discovery, routing, portfolio, transaction, attribution, or analytics experiences built inside your own application |
+
 ## A yield experience configured for your product
 
 <Frame>
-  ![Widget Screenshot](/images/widget_screen4.png)
+  ![Embeddable widget deposit screen configured for a Gauntlet USDC vault on Base](/images/widget_screen4.png)
 </Frame>
 
 Choose the opportunity set that fits your users. Configure:
 
-- Networks, including EVM networks and Solana
-- Assets, protocols, curators, and tags
-- Minimum TVL and APY
-- APY window and sort order
-- Number of opportunities shown
+- `allowedNetworks`, including EVM networks and Solana/SVM coverage
+- `allowedAssets`, `allowedProtocols`, `allowedVaults`, curators, and tags
+- `minTvlUsd`, `minReputationScore`, and APY filters
+- APY window, sort order, and number of opportunities shown
 - Discover and Positions views
-- Data displayed in each view
+- Visible columns and data displayed in each view
 
 <Frame>
-  ![Widget Config1](/images/widget_config1.png)
+  ![Widget configuration screen showing filters for Solana, networks, assets, protocols, minimum TVL, and reputation score](/images/widget_config1.png)
 </Frame>
 
-Surface a focused set of vault opportunities from our universe of 80\+ protocols and 20\+ networks.
+Surface a focused set of vault opportunities from 80\+ protocols, 20\+ EVM chains, and Solana/SVM coverage.
 
 ## Match your product’s brand
 
-![Widget with config](/images/widget_full5.png)
+<Frame>
+  ![Widget preview showing live mode, brand styling controls, React embed code, and event log](/images/widget_full5.png)
+</Frame>
 
 Configure the widget’s presentation to fit your application:
 
@@ -50,10 +60,36 @@ The widget can present a compact Discover experience, a user’s existing positi
 
 For transaction-enabled integrations, it supports host-controlled signing and custody handoff flows. Your product keeps control of the wallet experience while vaults.fyi provides the underlying opportunity data and transaction context.
 
+## How integration works
+
+<Steps>
+  <Step title="Configure the opportunity set">
+    Choose the networks, assets, protocols, vaults, curators, tags, TVL thresholds, reputation score threshold, APY window, sort order, and views available in the widget.
+  </Step>
+  <Step title="Apply your brand settings">
+    Set the theme, accent color, font, corner radius, widget title, attribution preference, and visible data fields.
+  </Step>
+  <Step title="Embed the widget">
+    Add the generated embed code or React component to your app. Your team controls where the widget appears and which mode is shown.
+  </Step>
+  <Step title="Connect wallet context">
+    Let the widget use the connected wallet context or pass the relevant wallet state from your host app, including EVM and Solana accounts where supported.
+  </Step>
+  <Step title="Handle transactions">
+    For live transaction flows, vaults.fyi provides the opportunity data and transaction context while your product controls signing, broadcasting, and custody handoff.
+  </Step>
+</Steps>
+
+## Non-custodial by design
+
+Vaults.fyi does not custody user funds. Transaction-enabled widget flows use vaults.fyi infrastructure for data and transaction preparation, while your app keeps control of the wallet experience. Users sign with their own wallet, and funds route to the target protocol contracts.
+
 ## Built on vaults.fyi coverage
 
-The widget uses vaults.fyi’s normalized vault data and transaction infrastructure across supported EVM networks and Solana. Teams can keep their interface focused while extending coverage as their product grows.
+The widget uses vaults.fyi’s normalized vault data and transaction infrastructure across supported EVM networks and Solana/SVM coverage. Teams can keep their interface focused while extending coverage as their product grows.
 
 ## Get the widget
 
-[Contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to learn more. Our team can help you create a bespoke Earn experience.
+[Contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to learn more. Include the target users, chains and assets, desired views, wallet model, signing or custody requirements, and brand constraints you want the widget to support.
+
+Our team can help you create a branded Earn experience.
