@@ -30,6 +30,7 @@
               "introduction",
               "why-vaultsfyi",
               "use-cases/for-wallets-and-apps",
+              "use-cases/embeddable-widget",
               "use-cases/for-analysts",
               "use-cases/for-protocols"
             ]
@@ -164,7 +165,8 @@
   },
   "logo": {
     "light": "/images/Logo-384px-black.png",
-    "dark": "/images/Logo-384px-white.png"
+    "dark": "/images/Logo-384px-white.png",
+    "href": "https://vaults.fyi/"
   },
   "appearance": {
     "default": "system"
@@ -496,5 +498,10 @@
       "source": "/api/getting-started-with-the-sdk/tutorials/data-analytics",
       "destination": "/sdk/tutorials/data-analytics"
     }
-  ]
+  ],
+  "footer": {
+    "socials": {
+      "x": "https://x.com/vaultsfyi"
+    }
+  }
 }
