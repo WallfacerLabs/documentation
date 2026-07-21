@@ -12,3 +12,11 @@ Near real-time vault metrics sourced directly from onchain state — updated far
 | Fetch the current total supply | [`GET /v2/nrt/vault/{network}/{vaultId}/totalSupply`](/api-reference/nrt/get-vault-nrt-total-supply) | Path: `network`, `vaultId` |
 | Fetch the current total assets | [`GET /v2/nrt/vault/{network}/{vaultId}/totalAssets`](/api-reference/nrt/get-vault-nrt-total-assets) | Path: `network`, `vaultId` |
 | Fetch the current underlying asset price | [`GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice`](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | Path: `network`, `vaultId` |
+
+## Related Beta endpoints
+
+Borrow market live data is currently exposed through the Beta borrow market surface.
+
+| Capability | How to call | Status |
+|------------|-------------|--------|
+| Fetch near-real-time borrow market asset data | [`GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |

@@ -31,3 +31,18 @@ curl "https://api.vaults.fyi/v2/transactions/deposit/0xUSER/base/0xVAULT?assetAd
 | Check claimable rewards | [`GET /v2/transactions/rewards/context/{userAddress}`](/api-reference/transactions/get-rewards-context) | Path: `userAddress` |
 | Build rewards claim calldata | [`GET /v2/transactions/rewards/claim/{userAddress}`](/api-reference/transactions/claim-rewards) | Path: `userAddress`. Query: `claimIds` |
 | Add transaction attribution | [`GET /v2/transactions/suffix/{userAddress}/{vaultId}`](/api-reference/transactions/get-transaction-suffix) | Path: `userAddress`, `vaultId` |
+
+## Related Alpha and Beta endpoints
+
+Alpha and Beta transaction endpoints extend the same wallet-action pattern to newer surfaces. Use them when your product needs these flows before they are promoted to stable V2.
+
+| Capability | How to call | Status |
+|------------|-------------|--------|
+| Build a ready-to-sign Solana/SVM transaction | [`GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| Check Solana/SVM balances and limits before building a transaction | [`GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| Build a ready-to-sign borrow market transaction | [`GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
+| Check borrow balances and limits before building a transaction | [`GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
+| Build a Deep deposit or withdrawal transaction | [`GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}`](/api-reference/beta#the-deep) | Beta |
+| Build a fixed-term transaction | [`GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
+| Quote, execute, and track cross-chain transaction intents | [`POST /alpha/transactions/intent/getQuote`](/api-reference/alpha#cross-chain-intents) | Alpha |
+| Build and track CCTP bridge transactions | [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/alpha#cctp-bridge) | Alpha |

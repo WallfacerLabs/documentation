@@ -11,3 +11,17 @@ Full vault objects with performance metrics, the Reputation Score, fee structure
 | Get one vault's full detail object | [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details) | Path: `network`, `vaultId` |
 | Get one vault's APY breakdown | [`GET /v2/detailed-vaults/{network}/{vaultId}/apy`](/api-reference/detailed-vaults/get-vault-apy) | Path: `network`, `vaultId` |
 | Get one vault's TVL data | [`GET /v2/detailed-vaults/{network}/{vaultId}/tvl`](/api-reference/detailed-vaults/get-vault-tvl) | Path: `network`, `vaultId` |
+
+## Related Alpha and Beta endpoints
+
+Use these endpoints when you need newer vault-like data surfaces that are still in Alpha or Beta.
+
+| Capability | How to call | Status |
+|------------|-------------|--------|
+| List Solana/SVM detailed vaults | [`GET /beta/svm/detailed-vaults`](/api-reference/beta#solana-vaults) | Beta |
+| Fetch one Solana/SVM detailed vault | [`GET /beta/svm/detailed-vaults/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| Fetch fixed-term detailed vault data | [`GET /beta/fixed-term/detailed/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
+| List Deep detailed vaults | [`GET /beta/amm/deep/detailed-vaults`](/api-reference/beta#the-deep) | Beta |
+| List borrow markets and market metadata | [`GET /beta/borrow/markets/`](/api-reference/beta#borrow-markets) | Beta |
+| Fetch advanced analytics for one vault | [`POST /alpha/advanced-analytics/{network}/{vaultId}`](/api-reference/alpha#advanced-analytics) | Alpha |
+| List vault holders and LP-token balances | [`GET /alpha/{network}/{vaultId}/holders`](/api-reference/alpha#holders) | Alpha |

@@ -14,3 +14,18 @@ Wallet-aware endpoints that return a user's vault positions, uninvested balances
 | Fetch the single best-fit vault for a wallet | [`GET /v2/portfolio/best-vault/{userAddress}`](/api-reference/portfolio/get-best-vault) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `minApy`, and `apyInterval` |
 | Calculate earned yield for one position | [`GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-total-returns) | Path: `userAddress`, `network`, `vaultId` |
 | List deposit, redeem, and claim history for one position | [`GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/list-position-events) | Path: `userAddress`, `network`, `vaultId` |
+
+## Related Alpha and Beta endpoints
+
+Some newer portfolio surfaces are available in Alpha or Beta before they move into the stable V2 API. Use these when you need the capability now and can tolerate interface changes.
+
+| Capability | How to call | Status |
+|------------|-------------|--------|
+| Measure user returns over a selected time window | [`GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}`](/api-reference/beta#portfolio) | Beta |
+| List Solana/SVM vault positions for a wallet | [`GET /beta/svm/portfolio/positions/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| List Solana/SVM portfolio events for a wallet or vault | [`GET /beta/svm/portfolio/events/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| List Solana/SVM idle assets for a wallet | [`GET /beta/svm/portfolio/idle-assets/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
+| List borrow positions for a wallet | [`GET /beta/borrow/portfolio/positions/{userAddress}`](/api-reference/beta#borrow-markets) | Beta |
+| List borrow market events for a wallet | [`GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
+| List historical vault positions for a wallet | [`GET /alpha/historical-positions/{userAddress}`](/api-reference/alpha#historical-positions) | Alpha |
+| Reconstruct wallet balances at a point in time | [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/alpha#historical-balances) | Alpha |

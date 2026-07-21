@@ -12,3 +12,14 @@ Time-series data for any vault over configurable date ranges and granularity. Us
 | Fetch TVL history only | [`GET /v2/historical/{network}/{vaultId}/tvl`](/api-reference/historical/get-historical-tvl) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |
 | Fetch share-price history only | [`GET /v2/historical/{network}/{vaultId}/sharePrice`](/api-reference/historical/get-historical-share-price) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
 | Fetch historical underlying asset prices | [`GET /v2/historical/asset-prices/{network}/{assetAddress}`](/api-reference/historical/get-historical-asset-prices) | Path: `network`, `assetAddress`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |
+
+## Related Alpha and Beta endpoints
+
+Use these endpoints for historical data that is still being validated outside the stable V2 surface.
+
+| Capability | How to call | Status |
+|------------|-------------|--------|
+| Fetch historical borrow market rates and liquidity | [`GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
+| Fetch historical daily vault inflows and outflows | [`GET /alpha/historical/{network}/{vaultId}/daily-flows`](/api-reference/alpha#historical-flows) | Alpha |
+| List historical positions for a wallet | [`GET /alpha/historical-positions/{userAddress}`](/api-reference/alpha#historical-positions) | Alpha |
+| Reconstruct wallet balances at a point in time | [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/alpha#historical-balances) | Alpha |
