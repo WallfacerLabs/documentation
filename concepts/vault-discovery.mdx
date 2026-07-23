@@ -177,6 +177,7 @@ Advanced Analytics uses a `select` request body so applications only request the
     "maxDrawdown": true,
     "withdrawalPauseRatio": true,
     "composition": true,
+    "utilizationRate": true,
     "detailedVault": true
   }
 }
@@ -193,6 +194,7 @@ Advanced Analytics uses a `select` request body so applications only request the
 | `composition[].supplyAssets` | Amount of underlying assets supplied to that investment. |
 | `composition[].allocation` | Share of the vault allocated to that investment, as a decimal. |
 | `composition[].name` | Human-readable name for the investment or market. |
+| `utilizationRate` | Share of vault assets currently utilized, as a decimal. For Morpho allocator vaults, this represents the invested share of vault assets. For Aave and Spark aToken vaults, it represents the underlying lending reserve utilization. Returns `null` when unavailable. |
 | `detailedVault` | Full V2 detailed vault payload embedded alongside the selected analytics fields. Useful when building one combined discovery response. |
 
 <Note>
@@ -232,7 +234,7 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 | `score.vaultTvlScore` | Score component based on this vault's TVL. |
 | `score.protocolTvlScore` | Score component based on the protocol's total TVL. |
 | `score.holderScore` | Score component based on holder count and distribution. |
-| `score.networkScore` | Score component based on which network the vault is on. |
+| `score.networkScore` | Deprecated network score. It is returned for backwards compatibility and diagnostics, but is not included in the current Reputation Score. |
 | `score.assetScore` | Score component based on the underlying asset type and liquidity. |
 | `score.totalScorePenalty` | Current point deduction applied to `score.vaultScore` because of flag penalties. |
 | `score.penaltyComponents` | Active or decaying flag penalties applied to the composite score, with severity and resolution details for each. |
