@@ -8,6 +8,32 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 30, 2026 — Jul 21–27
+
+**API**
+
+- Added **utilization rate** to Alpha advanced analytics. Integrators can now request `select.utilizationRate` on `POST /alpha/advanced-analytics` and `POST /alpha/advanced-analytics/{network}/{vaultId}` to see how much of a vault or lending reserve is currently utilized. The field returns Morpho allocator utilization, Aave/Spark reserve utilization where available, and `null` when utilization is not supported.
+
+- Updated Reputation Score behavior so `score.networkScore` is no longer included in the active vault score. The field remains in V2 detailed-vault responses as deprecated diagnostic data for backwards compatibility.
+
+- Added Morpho Blue liquidation-penalty support to Beta borrow market data. Morpho borrow-market responses can now include the pair-level liquidation penalty derived from the market LLTV, helping integrators show clearer liquidation-risk context.
+
+- Expanded Merkl reward ingestion for **Aave net-lending campaigns**, improving reward APY coverage for eligible Aave-style lending opportunities.
+
+- Improved wrapped-asset discovery and unwrapping support so vaults that rely on wrapped or receipt-token assets can be indexed and priced more reliably.
+
+**App**
+
+- Added a **Show APY as avg. of** control on vault detail pages, letting users switch the displayed yield window directly from the opportunity view.
+
+- Improved borrow-market discovery previews by sorting collateral icons by collateral TVL, so the most relevant assets appear first in compact market cards.
+
+- Made the dashboard more resilient when borrow positions fail to load. App vault positions can still render even if the borrow-position request errors.
+
+- Added an in-app case-studies panel so users can browse customer and partner examples without leaving the app.
+
+---
+
 ## Week 29, 2026 — Jul 14–20
 
 **API**
