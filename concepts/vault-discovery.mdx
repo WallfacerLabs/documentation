@@ -123,6 +123,8 @@ When a user deposits into a vault, they receive LP tokens representing their sha
 
 APY data is normalized across all protocols using a consistent methodology. See [Calculating APY](/methodology/calculating-apy) for details.
 
+All APY values are net of performance and management fees. Use `fees` to show fee details alongside yield, not to adjust the returned APY.
+
 Each vault returns APY across four time windows, each broken into three components:
 
 | Field | Description |
@@ -220,10 +222,6 @@ Many vaults distribute bonus reward tokens on top of base yield. Each entry in t
 
 <Note>
   Reward APYs are already included in the top-level `apy.*.reward` field. The `rewards` array lets you attribute yield to specific tokens and display individual reward rates.
-</Note>
-
-<Note>
-  All APY values are net of performance and management fees. Use `fees` to show fee details alongside yield, not to adjust the returned APY.
 </Note>
 
 ---
