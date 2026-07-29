@@ -5,6 +5,8 @@ description: "Comprehensive vault data including APY, TVL, the Reputation Score,
 
 Full vault objects with performance metrics, the Reputation Score, fee structures, holder data, and protocol info. Use these endpoints to build vault comparison views, detail pages, or yield aggregators.
 
+APY fields in detailed-vault responses are net of performance and management fees. Use the `fees` object to display the fee breakdown alongside yield; do not subtract it from APY again. See [How Vaults.fyi Calculates APY](/methodology/calculating-apy) for the full methodology.
+
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List and filter vaults with full analytics | [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | None. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `onlyTransactional`, `onlyAppFeatured`, `page`, `perPage`, `sortBy`, and `sortOrder` |

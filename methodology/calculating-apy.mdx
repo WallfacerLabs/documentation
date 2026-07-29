@@ -6,6 +6,12 @@ sidebarTitle: "Calculating APY"
 
 Vaults.fyi calculates APY by comparing a vault's share price across fixed trailing windows — 1 day, 7 days, and 30 days — rather than relying on instantaneous or self-reported rates. This approach smooths out short-term noise and gives you a yield figure that reflects what depositors actually earned over the period.
 
+## Net APY
+
+All APY values returned by Vaults.fyi are **net of fees**. Performance and management fees reflected in vault share price or yield accrual are already accounted for in the APY.
+
+The fee breakdown is still exposed through the `fees` object on detailed-vault responses so integrators can display fees alongside yield. Do not subtract those fees from returned APY values again.
+
 ## Share price method
 
 Every yield-bearing vault issues shares that represent a depositor's proportional stake. As the vault earns yield, the total value it holds grows relative to the number of shares outstanding, so each share becomes worth more. Vaults.fyi reads these values directly from onchain contracts hourly and derives APY from the change in share price over the chosen window.

@@ -13,7 +13,7 @@ Data is indexed onchain on an hourly basis, so you always have current metrics a
 Each vault object includes APY across four time windows, TVL in USD and native units, a fee breakdown, the Reputation Score with component scores, reward token rates, holder counts, capacity limits, and flags for active protocol notices — among other fields.
 
 <Note>
-APY, TVL, fees, and the Reputation Score are computed consistently across all protocols. This means you can safely sort and compare vaults from different protocols side by side.
+APY, TVL, fees, and the Reputation Score are computed consistently across all protocols. APY values are net of performance and management fees; the `fees` object is for display and does not need to be subtracted from APY.
 </Note>
 
 For a complete field-by-field reference covering everything the API can tell you about a vault, see [Vault Discovery](/concepts/vault-discovery).
