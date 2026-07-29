@@ -222,6 +222,10 @@ Many vaults distribute bonus reward tokens on top of base yield. Each entry in t
   Reward APYs are already included in the top-level `apy.*.reward` field. The `rewards` array lets you attribute yield to specific tokens and display individual reward rates.
 </Note>
 
+<Note>
+  All APY values are net of performance and management fees. Use `fees` to show fee details alongside yield, not to adjust the returned APY.
+</Note>
+
 ---
 
 ## Reputation Score
@@ -277,7 +281,7 @@ Vaults.fyi computes a composite reputation score for each vault based on several
 | `fees.depositFee` | Fee charged on deposits (as a decimal). |
 
 <Note>
-  All fee fields are optional and omitted when not applicable to a given vault.
+  All fee fields are optional and omitted when not applicable to a given vault. Performance and management fees are already reflected in returned APY values.
 </Note>
 
 ---

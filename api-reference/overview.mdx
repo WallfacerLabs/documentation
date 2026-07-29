@@ -61,6 +61,8 @@ All APY fields are **raw decimals**. Multiply by 100 to display as a percentage:
 const displayApy = (rawApy * 100).toFixed(2) + '%';
 ```
 
+APY values are net of performance and management fees. The detailed-vault `fees` object is for display and should not be subtracted from APY again.
+
 ## Pagination
 
 All list endpoints use offset pagination with `page` (zero-indexed) and `perPage`:
