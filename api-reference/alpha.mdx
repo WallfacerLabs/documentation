@@ -30,15 +30,6 @@ Build USDC bridge flows with transaction context, calldata generation, in-transi
 | List CCTP transfers in transit | `GET /alpha/transactions/cctp/money-in-transit/{userAddress}` | Path: `userAddress` |
 | Check CCTP transfer status | `GET /alpha/transactions/cctp/status` | Query: `burnTxHash`, `srcNetwork` |
 
-## Advanced analytics
-
-Request heavier per-vault analytics only when your product needs them, rather than paying the response-size and compute cost on every detailed-vault query. Selectable analytics sections currently include max drawdown, withdrawal pause ratio, composition, utilization rate, and the full V2 detailed-vault payload where supported.
-
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List advanced vault analytics using selected analytics sections | `POST /alpha/advanced-analytics` | JSON body: `select`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `page`, and `perPage` |
-| Fetch advanced analytics for one vault | `POST /alpha/advanced-analytics/{network}/{vaultId}` | Path: `network`, `vaultId`. JSON body: `select` |
-
 ## Historical flows
 
 Inspect daily vault inflows and outflows for flow analytics, dashboards, and monitoring.

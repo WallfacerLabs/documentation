@@ -1,6 +1,6 @@
 ---
 title: "API Credits & Compute Units Explained"
-description: "Learn how vaults.fyi Credits (Compute Units) work, and see the full table of base costs and per-datapoint costs for v2 and beta endpoints."
+description: "Learn how vaults.fyi Credits (Compute Units) work, and see the full table of base costs and per-datapoint costs for v2 and Beta endpoints."
 sidebarTitle: "Credits"
 ---
 
@@ -65,6 +65,22 @@ All plans can access transaction endpoints.
 Beta endpoints use the same base-cost and per-datapoint model as v2 endpoints.
 
 <BetaCreditCosts />
+
+### Advanced analytics
+
+Both `POST /beta/advanced-analytics` and `POST /beta/advanced-analytics/{network}/{vaultId}` cost 1 base credit per request. Add the following costs for each returned item:
+
+| Selected field | Credits per returned item |
+|---|---:|
+| `maxDrawdown` | 2 |
+| `detailedVault` | 3 |
+| `withdrawalPauseRatio` | 2 |
+| `composition` | 3 |
+| `utilizationRate` | 3 |
+
+The field costs are cumulative. Calculate the total request cost as `1 + number of returned items × sum of selected field costs`.
+
+For example, a request that returns 10 items with `maxDrawdown` and `composition` costs `1 + (10 × (2 + 3)) = 51` credits.
 
 ## Legacy v1 API Credits
 

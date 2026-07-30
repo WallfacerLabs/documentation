@@ -164,12 +164,12 @@ When a vault's underlying asset is itself another vault's LP token (e.g. a vault
 
 ## Advanced Analytics
 
-For deeper vault discovery and diligence workflows, use the Alpha Advanced Analytics endpoints:
+For deeper vault discovery and diligence workflows, use the Beta Advanced Analytics endpoints:
 
 | Endpoint | Use case |
 | --- | --- |
-| `POST /alpha/advanced-analytics` | Screen a filtered list of vaults with selected analytics fields. |
-| `POST /alpha/advanced-analytics/{network}/{vaultId}` | Fetch selected analytics fields for one known vault. |
+| `POST /beta/advanced-analytics` | Screen a filtered list of vaults with selected analytics fields. |
+| `POST /beta/advanced-analytics/{network}/{vaultId}` | Fetch selected analytics fields for one known vault. |
 
 Advanced Analytics uses a `select` request body so applications only request the sections they need:
 
@@ -184,6 +184,18 @@ Advanced Analytics uses a `select` request body so applications only request the
   }
 }
 ```
+
+Each request costs 1 base credit. Add the following costs for each returned item based on the fields included in `select`:
+
+| Selected field | Credits per returned item |
+| --- | ---: |
+| `maxDrawdown` | 2 |
+| `detailedVault` | 3 |
+| `withdrawalPauseRatio` | 2 |
+| `composition` | 3 |
+| `utilizationRate` | 3 |
+
+The selected field costs are cumulative. For `n` returned items, calculate the total as `1 + n × (sum of selected field costs)`.
 
 | Field | Description |
 | --- | --- |
@@ -200,10 +212,10 @@ Advanced Analytics uses a `select` request body so applications only request the
 | `detailedVault` | Full V2 detailed vault payload embedded alongside the selected analytics fields. Useful when building one combined discovery response. |
 
 <Note>
-  Advanced Analytics is currently in Alpha. Field availability depends on protocol support and data coverage. Build integrations so nullable fields can be hidden or explained instead of treated as failures.
+  Advanced Analytics is currently in Beta. Field availability depends on protocol support and data coverage. Build integrations so nullable fields can be hidden or explained instead of treated as failures.
 </Note>
 
-See [Alpha API Reference](/api-reference/alpha#advanced-analytics) for filters, request shape, and endpoint details.
+See [Beta API Reference](/api-reference/beta#advanced-analytics) for filters, request shape, and endpoint details.
 
 ---
 
