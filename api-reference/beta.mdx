@@ -48,6 +48,27 @@ Build borrow dashboards and account-health views against one borrow market model
 
 Borrow market responses expose `assetsData[].marketAssetId`. Pass that value as `{assetId}` when chaining from market discovery into historical data, portfolio events, asset-level positions, or transaction endpoints.
 
+## Advanced analytics
+
+Request heavier per-vault analytics only when your product needs them. Selectable analytics sections include max drawdown, withdrawal pause ratio, composition, utilization rate, and the full V2 detailed-vault payload where supported.
+
+| Capability | How to call | Required inputs |
+|------------|-------------|-----------------|
+| List advanced vault analytics using selected analytics sections | `POST /beta/advanced-analytics` | JSON body: `select`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `page`, and `perPage` |
+| Fetch advanced analytics for one vault | `POST /beta/advanced-analytics/{network}/{vaultId}` | Path: `network`, `vaultId`. JSON body: `select` |
+
+Each request costs 1 base credit. The remaining cost scales with the number of items returned and the fields included for each item:
+
+| Selected field | Credits per returned item |
+|----------------|--------------------------:|
+| `maxDrawdown` | 2 |
+| `detailedVault` | 3 |
+| `withdrawalPauseRatio` | 2 |
+| `composition` | 3 |
+| `utilizationRate` | 3 |
+
+The per-item costs are cumulative. For example, a request that returns 10 items with `maxDrawdown` and `composition` costs `1 + (10 × (2 + 3)) = 51` credits.
+
 ## The Deep
 
 Build AMM-style vault integrations for Deep liquidity positions. These endpoints cover vault discovery, wallet positions, and ready-to-sign deposit or withdrawal transactions.
