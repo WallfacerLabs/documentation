@@ -8,6 +8,26 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 31, 2026 — Jul 28–Aug 3
+
+**API**
+
+- Moved **Advanced Analytics into Beta**. Integrators can now request heavier vault analytics from the Beta API with `POST /beta/advanced-analytics` and `POST /beta/advanced-analytics/{network}/{vaultId}`, including max drawdown, withdrawal pause ratio, composition, utilization rate, and embedded detailed-vault data.
+
+- Added **Euler borrow market coverage** in Beta. `GET /beta/borrow/markets/` can now return Euler markets alongside existing borrow-market sources, helping integrators build broader borrow dashboards and account-health views through the shared Beta borrow model.
+
+- Improved **borrow position chaining**. Borrow position responses now include market-specific asset identifiers, making it easier to connect a user's supplied or borrowed asset position to the matching market detail, historical data, events, NRT data, or transaction context.
+
+- Expanded **Morpho V2 composition analytics**. Advanced Analytics can now return allocation data for additional Morpho V2 vaults where composition data is available, helping integrators show how vault assets are deployed underneath the top-level opportunity.
+
+**App**
+
+- Added **borrow market detail pages**. Users can now inspect supported borrow markets in a dedicated view with market-level context instead of only seeing borrow opportunities in list views.
+
+- Improved opportunity pages for agent and search discovery. Opportunity pages now expose clearer structured vault metadata and onchain identity information, making them easier for search engines and AI agents to interpret.
+
+---
+
 ## Week 30, 2026 — Jul 21–27
 
 **API**
