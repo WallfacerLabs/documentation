@@ -75,8 +75,8 @@ For complete documentation with full page content, see [llms-full.txt](https://d
 
 ## Optional
 
-- [Beta Endpoints](https://docs.vaults.fyi/api-reference/beta.md): Features in testing — Borrow markets, Solana/SVM vaults, Deep AMM liquidity vaults, Pendle fixed-term markets, and partial returns. More stable than alpha, may still change.
-- [Alpha Endpoints](https://docs.vaults.fyi/api-reference/alpha.md): Early access — cross-chain intents, CCTP bridge flows, advanced analytics, historical flows, historical positions, historical balances, and vault holders. May change without notice.
+- [Beta Endpoints](https://docs.vaults.fyi/api-reference/beta.md): Features in testing — advanced analytics, Borrow markets, Solana/SVM vaults, Deep AMM liquidity vaults, Pendle fixed-term markets, and partial returns. More stable than alpha, may still change.
+- [Alpha Endpoints](https://docs.vaults.fyi/api-reference/alpha.md): Early access — cross-chain intents, CCTP bridge flows, historical flows, historical positions, historical balances, and vault holders. May change without notice.
 
 ## OpenAPI Specs
 
