@@ -8,6 +8,62 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 34, 2026 — Aug 18–24
+
+**API**
+
+- Expanded **fixed-term market data** in Beta. `GET /beta/fixed-term/` and `GET /beta/fixed-term/detailed/{network}/{vaultId}` now return richer Pendle market, asset, liquidity, maturity, protocol, and yield context through a more consistent response model.
+
+- Added **Flying Tulip coverage**, including analytics for Flying Tulip Lend markets and the sftUSD savings vault, plus transaction support for supported Flying Tulip Lend deposit and withdrawal flows.
+
+- Added **Sky stUSDS coverage**, making stUSDS opportunities available through vault discovery and related vault data surfaces.
+
+- Expanded **vault composition coverage** for Yearn V3 and restored accurate allocation discovery for additional supported protocols, including Overnight Plus. Advanced Analytics can now explain the underlying positions of more multi-strategy vaults.
+
+- Corrected **Wildcat capacity data** so remaining deposit capacity is based on the market's actual deposit limit rather than its current liquid assets. This prevents markets with available capacity from appearing full.
+
+- Improved **Aave borrow position health factors**. Supply-only positions with no debt now return the appropriate no-debt health state instead of an invalid or misleading value.
+
+- Added optional **API usage alerts** for customers who want email notifications when their keys encounter repeated credit or rate-limit errors.
+
+---
+
+## Week 33, 2026 — Aug 11–17
+
+**API**
+
+- Added **fixed-term market discovery** in Beta with `GET /beta/fixed-term/`. Integrators can discover active Pendle principal-token markets with current fixed APY, maturity, TVL, and liquidity, then filter and sort the results for fixed-yield experiences.
+
+- Expanded **borrow market filtering**. Beta borrow discovery now supports protocol filters alongside the broader vault-style network, asset, TVL, pagination, and sorting controls.
+
+- Standardized **SVM APY values** to the same decimal format used by V2 endpoints. For example, a 5% APY is now returned as `0.05` instead of `5`. This is a breaking correction for Beta SVM clients using the previous display-percent format.
+
+- Added **curator metadata to SVM vault responses**, helping integrators show who manages supported Solana vault strategies.
+
+- Improved **Drift APY accuracy** by including unsettled funding in vault equity snapshots, reducing cases where short-window APY appeared flat despite active funding gains or losses.
+
+- Added normalized **Veda fee metadata** to detailed-vault responses, giving integrators clearer performance- and management-fee information for supported Veda/BoringVault opportunities.
+
+- Expanded **composition analytics** across more multi-strategy protocols, including Yearn V2, Notional, Mellow, Syrup, Upshift, and additional Morpho V2 vaults.
+
+---
+
+## Week 32, 2026 — Aug 4–10
+
+**API**
+
+- Added **Aave transaction support on Monad**. Supported Monad Aave opportunities can now provide deposit and withdrawal transaction context and payloads through the shared Transactions API.
+
+- Improved numeric vault filters so explicit zero values are handled correctly, including filters such as `maxTvl=0`, instead of being treated as omitted.
+
+- Expanded **vault composition accuracy** across several multi-strategy protocols, improving how Advanced Analytics identifies and reports underlying allocations for supported Beefy, Harvest, IPOR Fusion, Lazy Summer, Notional, Superform, Syrup, and other composite vaults.
+
+**App**
+
+- Improved borrow-market charts with both supply and borrow rates, clearer protocol context, and available-to-borrow liquidity.
+
+---
+
 ## Week 31, 2026 — Jul 28–Aug 3
 
 **API**
