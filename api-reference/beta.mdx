@@ -34,8 +34,8 @@ Build borrow dashboards and account-health views against one borrow market model
 
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
-| List all borrow markets | `GET /beta/borrow/markets/` | None. Optional query filters include `page`, `perPage`, `allowedNetworks`, `disallowedNetworks`, `allowedCollateralAssets`, `disallowedCollateralAssets`, `allowedBorrowAssets`, `disallowedBorrowAssets`, and `minTvl` |
-| List borrow markets on one network | `GET /beta/borrow/markets/{network}` | Path: `network`. Optional query filters include `page`, `perPage`, `allowedCollateralAssets`, `disallowedCollateralAssets`, `allowedBorrowAssets`, `disallowedBorrowAssets`, and `minTvl` |
+| List all borrow markets | `GET /beta/borrow/markets/` | None. Optional query filters include `page`, `perPage`, `allowedNetworks`, `disallowedNetworks`, `allowedCollateralAssets`, `disallowedCollateralAssets`, `allowedBorrowAssets`, `disallowedBorrowAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, and `maxTvl` |
+| List borrow markets on one network | `GET /beta/borrow/markets/{network}` | Path: `network`. Optional query filters include `page`, `perPage`, `allowedCollateralAssets`, `disallowedCollateralAssets`, `allowedBorrowAssets`, `disallowedBorrowAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, and `maxTvl` |
 | Fetch one borrow market | `GET /beta/borrow/markets/{network}/{marketId}` | Path: `network`, `marketId` |
 | Fetch near-real-time borrow market asset data | `GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}` | Path: `network`, `marketId`, `assetId` |
 | Fetch historical borrow market data | `GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}` | Path: `network`, `marketId`, `assetId` |
@@ -82,10 +82,11 @@ Build AMM-style vault integrations for Deep liquidity positions. These endpoints
 
 ## Fixed Term (Pendle)
 
-Add fixed-term yield market support for Pendle-backed opportunities. Use these endpoints to retrieve detailed market data, preview transaction context, and generate swap-in or swap-out transactions.
+Add fixed-term yield market support for Pendle-backed opportunities. Use these endpoints to discover and compare active markets, retrieve detailed market data, preview transaction context, and generate swap-in or swap-out transactions.
 
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
+| List fixed-term markets | `GET /beta/fixed-term/` | None. Optional query filters include `page`, `perPage`, `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `allowedNetworks`, `disallowedNetworks`, `minTvl`, `search`, `sortBy`, and `sortOrder` |
 | Fetch fixed-term detailed vault data | `GET /beta/fixed-term/detailed/{network}/{vaultId}` | Path: `network`, `vaultId` |
 | Preview balances and limits before building a fixed-term transaction | `GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId` |
 | Build a fixed-term transaction | `GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}` | Path: `action`, `userAddress`, `network`, `vaultId`. Query: `assetAddress`, `amount`. Optional query: `simulate` |

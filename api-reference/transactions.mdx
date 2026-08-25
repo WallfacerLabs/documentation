@@ -43,6 +43,7 @@ Alpha and Beta transaction endpoints extend the same wallet-action pattern to ne
 | Build a ready-to-sign borrow market transaction | [`GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
 | Check borrow balances and limits before building a transaction | [`GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
 | Build a Deep deposit or withdrawal transaction | [`GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}`](/api-reference/beta#the-deep) | Beta |
+| Check balances and limits before building a fixed-term transaction | [`GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
 | Build a fixed-term transaction | [`GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
 | Quote, execute, and track cross-chain transaction intents | [`POST /alpha/transactions/intent/getQuote`](/api-reference/alpha#cross-chain-intents) | Alpha |
 | Build and track CCTP bridge transactions | [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/alpha#cctp-bridge) | Alpha |
