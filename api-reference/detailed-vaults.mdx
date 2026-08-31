@@ -9,7 +9,7 @@ APY fields in detailed-vault responses are net of performance and management fee
 
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
-| List and filter vaults with full analytics | [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | None. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `onlyTransactional`, `onlyAppFeatured`, `page`, `perPage`, `sortBy`, and `sortOrder` |
+| List and filter vaults with full analytics | [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | None. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `onlyTransactional`, `onlyAppFeatured`, `page`, `perPage`, `sortBy`, and `sortOrder`. Protocol filters accept either a broad protocol name or a full [protocol ID](/concepts/supported-protocols#protocol-names-and-ids) |
 | Get one vault's full detail object | [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details) | Path: `network`, `vaultId` |
 | Get one vault's APY breakdown | [`GET /v2/detailed-vaults/{network}/{vaultId}/apy`](/api-reference/detailed-vaults/get-vault-apy) | Path: `network`, `vaultId` |
 | Get one vault's TVL data | [`GET /v2/detailed-vaults/{network}/{vaultId}/tvl`](/api-reference/detailed-vaults/get-vault-tvl) | Path: `network`, `vaultId` |

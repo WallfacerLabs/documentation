@@ -5,6 +5,8 @@ description: "User positions, idle assets, deposit recommendations, transaction 
 
 Wallet-aware endpoints that return a user's vault positions, uninvested balances, personalized deposit suggestions, total returns, and transaction history.
 
+Protocol filters accept either a broad protocol name or a full [protocol ID](/concepts/supported-protocols#protocol-names-and-ids) for one product and version.
+
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List all vault positions for a wallet | [`GET /v2/portfolio/positions/{userAddress}`](/api-reference/portfolio/list-portfolio-positions) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `apyInterval`, and `minUsdAssetValueThreshold` |

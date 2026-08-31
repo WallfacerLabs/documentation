@@ -39,6 +39,29 @@ The following protocols are among the most widely used on Vaults.fyi:
 
 These protocols represent a cross-section of the 80\+ covered. For the authoritative V2 EVM protocol list, query `GET /v2/protocols` directly. For Solana/SVM coverage, use the Beta SVM endpoints.
 
+## Protocol names and IDs
+
+Each protocol object includes a lowercase `protocolId` built from its name and, when available, its product and version. Use `GET /v2/protocols` to retrieve the current values rather than constructing them in your integration.
+
+Protocol filters such as `allowedProtocols` and `disallowedProtocols` accept either:
+
+- A protocol `name`, such as `aave`, to match every supported Aave product and version
+- A full `protocolId`, such as `aave-standard spoke-v4`, to match only Aave V4 Standard Spoke opportunities
+
+```bash
+# Match all Aave opportunities
+curl --get 'https://api.vaults.fyi/v2/detailed-vaults' \
+  --header 'x-api-key: YOUR_API_KEY' \
+  --data-urlencode 'allowedProtocols=aave'
+
+# Match only the Aave V4 Standard Spoke product
+curl --get 'https://api.vaults.fyi/v2/detailed-vaults' \
+  --header 'x-api-key: YOUR_API_KEY' \
+  --data-urlencode 'allowedProtocols=aave-standard spoke-v4'
+```
+
+The same name-or-ID behavior applies anywhere these filters are exposed across V2, Alpha, and Beta. If both allow and deny filters are supplied, `allowedProtocols` takes precedence.
+
 ## Full protocol list
 
 The following protocols are supported as of July 2026:
