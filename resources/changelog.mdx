@@ -8,6 +8,24 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 35, 2026 — Aug 25–31
+
+**API**
+
+- Added full **protocol IDs** to API responses and filtering. `protocol.protocolId` distinguishes protocol products and versions, while `allowedProtocols` and `disallowedProtocols` can now target either a broad protocol name or a specific protocol ID.
+
+- Added **Aave V4 transaction support**. Supported Aave V4 Standard Spoke opportunities can now provide instant deposit and withdrawal context and payloads through the shared Transactions API.
+
+- Expanded **Advanced Analytics composition coverage** with persisted allocation data. `select.composition` can now return stored underlying positions for more custody-based and composite strategies, alongside existing protocol-specific composition sources.
+
+**App**
+
+- Added **Fixed Term to Discover**. Users can now browse active Pendle principal-token markets, filter and sort by asset, network, APY, TVL, liquidity, or maturity, and open dedicated market pages with projected yield, maturity context, and related opportunities.
+
+- Improved **Reputation Score display** by withholding ratings when holder data is unavailable, rather than showing an incomplete score as if it were fully assessed.
+
+---
+
 ## Week 34, 2026 — Aug 18–24
 
 **API**
