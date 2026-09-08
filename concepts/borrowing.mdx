@@ -68,7 +68,9 @@ Borrow portfolio endpoints let you inspect a user's current positions and market
 - Asset-level position views for a specific market
 - User events for a market and asset
 
-This is useful for wallets that want to show a complete lending and borrowing account view without maintaining protocol-specific indexers.
+The wallet-wide borrow position list includes only markets with outstanding debt. Supply-only and collateral-only markets are omitted. Asset filters and the USD-value threshold can also exclude a market if no borrowed asset remains in the response. Use the single-market or asset-level position endpoint to inspect a known position without debt.
+
+When combining results across markets, deduplicate balances by `assets[].positionId`. The same economic position can appear in more than one market.
 
 ## Transaction support
 
@@ -79,7 +81,7 @@ Borrow transaction endpoints follow the same pattern as vault transaction flows:
 3. Generate the action payload with `amount` or `all=true` where required.
 4. Pass the returned transaction to the user's wallet.
 
-Supported actions depend on the market and user state, but the model covers supply, withdraw, borrow, and repay flows.
+Supported actions depend on the market and user state, but the model covers supply, withdraw, borrow, and repay flows. Read the action lists from transaction context: some protocols also require `enableCollateral` or `enableController`. Do not assume every supply flow consists only of approval and supply.
 
 <Warning>
   Always fetch transaction context before generating a borrow transaction. Borrow actions depend on collateral, balances, market limits, and protocol-specific constraints.

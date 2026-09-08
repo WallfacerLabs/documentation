@@ -20,13 +20,30 @@ Build Solana/SVM vault integrations alongside the EVM vault API surface. These e
 | List SVM vault identifiers | `GET /beta/svm/vaults` | None |
 | List SVM detailed vaults | `GET /beta/svm/detailed-vaults` | None. Optional query filters include `page`, `perPage`, `assetSymbol`, `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `allowedAssetMints`, `disallowedAssetMints`, `minTvl`, `maxTvl`, `minApy`, `maxApy`, `sortBy`, and `sortOrder` |
 | Fetch one SVM detailed vault | `GET /beta/svm/detailed-vaults/{vaultAddress}` | Path: `vaultAddress` |
-| List SVM positions for a wallet | `GET /beta/svm/portfolio/positions/{userAddress}` | Path: `userAddress` |
+| List SVM positions for a wallet | `GET /beta/svm/portfolio/positions/{userAddress}` | Path: `userAddress`. Optional query: `apyInterval`, `minUsdAssetValueThreshold` |
 | List SVM portfolio events for a wallet | `GET /beta/svm/portfolio/events/{userAddress}` | Path: `userAddress` |
 | List SVM portfolio events for one vault | `GET /beta/svm/portfolio/events/{userAddress}/{vaultAddress}` | Path: `userAddress`, `vaultAddress` |
-| List idle SVM assets for a wallet | `GET /beta/svm/portfolio/idle-assets/{userAddress}` | Path: `userAddress` |
+| List idle SVM assets for a wallet | `GET /beta/svm/portfolio/idle-assets/{userAddress}` | Path: `userAddress`. Optional query: `allowedAssets`, `disallowedAssets` |
 | Fetch one idle SVM asset | `GET /beta/svm/portfolio/idle-assets/{userAddress}/{assetAddress}` | Path: `userAddress`, `assetAddress` |
 | Check balances and limits before building an SVM transaction | `GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}` | Path: `userAddress`, `vaultAddress` |
 | Build a ready-to-sign SVM transaction | `GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}` | Path: `action`, `userAddress`, `vaultAddress`. Query: `assetAddress`, plus `amount` when the action requires an amount. Optional query: `simulate` |
+
+### Reading SVM position values
+
+`GET /beta/svm/portfolio/positions/{userAddress}` returns positions in `data`. Each position's `asset` object includes:
+
+| Field | Meaning |
+|-------|---------|
+| `balanceNative` | Current position value in underlying-asset base units, as an integer string |
+| `positionValueInAsset` | Optional explicit position-value field, currently equal to `balanceNative` |
+| `balanceUsd` | Current position value in USD, as a string |
+| `unclaimedNative` | Pending-redemption amount in underlying-asset base units, separate from the current position value |
+| `unclaimedUsd` | Pending-redemption value in USD, as a string |
+| `decimals` | Underlying-asset precision used to convert base units to display units |
+
+For example, a `positionValueInAsset` of `"1250000"` with `decimals: 6` represents 1.25 underlying tokens. Do not add `positionValueInAsset` to `balanceNative`: they describe the same balance. If the optional field is absent, use `balanceNative`. These are underlying-asset amounts, not LP-token share amounts.
+
+### Building SVM transactions
 
 SVM transaction responses return one or more actions with a Solana transaction object at `actions[].tx.transaction`. The value is a base64-encoded serialized Solana transaction ready for wallet signing. Passing `simulate=true` can add a `simulation` object with status plus token amounts expected to be spent or received.
 
@@ -47,6 +64,16 @@ Build borrow dashboards and account-health views against one borrow market model
 | List borrow market events | `GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}` | Path: `userAddress`, `network`, `marketId`, `assetId` |
 | Check balances and limits before building a borrow transaction | `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}` | Path: `userAddress`, `network`, `marketId`, `assetId` |
 | Build a ready-to-sign borrow market transaction | `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}` | Path: `action`, `userAddress`, `network`, `marketId`, `assetId`. Query: `amount` or `all=true` when the action requires an amount |
+
+### Reading borrow positions
+
+`GET /beta/borrow/portfolio/positions/{userAddress}` lists markets with outstanding debt, not every supply-only or collateral-only position. A market must retain an asset with nonzero `borrowedNative` after asset and USD-value filtering to appear in the list. Filtering out the debt asset can therefore remove the entire market, including its collateral.
+
+Use the single-market or asset-level position endpoints when inspecting a known position, including one without debt. When aggregating balances across markets, use `assets[].positionId` to avoid counting the same underlying position more than once.
+
+### Building borrow transactions
+
+Fetch transaction context first and use the returned `supplySteps`, `withdrawSteps`, `borrowSteps`, or `repaySteps`. Their action lists depend on the protocol and collateral configuration, and may include `enableCollateral` or `enableController` alongside approval and supply/withdraw/borrow/repay actions. Do not hard-code a universal approval-and-supply sequence.
 
 Borrow market responses expose `assetsData[].marketAssetId`. Pass that value as `{assetId}` when chaining from market discovery into historical data, portfolio events, asset-level positions, or transaction endpoints.
 
@@ -92,6 +119,8 @@ Add fixed-term yield market support for Pendle-backed opportunities. Use these e
 | Fetch fixed-term detailed vault data | `GET /beta/fixed-term/detailed/{network}/{vaultId}` | Path: `network`, `vaultId` |
 | Preview balances and limits before building a fixed-term transaction | `GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}` | Path: `userAddress`, `network`, `vaultId` |
 | Build a fixed-term transaction | `GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}` | Path: `action`, `userAddress`, `network`, `vaultId`. Query: `assetAddress`, `amount`. Optional query: `simulate` |
+
+Fixed-term market discovery costs 1 base credit plus 3 credits per returned market. For example, 10 returned markets cost 31 credits.
 
 ## Portfolio
 
