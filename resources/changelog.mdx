@@ -8,6 +8,24 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 36, 2026 — Sep 1–7
+
+**API**
+
+- Added **borrow support for Fluid** in Beta, covering supported single-collateral, single-debt markets, with position tracking and supply, withdraw, borrow, and repay transaction flows.
+
+- Improved **borrow transaction context** with protocol-specific action steps, including collateral and controller activation where required. Integrators can follow the returned sequence when preparing transactions.
+
+- Improved **vault composition accuracy** across supported multi-strategy vaults. Allocation discovery now includes positions held directly by the vault, and small incidental balances no longer hide underlying Morpho market allocations.
+
+- Fixed **Jupiter Lend pricing** on Solana, addressing missing asset prices and USD TVL that caused affected vaults to disappear from discovery and become unavailable through transaction routes.
+
+- Added **ether.fi eBTC withdrawal-queue support on Optimism**, extending queued redemption support through the shared Transactions API.
+
+- Improved **Kamino transaction payload generation** for deposits and withdrawals, using address lookup tables to produce more compact transactions.
+
+---
+
 ## Week 35, 2026 — Aug 25–31
 
 **API**
