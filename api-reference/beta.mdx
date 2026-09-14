@@ -15,6 +15,10 @@ Where an endpoint supports `allowedProtocols` or `disallowedProtocols`, each val
 
 Build Solana/SVM vault integrations alongside the EVM vault API surface. These endpoints cover Solana vault discovery, detailed vault data, wallet positions and events, idle assets, and ready-to-sign transaction construction.
 
+Detailed vault responses can include an optional `lpToken` object with `address` (the LP-token mint), `tokenCaip` (its CAIP-19 identifier), `name`, `symbol`, and `decimals`. The object is omitted when the required metadata is unavailable.
+
+Idle-asset responses include token `name` and `symbol`, plus `assetLogo` where available, alongside the address, decimals, and balance. For single-asset lookups, unavailable names and symbols can be empty strings.
+
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List SVM vault identifiers | `GET /beta/svm/vaults` | None |

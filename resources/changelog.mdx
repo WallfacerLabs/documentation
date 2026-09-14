@@ -8,6 +8,28 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 37, 2026 — Sep 8–14
+
+**API**
+
+- Added **Solana vault LP-token metadata** in Beta. Detailed vault responses now include an optional `lpToken` object with the token’s mint address, name, symbol, decimals, and CAIP-19 identifier where available.
+
+- Expanded **Solana portfolio data** in Beta. Idle-asset responses now include token names, symbols, and logos where available. Position responses also expose `asset.positionValueInAsset`, expressing the position value in underlying asset units at the asset’s precision. This mirrors `balanceNative`, not an additional balance.
+
+- Optimized **Solana portfolio position lookups** by batching balance requests and reusing protocol connections, reducing RPC overhead when retrieving wallet positions.
+
+- Updated **borrow portfolio filtering** so wallet-wide position lists include only markets with outstanding debt. Supply-only and collateral-only markets are excluded from these lists.
+
+- Fixed **native-token wallet balances in borrow portfolio responses**, using the chain’s native balance lookup instead of treating native assets as ERC-20 tokens.
+
+**App**
+
+- Expanded **vault performance charts** so yield, TVL, and share price are visible together on opportunity pages, with an expanded view for each chart.
+
+- Improved **borrow market comparisons** with charts showing supply and borrow APY together, plus total supplied and total borrowed balances.
+
+---
+
 ## Week 36, 2026 — Sep 1–7
 
 **API**
