@@ -8,6 +8,30 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 38, 2026 — Sep 15–21
+
+**API**
+
+- Added **curator display names** to V2. `GET /v2/curators` and both detailed-vault routes now return optional `curator.displayName` alongside the canonical `curator.name`, giving integrators presentation-ready curator labels without changing identifiers used for filtering.
+
+- Added **Aave V4 Standard Spoke borrowing** in Beta on Ethereum. Supported markets can now expose market data, wallet positions, and transaction payloads for supply, withdraw, borrow, and repay flows.
+
+- Expanded **borrow risk data** with optional `borrowRateMultiplier`, exposing the collateral risk multiplier applied to the base borrow rate where the protocol provides one.
+
+- Added **three Ink xStocks vaults** for SPYx, QQQx, and NVDAx, including asset pricing and queued-withdrawal support.
+
+- Fixed **TOKE pricing** using TOKE/WETH liquidity, improving USD valuation for vault rewards paid in TOKE.
+
+- Expanded vault coverage by **14 vaults**, bringing the tracked total to **1,837 vaults across 20 networks**. The largest additions included Sentora x Spark RLUSD, Axis Origin USDx, Compound Institutional USDC, and RockawayX Confidential RWA USDC.
+
+**App**
+
+- Added curator display names across vault cards, curator filters, opportunity metadata, and analytics views. Also fixed a crash when the curator filter had no available entries.
+
+- Updated **borrow-market charts** to match the vault performance experience, with separate expandable views for borrow APY, utilization, and total supplied.
+
+---
+
 ## Week 37, 2026 — Sep 8–14
 
 **API**

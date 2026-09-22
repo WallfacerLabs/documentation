@@ -55,6 +55,8 @@ SVM transaction responses return one or more actions with a Solana transaction o
 
 Build borrow dashboards and account-health views against one borrow market model instead of wiring separate protocol-specific routes. Use these endpoints for market discovery, historical rates, user positions, user events, and ready-to-sign borrow transaction payloads.
 
+Supported Aave V4 Standard Spoke markets on Ethereum use this same normalized surface for market data, wallet positions, and supply, withdraw, borrow, and repay transaction payloads.
+
 | Capability | How to call | Required inputs |
 |------------|-------------|-----------------|
 | List all borrow markets | `GET /beta/borrow/markets/` | None. Optional query filters include `page`, `perPage`, `allowedNetworks`, `disallowedNetworks`, `allowedCollateralAssets`, `disallowedCollateralAssets`, `allowedBorrowAssets`, `disallowedBorrowAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, and `maxTvl` |
@@ -80,6 +82,8 @@ Use the single-market or asset-level position endpoints when inspecting a known 
 Fetch transaction context first and use the returned `supplySteps`, `withdrawSteps`, `borrowSteps`, or `repaySteps`. Their action lists depend on the protocol and collateral configuration, and may include `enableCollateral` or `enableController` alongside approval and supply/withdraw/borrow/repay actions. Do not hard-code a universal approval-and-supply sequence.
 
 Borrow market responses expose `assetsData[].marketAssetId`. Pass that value as `{assetId}` when chaining from market discovery into historical data, portfolio events, asset-level positions, or transaction endpoints.
+
+Risk-parameter objects can include `borrowRateMultiplier`, the collateral risk multiplier applied to the base borrow rate. The field is optional because it is only returned when the underlying protocol supplies this parameter.
 
 ## Advanced analytics
 

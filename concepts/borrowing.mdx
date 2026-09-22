@@ -54,9 +54,12 @@ Borrow markets expose the normalized data needed to build market screens and pos
 - Rates and utilization
 - Supplied and borrowed asset data
 - Collateral and liquidation parameters
+- An optional `borrowRateMultiplier` where the protocol applies a collateral risk multiplier to the base borrow rate
 - Historical market data where available
 
 Use this data for borrow dashboards, market comparison views, and account-specific borrow screens.
+
+Aave V4 Standard Spoke markets on Ethereum use this normalized model for discovery, positions, and transaction construction alongside the other supported lending protocols.
 
 ## Positions and events
 

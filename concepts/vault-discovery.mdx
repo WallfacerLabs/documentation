@@ -78,7 +78,8 @@ Vaults belong to a protocol. Some are additionally managed by a named curator (e
 | `protocol.protocolUrl` | Protocol website. |
 | `protocol.description` | Short protocol description. |
 | `protocol.protocolLogo` | URL to the protocol logo image. |
-| `curator.name` | Name of the vault curator, if one is assigned. |
+| `curator.name` | Canonical curator identifier, if one is assigned. Use this value for filtering and stable matching. |
+| `curator.displayName` | Optional presentation-ready curator name. Fall back to `curator.name` when absent. |
 | `curator.description` | Description of the curator. |
 | `curator.websiteUrl` | Curator website. |
 | `protocolVaultUrl` | Direct URL to this vault on the protocol's own interface. |

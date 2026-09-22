@@ -14,3 +14,5 @@ Core reference data endpoints — use these to browse available vaults, resolve 
 | List vault curators | [`GET /v2/curators`](/api-reference/general/list-curators) | None |
 | List supported protocols and their filterable protocol IDs | [`GET /v2/protocols`](/api-reference/general/list-protocols) | None. See [Protocol names and IDs](/concepts/supported-protocols#protocol-names-and-ids) for filtering examples |
 | Check API availability | [`GET /v2/health`](/api-reference/health/health-check) | None |
+
+`GET /v2/curators` returns each curator's canonical `name` and an optional `displayName`. Use `name` for filtering and stable matching; use `displayName` for presentation, falling back to `name` when it is absent. The same fields appear in the optional `curator` object returned by both detailed-vault endpoints.
