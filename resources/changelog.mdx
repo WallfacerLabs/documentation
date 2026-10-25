@@ -8,6 +8,26 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 42, 2026 — Oct 13–19
+
+**API**
+
+- Added **data-freshness timestamps to Solana vault responses and borrow-market asset records**. These responses now expose `lastUpdateTimestamp` in Unix seconds, helping integrators detect stale snapshots before displaying them.
+
+- Improved **API reliability and incident diagnosis** across vault data, portfolio, analytics, and transaction flows. Error reports now include more useful customer and request context, helping the team trace and resolve failures faster.
+
+---
+
+## Week 41, 2026 — Oct 6–12
+
+**App**
+
+- Expanded **X-Ray** to include direct wallet lending alongside vault-derived Morpho exposure. Analyses now combine eligible direct Morpho supply with underlying vault allocations, preserve Midnight lending as separate evidence, and trace positions back to a source vault or `Wallet · direct lend`.
+
+- Improved **post-transaction navigation**. Users can cancel the automatic redirect after completing a transaction, and the destination position is now highlighted correctly when they continue.
+
+---
+
 ## Week 40, 2026 — Sep 29–Oct 5
 
 **API**
