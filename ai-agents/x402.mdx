@@ -75,19 +75,17 @@ For a complete working example, see the [Agentic DeFi repo](https://github.com/W
 
 ## Pricing
 
-All prices are in USDC on Base, charged per request, at **0.002 USDC per [API credit](/plans/credits)**. Payment is in USDC raw units (6 decimals) — for example, `2000` = 0.002 USDC. The `402` response always contains the current `accepts[].amount`. Prices are subject to change.
+All prices are in USDC on Base, charged per request. Payment is in USDC raw units (6 decimals) — for example, `5000` = $0.005 USDC. The `402` response always contains the current `accepts[].amount`. Prices are subject to change.
 
-| Price (USDC) | Endpoints |
+| Price  | Endpoints |
 | ------ | --------- |
-| 0.002 | `/v2/networks`, `/v2/vaults`, `/v2/tags`, `/v2/assets`, `/v2/curators`, `/v2/protocols` |
-| 0.002 | `/v2/detailed-vaults/{network}/{vaultId}/apy`, `/v2/detailed-vaults/{network}/{vaultId}/tvl` |
-| 0.006 | `/v2/detailed-vaults/{network}/{vaultId}` |
-| 0.010 | `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}` |
-| 0.004 | `/v2/portfolio/best-vault/{userAddress}` |
-| 0.002 + 0.004 per returned balance entry | `/v2/portfolio/best-deposit-options/{userAddress}` |
-| 0.006 for context, 0.010 for action or claim, 0.002 for suffix | `/v2/transactions/*`, `/v2/transactions/rewards/claim/{userAddress}` |
-| 0.002 + 0.006 per returned vault | `/v2/detailed-vaults` (paginated list of all vaults) |
-| Free | `/v2/health` |
+| $0.005 | `/v2/networks`, `/v2/vaults`, `/v2/tags`, `/v2/assets`, `/v2/curators` |
+| $0.01  | `/v2/detailed-vaults/{network}/{vaultId}/apy`, `/v2/detailed-vaults/{network}/{vaultId}/tvl` |
+| $0.02  | `/v2/detailed-vaults/{network}/{vaultId}`, `/v2/portfolio/positions/{userAddress}` |
+| $0.025 | `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}` |
+| $0.05  | `/v2/transactions/*`, `/v2/transactions/rewards/claim/{userAddress}` |
+| $0.75  | `/v2/detailed-vaults` (paginated list of all vaults) |
+| Free   | `/v2/health` |
 
 Fixed-price endpoints use `exact`. Detailed-vault lists, best deposit options, historical data, historical benchmarks, and advanced analytics use `upto`: authorize the quoted maximum, then pay for actual returned usage. Paginated endpoints quote using `perPage`; best deposit options quote up to 50 balance entries. Results above the authorization fail without charging; narrow the filters or use an API key. Empty successful results still incur the base charge.
 
