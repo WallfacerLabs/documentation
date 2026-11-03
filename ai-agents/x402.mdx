@@ -87,9 +87,11 @@ All prices are in USDC on Base, charged per request. Payment is in USDC raw unit
 | $0.75  | `/v2/detailed-vaults` (paginated list of all vaults) |
 | Free   | `/v2/health` |
 
-Fixed-price endpoints use `exact`. Detailed-vault lists, best deposit options, historical data, historical benchmarks, and advanced analytics use `upto`: authorize the quoted maximum, then pay for actual returned usage. Paginated endpoints quote using `perPage`; best deposit options quote up to 50 balance entries. Results above the authorization fail without charging; narrow the filters or use an API key. Empty successful results still incur the base charge.
+All paginated v2 endpoints and beta advanced analytics support `upto`: authorize the quoted maximum, then pay for actual returned usage. Per-item endpoints quote using `perPage`; the basic vault and asset lists retain their flat charge. Empty successful results still incur the base charge. Best deposit options intentionally remain fixed-price with `exact`.
 
-For `upto` endpoints, use an `upto`-capable client (for example, register `UptoEvmScheme` from `@x402/evm/upto/client` in JavaScript) and approve USDC to Permit2 before paying. Approval may require Base ETH for gas. The exact-only examples above do not handle these endpoints. Batch-capable clients can alternatively use `batch-settlement` when advertised in `accepts`.
+Every `upto` endpoint also accepts `exact` at the quoted maximum. Choosing `exact` pays that full amount even when fewer items or analytics sections are returned, with no refund of the difference. This intentional overpayment supports exact-only clients, including the examples above.
+
+To pay for actual usage instead, register an `upto`-capable client (for example, `UptoEvmScheme` from `@x402/evm/upto/client` in JavaScript) and approve USDC to Permit2 before paying. Approval may require Base ETH for gas. Batch-capable clients can alternatively use `batch-settlement` when advertised in `accepts`.
 
 <Note>
   x402 supports paid v2 endpoints, including `/v2/historical/*`, and the beta advanced-analytics endpoints. See [credit costs](/plans/credits) for historical and other endpoint prices. Other beta, alpha, and legacy v1 endpoints require an API key; [sign up](https://portal.vaults.fyi/signup) to get one.
