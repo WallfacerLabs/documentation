@@ -1,31 +1,163 @@
 ---
-title: "Vaults.fyi API Overview"
+title: "vaults.fyi REST API overview"
 sidebarTitle: "Overview"
-description: "The vaults.fyi V2 API — comprehensive DeFi vault data and transaction execution across 20+ EVM networks, with Solana/SVM endpoints in Beta."
+description: "Start here for the vaults.fyi REST API: base URL, x-api-key auth, a first working request, units, pagination, defaults, errors and a map of every endpoint section."
 ---
 
-## Base URL
+This page is the starting point for the vaults.fyi REST API. It gives you the base URL, how to authenticate, a first request with its real response, and the conventions every endpoint shares: units, pagination, hidden defaults and errors. It ends with a map of every endpoint section. Read it before you write client code or let an agent call the API.
 
-```
-https://api.vaults.fyi/v2
-```
+The API serves DeFi vault data (APY, TVL, Reputation Score, fees, holders) and wallet portfolios, and it builds **unsigned**, ready-to-sign transaction payloads. The stable `/v2` surface covers 22 EVM networks. Solana (SVM), borrow markets, fixed-term (Pendle) and advanced analytics are in `/beta`. Cross-chain intents, CCTP bridging, vault holders and historical positions are in `/alpha`.
+
+## Base URL and version prefixes
+
+The base URL is `https://api.vaults.fyi` with **no** version suffix. Every path carries its own version prefix:
+
+| Prefix | Stability | Example |
+| - | - | - |
+| `/v2/...` | Stable; breaking changes get at least 30 days' notice (35 operations) | `https://api.vaults.fyi/v2/detailed-vaults` |
+| `/beta/...` | Stable in practice, shape may change without notice (32 operations) | `https://api.vaults.fyi/beta/svm/vaults` |
+| `/alpha/...` | Early access, may change without notice (11 operations) | `https://api.vaults.fyi/alpha/base/{vaultId}/holders` |
+
+The OpenAPI specs declare `servers: [{url: "https://api.vaults.fyi"}]`, and every spec path already starts with `/v2`, `/beta` or `/alpha`. If you configure `https://api.vaults.fyi/v2` as the base URL in a generated client, every request goes to `/v2/v2/...` and returns 404, and `/beta` and `/alpha` are unreachable. Set the base URL to `https://api.vaults.fyi`.
+
+What each stability level promises is covered in [Versioning and stability](/api-reference/versioning).
 
 ## Authentication
 
-Every request must include your API key as a header:
+Send your API key in the `x-api-key` header on every REST request:
 
 ```bash
-x-api-key: YOUR_API_KEY
+curl -H "x-api-key: $VAULTSFYI_API_KEY" "https://api.vaults.fyi/v2/networks"
 ```
 
-All API keys have access to all endpoints. Rate limits depend on your plan — see [Plans & Pricing](/plans/overview), or contact support to increase your limit.
+- Get a key at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup). Every key can call every endpoint (v2, beta and alpha). Plans differ only in price, included credits, rate limit and support. See [Plans and pricing](/plans/overview).
+- **No key, v2 endpoints:** HTTP **402** with an x402 v2 payment challenge, not 401. You can pay per request with USDC on Base instead of using a key. See [x402](/ai-agents/x402).
+- **No key, beta, alpha and NRT endpoints:** these need an API key; they are not offered over x402.
+- **Invalid key:** HTTP **401** with the message "An API key is required…". Branch on the status code, not the message.
+- **Public:** `GET /v2/health` needs no key.
+- **MCP is different.** The hosted MCP server takes the same key as `Authorization: Bearer <key>`, not `x-api-key`. See [MCP server](/ai-agents/mcp-server).
+
+Never hard-code the key. Read it from an environment variable (`VAULTSFYI_API_KEY` in the examples).
+
+## Your first request
+
+This request lists the two highest 7-day-APY USDC vaults on Base with at least $1M TVL:
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&minTvl=1000000&sortBy=apy7day&sortOrder=desc&perPage=2"
+```
+
+```python
+import os, requests
+
+resp = requests.get(
+    "https://api.vaults.fyi/v2/detailed-vaults",
+    headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+    params={
+        "allowedNetworks": "base",
+        "allowedAssets": "USDC",
+        "minTvl": 1000000,
+        "sortBy": "apy7day",
+        "sortOrder": "desc",
+        "perPage": 2,
+    },
+    timeout=30,
+)
+resp.raise_for_status()
+body = resp.json()
+for v in body["data"]:
+    print(v["name"], f'{v["apy"]["7day"]["total"] * 100:.2f}%', v["tvl"]["usd"])
+```
+
+```typescript
+const params = new URLSearchParams({
+  allowedNetworks: "base",
+  allowedAssets: "USDC",
+  minTvl: "1000000",
+  sortBy: "apy7day",
+  sortOrder: "desc",
+  perPage: "2",
+});
+const res = await fetch(`https://api.vaults.fyi/v2/detailed-vaults?${params}`, {
+  headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! },
+});
+if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+const body = await res.json();
+for (const v of body.data) {
+  console.log(v.name, `${(v.apy["7day"].total * 100).toFixed(2)}%`, v.tvl.usd);
+}
+```
+
+Response, captured 2026-10-23 and trimmed to the first vault and its key fields (the real item also has `protocol`, `score`, `holdersData`, `rewards`, `lpToken`, `flags`, `isCorrupted` and more):
+
+```json
+{
+  "itemsOnPage": 2,
+  "nextPage": 1,
+  "data": [
+    {
+      "vaultId": "0xB99B6dF96d4d5448cC0a5B3e0ef7896df9507Cf5",
+      "address": "0xB99B6dF96d4d5448cC0a5B3e0ef7896df9507Cf5",
+      "name": "40acres USDC Vault",
+      "network": { "name": "base", "chainId": 8453, "networkCaip": "eip155:8453" },
+      "asset": {
+        "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "assetCaip": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "symbol": "USDC",
+        "decimals": 6,
+        "assetPriceInUsd": "0.99985668"
+      },
+      "isTransactional": true,
+      "apy": {
+        "1hour": { "base": 0.3324, "reward": 0, "total": 0.3324 },
+        "1day":  { "base": 0.3342, "reward": 0, "total": 0.3342 },
+        "7day":  { "base": 0.3136, "reward": 0, "total": 0.3136 },
+        "30day": { "base": 0.3059, "reward": 0, "total": 0.3059 },
+        "90day": { "base": 0.273,  "reward": 0, "total": 0.273 }
+      },
+      "tvl": { "usd": "5708490", "native": "5709308677428" },
+      "lastUpdateTimestamp": 1792756800,
+      "warnings": [
+        "Utilization is high for this vault, so withdrawals may be unavailable until liquidity returns. ..."
+      ]
+    }
+  ],
+  "errors": { "unsupportedNetworks": [], "unsupportedAssets": [], "unsupportedProtocols": [] }
+}
+```
+
+What this response shows:
+
+- `apy.7day.total` is `0.3136`, a **decimal fraction**: 31.36%, not 0.31%.
+- `tvl.usd` is a string of whole USD. `tvl.native` is in the asset's **base units**: 5709308677428 / 10^6 = 5,709,308.68 USDC.
+- The top-ranked vault carries a `warnings` entry. Ranking by APY surfaces risky vaults first. Check `warnings`, `flags` and `score.vaultScore` before you recommend a vault.
+- `nextPage: 1` means another page exists. On the last page the key is **absent**.
+- `errors` lists filter values the server did not recognise. Here it is empty.
+
+## Conventions you must know
+
+The full rules are on [Conventions](/api-reference/conventions). These are the ones that most often cause silent bugs:
+
+| Topic | Rule |
+| - | - |
+| APY | Decimal fraction, net of fees: `0.0315` = 3.15%. Shape `apy.<window>.{base, reward, total}`, where `total = base + reward`. Windows on detailed vaults: `1hour`, `1day`, `7day`, `30day`, `90day`. Values can be negative or far above 1. |
+| Token amounts | Integer strings in base units. 1 USDC = `"1000000"` (6 decimals). Transaction `amount` must be base units; `amount=1.5` returns 400. |
+| USD values | Strings (`tvl.usd`, `balanceUsd`, `assetPriceInUsd`). Parse them as decimals. |
+| Timestamps | Unix **seconds** (`fromTimestamp=1792540800`). Milliseconds return 400. |
+| Networks | Name (`base`, `mainnet`) or CAIP-2 (`eip155:8453`). A bare chain ID (`8453`) or `ethereum` is rejected. |
+| Array query params | Repeat the key: `allowedNetworks=base&allowedNetworks=arbitrum`. A comma list (`base,arbitrum`) returns 200 with **0 results**. |
+| Default network scope | `/v2/detailed-vaults` and the `/v2/portfolio/*` endpoints cover only **base, mainnet, arbitrum, optimism** unless you pass `allowedNetworks`. `/v2/vaults` and `/v2/assets` cover all networks. |
+| Other defaults | `minTvl=100000` (USD) hides small vaults; `sortOrder=asc` puts the lowest first, so send `sortOrder=desc` to rank. |
+| Soft errors | Unknown filter values return **200** with empty `data` and the value echoed in `errors.unsupportedNetworks` / `unsupportedAssets` / `unsupportedProtocols`. |
+| Positions | In `/v2/portfolio/positions`, `asset.balanceNative` / `asset.balanceUsd` are the wallet's **idle balance** of the underlying, repeated on every position. Position size is `asset.positionValueInAsset` or `lpToken.balanceUsd`. |
 
 ## Networks
 
-The V2 API tracks vaults across 20+ EVM-compatible networks. Networks can be identified by name or CAIP-2 identifier:
+The `/v2` endpoints cover 22 EVM networks. Identify a network by its **name** or its **CAIP-2** ID in paths and filters. A bare chain ID (`8453`) or `ethereum` returns 400; Ethereum is `mainnet`. This table is the `GET /v2/networks` response captured 2026-10-23; call that endpoint (1 credit) for the current list.
 
 | Name | Chain ID | CAIP-2 |
-|------|----------|--------|
+| - | - | - |
 | `arbitrum` | 42161 | `eip155:42161` |
 | `avalanche` | 43114 | `eip155:43114` |
 | `base` | 8453 | `eip155:8453` |
@@ -49,81 +181,75 @@ The V2 API tracks vaults across 20+ EVM-compatible networks. Networks can be ide
 | `unichain` | 130 | `eip155:130` |
 | `worldchain` | 480 | `eip155:480` |
 
-Use `GET /v2/networks` for the complete current list of V2 EVM networks. Solana/SVM vault discovery, portfolio, idle-asset, and transaction endpoints are available separately in [Beta](/api-reference/beta#solana-vaults).
-
-## APY values
-
-All APY fields are **raw decimals**. Multiply by 100 to display as a percentage:
-
-```js
-// API returns: 0.0543
-// Display as:  5.43%
-const displayApy = (rawApy * 100).toFixed(2) + '%';
-```
-
-APY values are net of performance and management fees. The detailed-vault `fees` object is for display and should not be subtracted from APY again.
+Solana is not a v2 network: Solana vaults are under `/beta/svm/*` (see [Beta → Solana vaults](/api-reference/beta#solana-vaults)). Most `/v2/detailed-vaults` and `/v2/portfolio/*` requests cover only base, mainnet, arbitrum and optimism unless you pass `allowedNetworks`; see [Conventions → Networks](/api-reference/conventions#networks).
 
 ## Pagination
 
-All list endpoints use offset pagination with `page` (zero-indexed) and `perPage`:
+List endpoints take `page` (0-based, default 0) and `perPage` (default 50). The maximum `perPage` depends on the endpoint: 5000 for vault and asset lists, 20000 for historical series, 1000 for some beta lists. `perPage=0` returns 400.
 
-```bash
-GET /v2/detailed-vaults?page=0&perPage=50   # first page
-GET /v2/detailed-vaults?page=1&perPage=50   # second page
-```
+Paginated responses look like `{ "itemsOnPage": n, "nextPage": n+1, "data": [...], "errors": {...} }`:
 
-The response includes `nextPage` — it is `null` when you are on the last page.
+- `nextPage` is **omitted** on the last page. It is never `null`, so loop while the key is present.
+- There is no total count. The only way to know how many items exist is to page to the end.
+- A `page` past the end returns 200 with `itemsOnPage: 0` and `data: []`.
+- `/v2/portfolio/*` endpoints are not paginated: they return everything in `{ "data": [...], "errors": {...} }`.
 
-## Error responses
+Copy-paste loops in Python and TypeScript are on [Conventions → Pagination](/api-reference/conventions#pagination).
 
-| Status | Meaning |
-|--------|---------|
-| `400` | Invalid parameters |
-| `401` | Missing or invalid API key |
-| `403` | API key has exhausted available credits |
-| `404` | Resource not found |
-| `429` | Rate limit exceeded |
-| `500` | Internal server error |
-| `503` | Service temporarily unavailable |
+## Errors and rate limits
 
-Error bodies follow this shape:
+Branch on the HTTP status first. The full catalog, with real bodies, is on [Errors and rate limits](/api-reference/errors).
 
-```json
-{
-  "statusCode": 400,
-  "error": "Bad Request",
-  "message": "Descriptive error message"
-}
-```
+| Status | Meaning (observed 2026-10-23) | Retry? |
+| - | - | - |
+| 400 | Validation failure (`message` is a JSON-encoded array of Zod issues), or a v2 resource not found (`"Vault … on network base not found"`) | No, fix the request |
+| 401 | Invalid key | No |
+| 402 | No `x-api-key` on a v2 endpoint: x402 payment challenge | No, add the key |
+| 403 | Credits exhausted (documented in the spec; not observed) | No, top up |
+| 404 | Unknown route, wrong HTTP method, or a beta resource not found | No |
+| 429 | Rate limit exceeded (documented; not observed) | Yes, after `x-ratelimit-reset` seconds |
+| 500 | Server error | At most once, then report |
+| 503, 504 | Upstream or gateway timeout; 504 carries `retry-after: 120` | Yes, with backoff |
 
-Some authentication errors omit `statusCode`; always key your handling off the HTTP status code first.
+Authenticated responses carry `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-reset` (seconds until the window resets). The key used to write these docs reported `x-ratelimit-limit: 600` over a 60-second window. Plan limits are on [Plans and pricing](/plans/overview).
 
-## Quick start
+## Credits
 
-Fetch the top 5 USDC vaults by 7-day APY on Ethereum mainnet:
+Each request consumes credits: a base cost per call plus, on some list endpoints, a cost per returned item. For example, `/v2/detailed-vaults` costs 1 + 3 per vault returned, so `perPage=50` costs up to 151 credits. Pay-as-you-go is $0.002 per credit. The full table is on [Credits](/plans/credits).
 
-```bash
-curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.vaults.fyi/v2/detailed-vaults\
-?allowedAssets=USDC\
-&allowedNetworks=mainnet\
-&minTvl=1000000\
-&sortBy=apy7day\
-&sortOrder=desc\
-&perPage=5"
-```
+## Endpoint sections
 
-Check a user's idle assets and suggest vaults to deposit into:
+Each section page links every endpoint page in it, with when to use each endpoint and its credit cost.
 
-```bash
-# Step 1 — find idle assets
-curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.vaults.fyi/v2/portfolio/idle-assets/0xYourWallet"
+| Section | Use it to | Prefix |
+| - | - | - |
+| [General](/api-reference/general) | List vault IDs, assets, networks, protocols, curators and tags (cheap reference data) | `/v2` |
+| [Detailed vaults](/api-reference/detailed-vaults) | Rank and filter vaults with APY, TVL, Reputation Score and fees; fetch one vault | `/v2` |
+| [Historical](/api-reference/historical) | APY, TVL, share-price and asset-price time series | `/v2` |
+| [Benchmarks](/api-reference/benchmarks) | USD and ETH benchmark APY, current and historical | `/v2` |
+| [Portfolio](/api-reference/portfolio) | A wallet's positions, idle assets, returns, events and deposit suggestions | `/v2` |
+| [Transactions](/api-reference/transactions) | Build unsigned deposit, redeem and reward-claim payloads | `/v2` |
+| [Near real-time (NRT)](/api-reference/nrt) | Share price, total assets and total supply read live from chain | `/v2` |
+| [Health](/api-reference/health) | Public liveness check | `/v2` |
+| [Beta](/api-reference/beta) | Solana/SVM vaults, borrow markets, The Deep, fixed-term (Pendle), advanced analytics, partial returns | `/beta` |
+| [Alpha](/api-reference/alpha) | Cross-chain intents, CCTP bridge, vault holders, historical positions and balances, daily flows | `/alpha` |
 
-# Step 2 — get ranked deposit suggestions
-curl -H "x-api-key: YOUR_API_KEY" \
-  "https://api.vaults.fyi/v2/portfolio/best-deposit-options/0xYourWallet\
-?onlyTransactional=true&maxVaultsPerAsset=3"
-```
+Reference pages that apply to every section:
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{__html: `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Docs","item":"https://docs.vaults.fyi"},{"@type":"ListItem","position":2,"name":"API Reference","item":"https://docs.vaults.fyi/api-reference/overview"}]}`}} />
+- [Conventions](/api-reference/conventions): units, identifiers, networks, defaults per endpoint, pagination, nullability.
+- [Errors and rate limits](/api-reference/errors): status codes, body shapes, rate-limit headers, retry policy.
+- [Versioning and stability](/api-reference/versioning): what v2, beta and alpha promise, and how to detect changes.
+
+## OpenAPI specs
+
+Use the specs for code generation and agent tool definitions. Remember to set the client base URL to `https://api.vaults.fyi`.
+
+- v2 (stable): [https://api.vaults.fyi/v2/documentation/json](https://api.vaults.fyi/v2/documentation/json)
+- beta: [https://api.vaults.fyi/beta/documentation/json](https://api.vaults.fyi/beta/documentation/json)
+- alpha: [https://api.vaults.fyi/alpha/documentation/json](https://api.vaults.fyi/alpha/documentation/json)
+
+The v2 spec's `info.description` says "Basic API key use is limited to 10 requests per minute". That figure is the limit for requests without an API key (per IP), not a plan limit. Keys get 600 to 3,000 requests per minute depending on the plan: see [Plans and pricing](/plans/overview) and the `x-ratelimit-*` headers.
+
+## Transactions are unsigned
+
+Transaction endpoints return calldata only. They do not sign, broadcast, simulate or check balances. The `simulate` parameter is deprecated and ignored. Before you ask a user to sign, verify `tx.chainId`, `tx.to`, the asset and the amount in base units, and run the `actions[]` in order. See [Transactions](/api-reference/transactions) and [Transaction safety for agents](/ai-agents/transaction-safety).

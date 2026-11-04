@@ -1,83 +1,103 @@
 ---
-title: "USD and ETH Benchmark Rates Explained"
-description: "Understand how Vaults.fyi constructs USD and ETH benchmark rates from top vaults by TVL, and how to use them to compare yields across networks."
+title: "Benchmark rates"
 sidebarTitle: "Benchmark Rates"
+description: "How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/:network?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/:network."
 ---
 
-Benchmark rates give you a consistent baseline for evaluating vault performance. Instead of comparing a vault's APY to an arbitrary number, you can compare it to what the largest, most liquid vaults in the same denomination are actually returning right now.
+This page explains how vaults.fyi builds its USD and ETH benchmark rates and how to fetch current and historical benchmarks from the API. Use it to compare a vault's APY with the market baseline for the same network and denomination. Benchmarks use the same APY method and units as vaults: decimal fractions (`0.0407` = 4.07%), net of fees, in `apy.<window>.{base,reward,total}`.
 
-## What benchmarks measure
+## What a benchmark measures
 
-A benchmark represents the TVL-weighted average APY across the five largest vaults in a given denomination and network, each with at least $1M in TVL. Vaults.fyi publishes separate **USD** and **ETH** benchmarks for Ethereum mainnet and every supported L2.
+A benchmark is the TVL-weighted average APY of the five largest featured vaults of one denomination on one network, each with more than $1M TVL. There are two denominations:
 
-<Info>
-  Benchmarks use the same trailing APY calculations — 1-day, 7-day, and 30-day windows — as individual vaults. You can compare a vault's APY at any time horizon directly against the benchmark for that same window.
-</Info>
+| Code | Denomination | Tracks |
+| - | - | - |
+| `usd` | USD-denominated vaults (USDC, USDT, DAI, USDS, USDe) | Stablecoin lending and savings yield |
+| `eth` | ETH-denominated vaults (WETH, ETH) | ETH staking yield (consensus and execution rewards); usually steadier than lending rates |
 
-## USD benchmark
+The set of five is chosen dynamically by TVL, so composition changes with the market. If fewer than five vaults qualify, the benchmark uses as many as qualify, but a network needs at least three qualifying vaults to have a benchmark that day.
 
-The USD benchmark tracks stablecoin lending yield. It is constructed from the five largest USD-denominated vaults on a given network by TVL, weighted proportionally to their TVL at the time of calculation.
+There is no fixed list of benchmark networks: any network with enough qualifying vaults has one. For a network or code with no benchmark data, both `GET /v2/benchmarks/{network}` and `GET /v2/historical-benchmarks/{network}` return 404 ("No benchmark data found for code … on network …"). If a network has data but no vault qualified on the latest day, `/v2/benchmarks/{network}` can return 200 with `apy: null`, so check for `null` before reading `apy`.
 
-On Ethereum mainnet, the legacy v1 USD benchmark is built from four fixed markets:
+## Get the current benchmark
 
-| Protocol | Market |
-|---|---|
-| Aave v3 | USDT |
-| Aave v3 | USDC |
-| MakerDAO | Savings DAI (sDAI) |
-| Compound v3 | USDC |
+`GET /v2/benchmarks/{network}?code=usd` or `?code=eth`.
 
-The current v2 benchmark dynamically selects the top five vaults by TVL on each network, so the composition can change as the market evolves.
+- `code` is **required** and selects **one** benchmark. Omitting it returns HTTP 400; `code=btc` returns 400 (only `usd` and `eth` exist). To get both, make two calls.
+- `network` is a network slug (`mainnet`, `base`, ...) or CAIP-2 id (`eip155:8453`). A bare chain id is rejected.
+- Response: `apy` with windows `1day`, `7day`, `30day`, `90day` (no `1hour`), each `{base, reward, total}`; and `timestamp` (Unix seconds).
+- Cost: 3 credits ([Credits](/plans/credits)).
 
-<Tip>
-  Use the USD benchmark to answer the question: "Is this stablecoin vault returning more or less than the best passive yield available right now on this network?"
-</Tip>
-
-## ETH benchmark
-
-The ETH benchmark tracks ETH staking yield. It is constructed from the five largest ETH-denominated vaults on a given network by TVL, weighted proportionally to their TVL.
-
-On Ethereum mainnet, the legacy v1 ETH benchmark uses four fixed liquid staking tokens (LSTs):
-
-| Protocol | Token |
-|---|---|
-| Lido | stETH |
-| ether.fi | eETH |
-| Coinbase | cbETH |
-| Rocket Pool | rETH |
-
-As with the USD benchmark, the v2 version dynamically selects the top five ETH vaults by TVL on each supported network.
-
-<Note>
-  ETH benchmark rates reflect consensus-layer and execution-layer staking rewards. They are typically more stable than lending rates because they do not respond to short-term changes in borrow demand.
-</Note>
-
-## Comparing vaults across networks
-
-Because benchmarks are published per network, you can normalize vault comparisons across chains. A vault yielding 6% APY on Arbitrum is performing differently relative to its market than a 6% APY vault on Ethereum mainnet if the underlying benchmark rates differ.
-
-<Tip>
-  When building a yield ranking UI, display the spread between a vault's APY and the benchmark for its network and denomination. This gives users a more meaningful signal than raw APY alone.
-</Tip>
-
-## Accessing benchmark data
-
-Retrieve current and historical benchmark APYs via the API:
-
-```
-GET /v2/benchmarks/{network}
+```bash
+curl -s "https://api.vaults.fyi/v2/benchmarks/base?code=usd" -H "x-api-key: $VAULTSFYI_API_KEY"
 ```
 
-This endpoint returns both USD and ETH benchmarks for the specified network, including 1-day, 7-day, and 30-day trailing APYs.
+```python
+import os, requests
+H = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+usd = requests.get("https://api.vaults.fyi/v2/benchmarks/base", headers=H, params={"code": "usd"}).json()
+eth = requests.get("https://api.vaults.fyi/v2/benchmarks/base", headers=H, params={"code": "eth"}).json()
+print(usd["apy"]["7day"]["total"], eth["apy"]["7day"]["total"])
+```
 
-<AccordionGroup>
-  <Accordion title="What networks have benchmark data?">
-    Vaults.fyi publishes benchmarks for Ethereum mainnet and all supported L2s. If fewer than five vaults with at least $1M TVL exist in a given denomination on a network, the benchmark uses however many qualify — down to a minimum of one vault.
-  </Accordion>
-  <Accordion title="What is the difference between v1 and v2 benchmarks?">
-    The v1 benchmarks use a fixed set of protocols on Ethereum mainnet only and are available via the legacy endpoint and the chart explorer. The v2 benchmarks are dynamic, cover all supported networks, and are available via `GET /v2/benchmarks/{network}`. Use v2 for new integrations.
-  </Accordion>
-  <Accordion title="How often are benchmark rates updated?">
-    Benchmarks update on the same hourly cadence as vault data — Vaults.fyi indexes onchain state every hour and recalculates all APYs and benchmarks from fresh data.
-  </Accordion>
-</AccordionGroup>
+```typescript
+const H = { "x-api-key": process.env.VAULTSFYI_API_KEY! };
+const usd = await (await fetch("https://api.vaults.fyi/v2/benchmarks/base?code=usd", { headers: H })).json();
+console.log(usd.apy["7day"].total); // decimal fraction
+```
+
+Real response (2026-10-23, `GET /v2/benchmarks/base?code=usd`):
+
+```json
+{
+  "apy": {
+    "1day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "7day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "30day": { "base": 0.0395, "reward": 0, "total": 0.0395 },
+    "90day": { "base": 0.0382, "reward": 0, "total": 0.0382 }
+  },
+  "timestamp": 1792713600
+}
+```
+
+Error without `code` (real, trimmed). The `message` is a JSON-encoded string; see [Errors](/api-reference/errors):
+
+```json
+{ "statusCode": 400, "error": "Bad Request",
+  "message": "[{\"expected\": \"'usd' | 'eth'\", \"received\": \"undefined\", \"code\": \"invalid_type\", \"path\": [\"code\"], \"message\": \"Required\"}]" }
+```
+
+## Get historical benchmarks
+
+`GET /v2/historical-benchmarks/{network}?code=usd&fromTimestamp=<s>&toTimestamp=<s>`
+
+- `code` is required (`usd` or `eth`). Timestamps are Unix **seconds**.
+- Paginated: `page` (from 0), `perPage` (default 50). Response `{itemsOnPage, nextPage?, data[]}`; each item is `{apy: {1day,7day,30day,90day}, timestamp}`. `nextPage` is absent on the last page.
+- Results are oldest first.
+- Cost: 3 credits + 3 per data point.
+
+Data availability: history has one point per UTC day. Windows before the first data point return an empty `data` array; check `itemsOnPage`.
+
+## Comparing vaults with benchmarks
+
+Benchmarks are per network, so compare a vault with the benchmark for its own network and denomination and the same window:
+
+```python
+spread_7d = vault["apy"]["7day"]["total"] - usd_benchmark["apy"]["7day"]["total"]
+```
+
+A 6% vault on Arbitrum and a 6% vault on mainnet perform differently relative to their markets if the benchmarks differ. Showing the spread is more informative than raw APY. Match the denomination to the vault's `asset.assetGroup` (`USD` → `code=usd`, `ETH` → `code=eth`).
+
+## Update frequency
+
+Benchmarks are computed once per day (UTC) from the previous day's hourly vault data, not on every hourly indexing cycle. The `timestamp` in the response shows the data time.
+
+## Legacy v1 benchmarks (not used by v2)
+
+The v1 API has fixed-composition benchmarks for Ethereum mainnet only, at `GET /v1/benchmarks` (latest USD and ETH rates; no history and no network parameter). It is still served and not marked deprecated. They are not what `GET /v2/benchmarks/{network}` returns; use v2 for new work.
+
+| v1 USD benchmark (mainnet) | v1 ETH benchmark (mainnet) |
+| - | - |
+| Aave v3 USDT, Aave v3 USDC, MakerDAO sDAI, Compound v3 USDC | Lido stETH, ether.fi eETH, Coinbase cbETH, Rocket Pool rETH |
+
+Related: [Calculating APY](/methodology/calculating-apy), [Yield and market data](/concepts/yield-and-market-data), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).

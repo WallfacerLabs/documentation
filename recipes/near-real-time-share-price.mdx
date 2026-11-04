@@ -1,0 +1,144 @@
+---
+title: "Recipe: near-real-time share price for a deposit preview"
+sidebarTitle: "Near real-time share price"
+description: "Executed recipe: read sharePrice, totalAssets, totalSupply and underlyingAssetPrice from GET /v2/nrt/vault/:network/:vaultId, convert units with asset and lpToken decimals, and preview shares for a deposit, in curl, Python and TypeScript."
+---
+
+This recipe answers "what is the vault's share price right now?" The standard index refreshes about hourly; the near-real-time (NRT) endpoints read fresher on-chain state. The recipe reads all four NRT metrics, checks them against each other, and previews how many shares a 1,000 USDC deposit buys. Use it for deposit previews and fresh TVL figures.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Original live outputs were recorded on 2026-10-23; the BigInt ratio update was replayed offline against cached responses on 2026-10-30, without API calls.
+
+## Benchmark tasks covered
+
+T17 (near-real-time share price). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`. NRT endpoints need an API key.
+- curl, Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+Each of the five `/v2/nrt/vault/*` endpoints costs **1 credit** per call and needs an API key (no x402). The Python and TypeScript examples also call `GET /v2/detailed-vaults/{network}/{vaultId}` (3 credits) for decimals and symbols; cache that, because decimals don't change.
+
+## Endpoints and units
+
+| Endpoint | Field | Unit |
+| - | - | - |
+| `GET /v2/nrt/vault/{network}/{vaultId}` | all four below | — |
+| `…/sharePrice` | `sharePrice` | number: deposit asset per share, decimals already applied |
+| `…/totalAssets` | `totalAssets` | string, **asset** base units (÷ 10^`asset.decimals`) |
+| `…/totalSupply` | `totalSupply` | string, **share** base units (÷ 10^`lpToken.decimals`) |
+| `…/underlyingAssetPrice` | `underlyingAssetPrice` | number, USD per asset token |
+
+`asset.decimals` and `lpToken.decimals` can differ (USDC has 6, this vault's share token has 18).
+
+## curl
+
+```bash
+# Near-real-time (NRT) vault metrics: fresher than the hourly index.
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/nrt/vault/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
+```
+
+Output (2026-10-23):
+
+```json
+{"totalSupply":"462386856783187952495543714","totalAssets":"468841405001476","sharePrice":1.01395919150542,"underlyingAssetPrice":0.99985668}
+```
+
+## Python
+
+```python
+"""Fresh share price for a deposit preview, from the near-real-time (NRT) endpoint."""
+import os
+from decimal import Decimal
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+NETWORK, VAULT_ID = "base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845"
+
+# Decimals come from the indexed vault record (asset.decimals and lpToken.decimals can differ).
+vault = requests.get(f"{API}/v2/detailed-vaults/{NETWORK}/{VAULT_ID}", headers=HEADERS, timeout=30).json()
+nrt = requests.get(f"{API}/v2/nrt/vault/{NETWORK}/{VAULT_ID}", headers=HEADERS, timeout=30).json()
+
+share_price = Decimal(str(nrt["sharePrice"]))  # asset per share, decimals-adjusted (number)
+total_assets = Decimal(nrt["totalAssets"]) / 10 ** vault["asset"]["decimals"]     # asset base units
+total_supply = Decimal(nrt["totalSupply"]) / 10 ** vault["lpToken"]["decimals"]   # SHARE base units
+print(f'sharePrice {share_price:.6f} {vault["asset"]["symbol"]}/share')
+print(f"check: totalAssets/totalSupply = {total_assets / total_supply:.6f}")
+print(f'underlying price ${nrt["underlyingAssetPrice"]}')
+
+deposit = Decimal(1000)  # 1,000 USDC
+print(f"preview: {deposit} {vault['asset']['symbol']} -> ~{deposit / share_price:,.4f} {vault['lpToken']['symbol']}")
+```
+
+## TypeScript
+
+```typescript
+// Fresh share price for a deposit preview, from the near-real-time (NRT) endpoint.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845';
+
+async function get(path: string) {
+  const res = await fetch(`${API}${path}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+const vault = await get(`/v2/detailed-vaults/${NETWORK}/${VAULT_ID}`); // for decimals and symbols
+const nrt = await get(`/v2/nrt/vault/${NETWORK}/${VAULT_ID}`);
+// sharePrice: number, asset per share. totalAssets: asset base units. totalSupply: SHARE base units.
+const totalAssets = BigInt(nrt.totalAssets);
+const totalSupply = BigInt(nrt.totalSupply);
+// Integer-rational division; only the final six display decimals are rounded.
+function ratioFixed(numerator: bigint, denominator: bigint, places: number): string {
+  if (denominator <= 0n) throw new Error('No positive share supply');
+  const scale = 10n ** BigInt(places);
+  const rounded = (numerator * scale + denominator / 2n) / denominator;
+  return `${rounded / scale}.${(rounded % scale).toString().padStart(places, '0')}`;
+}
+const priceCheck = ratioFixed(
+  totalAssets * 10n ** BigInt(vault.lpToken.decimals),
+  totalSupply * 10n ** BigInt(vault.asset.decimals), 6,
+);
+console.log(`sharePrice ${nrt.sharePrice.toFixed(6)} ${vault.asset.symbol}/share`);
+console.log(`check: totalAssets/totalSupply = ${priceCheck}`);
+console.log(`underlying price $${nrt.underlyingAssetPrice}`);
+const deposit = 1000;
+console.log(`preview: ${deposit} ${vault.asset.symbol} -> ~${(deposit / nrt.sharePrice).toFixed(4)} ${vault.lpToken.symbol}`);
+```
+
+### Output (2026-10-23)
+
+Python and TypeScript printed identical lines:
+
+```text
+sharePrice 1.013959 USDC/share
+check: totalAssets/totalSupply = 1.013959
+underlying price $0.99985668
+preview: 1000 USDC -> ~986.2330 sirloinUSDC
+```
+
+`totalAssets / totalSupply` (after each is scaled by its own decimals) equals `sharePrice`, which confirms the units.
+
+## Pitfalls
+
+- **Dividing `totalSupply` by the asset's decimals.** It is in share units; use `lpToken.decimals`.
+- **Treating the preview as exact.** Deposits can incur fees or rounding; the on-chain `previewDeposit` is authoritative.
+- **Polling NRT for lists.** NRT is per vault; use `/v2/detailed-vaults` for many vaults.
+- **"Sub-second" claims.** NRT values are read from the chain's latest block on each call, with no response cache, so they are typically at most a block or a second old. The response time is a separate matter.
+
+## Related pages
+
+- [NRT API](/api-reference/nrt).
+- [API conventions: token amounts and decimals](/api-reference/conventions#token-amounts-and-decimals).
+- [Errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Build a deposit](/recipes/deposit-transaction).
+
+_Updated 2026-10-30. Code ran against the live API on 2026-10-23; the revised arithmetic/unit handling was checked offline, not live-rerun._

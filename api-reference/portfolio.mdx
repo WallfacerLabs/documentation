@@ -1,33 +1,82 @@
 ---
-title: "Portfolio"
-description: "User positions, idle assets, deposit recommendations, transaction history, and returns."
+title: "Portfolio: positions, idle assets, returns and deposit suggestions"
+sidebarTitle: "Portfolio"
+description: "Index of the v2 wallet endpoints (positions, idle assets, best vault, best deposit options, total returns, events) with their 4-network default scope, position-size semantics, credit costs and links to every endpoint page."
 ---
 
-Wallet-aware endpoints that return a user's vault positions, uninvested balances, personalized deposit suggestions, total returns, and transaction history.
+This section lists the v2 endpoints that read one wallet: its vault positions, idle (undeposited) tokens, suggested deposits, lifetime returns and event history. Use them for portfolio views and deposit recommendations. Nothing here moves funds; to build transactions, use [Transactions](/api-reference/transactions).
 
-Protocol filters accept either a broad protocol name or a full [protocol ID](/concepts/supported-protocols#protocol-names-and-ids) for one product and version.
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key. APY values are decimal fractions net of fees (`0.0315` = 3.15%); token amounts are integer strings in base units; timestamps are Unix seconds. See [Conventions](/api-reference/conventions).
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List all vault positions for a wallet | [`GET /v2/portfolio/positions/{userAddress}`](/api-reference/portfolio/list-portfolio-positions) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `apyInterval`, and `minUsdAssetValueThreshold` |
-| Fetch one vault position for a wallet | [`GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-portfolio-position) | Path: `userAddress`, `network`, `vaultId`. Optional query: `apyInterval` |
-| List uninvested token balances | [`GET /v2/portfolio/idle-assets/{userAddress}`](/api-reference/portfolio/list-idle-assets) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `minUsdAssetValueThreshold`, `sortBy`, and `sortDirection` |
-| Rank deposit opportunities matching wallet holdings | [`GET /v2/portfolio/best-deposit-options/{userAddress}`](/api-reference/portfolio/get-best-deposit-options) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `minApy`, `apyInterval`, `alwaysReturnAssets`, and `maxVaultsPerAsset` |
-| Fetch the single best-fit vault for a wallet | [`GET /v2/portfolio/best-vault/{userAddress}`](/api-reference/portfolio/get-best-vault) | Path: `userAddress`. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `minVaultScore`, `minApy`, and `apyInterval` |
-| Calculate earned yield for one position | [`GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-total-returns) | Path: `userAddress`, `network`, `vaultId` |
-| List deposit, redeem, and claim history for one position | [`GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/list-position-events) | Path: `userAddress`, `network`, `vaultId` |
+## Endpoints
 
-## Related Alpha and Beta endpoints
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/portfolio/positions/{userAddress}`](/api-reference/portfolio/list-portfolio-positions) | List a wallet's vault positions. Position size is `asset.positionValueInAsset` or `lpToken.balanceUsd`, not `asset.balanceUsd`. Defaults: 4 networks, `minTvl=100000`. | Path: `userAddress` | 5 |
+| [`GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-portfolio-position) | Get one wallet's position in one known vault (cheaper than listing). | Path: `userAddress`, `network`, `vaultId` | 1 |
+| [`GET /v2/portfolio/idle-assets/{userAddress}`](/api-reference/portfolio/list-idle-assets) | List a wallet's tokens that are not deposited in a vault. Sort with `sortDirection` (not `sortOrder`). | Path: `userAddress` | 5 |
+| [`GET /v2/portfolio/best-deposit-options/{userAddress}`](/api-reference/portfolio/get-best-deposit-options) | For each asset the wallet holds, get up to `maxVaultsPerAsset` (default 3) vaults ranked by APY. Defaults: `onlyAppFeatured=true`, `allowVaultsWithWarnings=false`. | Path: `userAddress` | 1 + 2 per vault returned |
+| [`GET /v2/portfolio/best-vault/{userAddress}`](/api-reference/portfolio/get-best-vault) | Get the single best vault for the asset the wallet holds most of. Can return `isTransactional: false`; pass `onlyTransactional=true` before building a deposit. | Path: `userAddress` | 2 |
+| [`GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-total-returns) | Lifetime returns of a wallet in one vault (`returnsNative`, base units). | Path: `userAddress`, `network`, `vaultId` | 1 |
+| [`GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/list-position-events) | All deposit and withdrawal events of a wallet in one vault. Not paginated; `items` is the total count. | Path: `userAddress`, `network`, `vaultId` | 3 |
 
-Some newer portfolio surfaces are available in Alpha or Beta before they move into the stable V2 API. Use these when you need the capability now and can tolerate interface changes.
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit.
 
-| Capability | How to call | Status |
-|------------|-------------|--------|
-| Measure user returns over a selected time window | [`GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}`](/api-reference/beta#portfolio) | Beta |
-| List Solana/SVM vault positions for a wallet | [`GET /beta/svm/portfolio/positions/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| List Solana/SVM portfolio events for a wallet or vault | [`GET /beta/svm/portfolio/events/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| List Solana/SVM idle assets for a wallet | [`GET /beta/svm/portfolio/idle-assets/{userAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| List borrow positions for a wallet | [`GET /beta/borrow/portfolio/positions/{userAddress}`](/api-reference/beta#borrow-markets) | Beta |
-| List borrow market events for a wallet | [`GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
-| List historical vault positions for a wallet | [`GET /alpha/historical-positions/{userAddress}`](/api-reference/alpha#historical-positions) | Alpha |
-| Reconstruct wallet balances at a point in time | [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/alpha#historical-balances) | Alpha |
+## Things to know
+
+- **Default network scope.** `positions`, `idle-assets`, `best-vault` and `best-deposit-options` cover only base, mainnet, arbitrum and optimism unless you pass `allowedNetworks` (one repeated key per network). A wallet's positions on other networks are silently omitted.
+- **Default `minTvl=100000`** on `positions`, `best-vault` and `best-deposit-options` hides positions in vaults under $100k TVL.
+- **Position size is not `asset.balanceUsd`.** In positions, `asset.balanceNative` and `asset.balanceUsd` are the wallet's idle balance of the underlying token, repeated on every position in that asset. The position is `asset.positionValueInAsset` (base units) or `lpToken.balanceUsd`. Summing `asset.balanceUsd` over-counts. See [Conventions → Positions](/api-reference/conventions#positions-wallet-balance-vs-position-size).
+- **Best-vault defaults differ** from list endpoints: `onlyAppFeatured=true` and `allowVaultsWithWarnings=false`. `best-vault` can still return a vault with `isTransactional: false`; pass `onlyTransactional=true` if you will build a deposit.
+- **Idle assets** sort with `sortBy` + `sortDirection` (not `sortOrder`), with default `minUsdAssetValueThreshold=0.5`.
+- **Not paginated.** These endpoints return `{data, errors}` with everything in one response. `events` returns `{asset, lpToken, data, items}`, where `items` is the total count.
+- `userAddress` must be `0x` + 40 hex characters. ENS names return 400. Addresses are case-insensitive.
+- Path order is user, then network, then vault: `/v2/portfolio/positions/{userAddress}/{network}/{vaultId}`.
+
+## Example
+
+```bash
+# Default scope: base, mainnet, arbitrum, optimism. Add allowedNetworks=<name> (repeated) for others.
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/portfolio/positions/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+```
+
+Response, captured 2026-10-23 (trimmed to 1 of 10 positions and key fields):
+
+```json
+{
+  "data": [
+    {
+      "vaultId": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+      "name": "Lido stETH",
+      "network": { "name": "mainnet", "chainId": 1, "networkCaip": "eip155:1" },
+      "asset": {
+        "symbol": "ETH",
+        "decimals": 18,
+        "balanceNative": "5773252986299759339",
+        "balanceUsd": "13850.55495425",
+        "positionValueInAsset": "10424842274072"
+      },
+      "lpToken": { "symbol": "stETH", "decimals": 18, "balanceNative": "10424842274072", "balanceUsd": "0.0250101374648113525898504" }
+    }
+  ],
+  "errors": { "unsupportedNetworks": [], "unsupportedAssets": [], "unsupportedProtocols": [] }
+}
+```
+
+Here the wallet holds 5.77 idle ETH (`asset.balanceUsd` ≈ $13,850), but the Lido position is worth about $0.025 (`lpToken.balanceUsd`).
+
+## Related beta and alpha endpoints
+
+| Endpoint | Use it when | Status | Credits |
+| - | - | - | - |
+| [`GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-partial-returns) | A wallet's returns in one vault over a time window. `fromTimestamp` (Unix seconds) is required. | Beta | 2 |
+| [`GET /beta/svm/portfolio/positions/{userAddress}`](/api-reference/svm/list-svm-positions) | A Solana wallet's vault positions. Here `asset.balanceNative` **is** the position value. | Beta | 5 |
+| [`GET /beta/svm/portfolio/events/{userAddress}`](/api-reference/svm/list-svm-portfolio-events-across-supported-vaults) | Events across all Solana vaults for a wallet. | Beta | 3 |
+| [`GET /beta/svm/portfolio/idle-assets/{userAddress}`](/api-reference/svm/list-svm-idle-assets) | A Solana wallet's tokens not deposited in a vault. | Beta | 5 |
+| [`GET /beta/borrow/portfolio/positions/{userAddress}`](/api-reference/borrow-markets/list-borrow-positions) | A wallet's borrow positions; lists only markets with outstanding debt. | Beta | 6 |
+| [`GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/list-borrow-market-events) | A wallet's events in one market asset. | Beta | 3 |
+| [`GET /alpha/historical-positions/{userAddress}`](/api-reference/historical-positions/list-user-historical-positions) | A wallet's past vault positions (latency around 40 s). | Alpha | 0 (free during early access) |
+| [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/historical-positions/list-user-historical-balances) | A wallet's vault balances at one Unix-seconds `timestamp`. Default 4-network scope. | Alpha | 0 (free during early access) |
+
+Related: [Portfolio tracking](/concepts/portfolio-tracking), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

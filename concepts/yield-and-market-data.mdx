@@ -1,54 +1,116 @@
 ---
-title: "Yield & Market Data"
-description: "Query standardized APY, TVL, fees, the Reputation Score, and rewards across 1,000+ vaults via hourly onchain indexing — all from a single API."
+title: "Yield and market data"
 sidebarTitle: "Yield & Market Data"
+description: "Which endpoint gives which vault data (list, single vault, APY, TVL, history, benchmarks, NRT), with units, defaults (4 networks, minTvl 100000, sortOrder asc) and a trimmed real response."
 ---
 
-The Vaults.fyi API gives you standardized market data for over 1,000 DeFi yield vaults across 80+ protocols, 20+ EVM chains, and Solana/SVM vault coverage in Beta. Instead of building and maintaining one-off integrations per protocol, you get a single endpoint family that returns consistent, comparable data for supported vaults.
+This page maps each kind of vault market data (APY, TVL, fees, rewards, Reputation Score, history, benchmarks) to the endpoint that returns it, with units and the defaults that change results. Use it to pick the right call before you build a vault list, a vault page or an analysis. All data comes from hourly onchain indexing and is computed the same way for every protocol. REST base URL `https://api.vaults.fyi`, key in the `x-api-key` header. For every field of a vault object, see [Vault discovery](/concepts/vault-discovery).
 
-Data is indexed onchain on an hourly basis, so you always have current metrics alongside the full historical record you need for backtesting and trend analysis.
+## Which endpoint to call
 
-## What data is available
+| You need | Endpoint | Notes | Cost |
+| - | - | - | - |
+| A filtered, sorted list of vaults with full detail | `GET /v2/detailed-vaults` | Paginated; defaults below | 1 + 3 per vault |
+| Everything about one vault | `GET /v2/detailed-vaults/{network}/{vaultId}` | Same object as one list item | 3 |
+| Only current APY of one vault | `GET /v2/detailed-vaults/{network}/{vaultId}/apy` | Windows `1day`–`90day` at top level (no `1hour`) | 1 |
+| Only current TVL of one vault | `GET /v2/detailed-vaults/{network}/{vaultId}/tvl` | `{usd, native}` | 1 |
+| A light list of all vault ids | `GET /v2/vaults` | Id, name, network, asset, `isTransactional`; **no default network scope** | 1 |
+| History (APY, TVL, share price) | `GET /v2/historical/{network}/{vaultId}` (or `/apy`, `/tvl`, `/sharePrice`) | Oldest first; `granularity` default `1hour`; `apyInterval` default `7day` | 3 + 3/point (1 + 1/point for single series) |
+| Asset price history | `GET /v2/historical/asset-prices/{network}/{assetAddress}` | Oldest first | 1 + 1/point |
+| Market baseline | `GET /v2/benchmarks/{network}?code=usd` (or `eth`) | `code` required | 3 |
+| Current chain state between hourly updates | `GET /v2/nrt/vault/{network}/{vaultId}` | Share price, total assets, total supply, asset price | see [Credits](/plans/credits) |
+| Filter values | `GET /v2/networks`, `/v2/assets`, `/v2/protocols`, `/v2/curators`, `/v2/tags` | See [Supported protocols and networks](/concepts/supported-protocols) | 1 each |
 
-Each vault object includes APY across four time windows, TVL in USD and native units, a fee breakdown, the Reputation Score with component scores, reward token rates, holder counts, capacity limits, and flags for active protocol notices — among other fields.
+There are no separate "single-vault APY history" fields on the detailed-vault object; history always comes from `/v2/historical/...`.
 
-<Note>
-APY, TVL, fees, and the Reputation Score are computed consistently across all protocols. APY values are net of performance and management fees; the `fees` object is for display and does not need to be subtracted from APY.
-</Note>
+## Defaults on GET /v2/detailed-vaults
 
-For a complete field-by-field reference covering everything the API can tell you about a vault, see [Vault Discovery](/concepts/vault-discovery).
+| Parameter | Default | Effect |
+| - | - | - |
+| `allowedNetworks` | `base`, `mainnet`, `arbitrum`, `optimism` | Every other network is excluded. Example: `allowedAssets=USDT0` returned 0 vaults although an $812M USDT0 vault exists on Plasma. |
+| `minTvl` | `100000` (USD) | Smaller vaults are excluded. Pass `minTvl=0` to include them. |
+| `sortOrder` | `asc` | Lowest first. Use `sortOrder=desc` with `sortBy=apy7day` for "top APY". |
+| `allowVaultsWithWarnings` | `true` | Flagged vaults are included. |
+| `allowCorrupted` | `false` | Vaults with unreliable data are excluded. |
+| `perPage` | `50` (max 5000) | `nextPage` is absent on the last page. |
 
-## Endpoints
+Array filters take repeated keys: `allowedNetworks=base&allowedNetworks=arbitrum`. Details: [API conventions](/api-reference/conventions).
 
-<CardGroup cols={2}>
-  <Card title="Vault discovery" icon="magnifying-glass" href="/api-reference/detailed-vaults">
-    Filter and sort vaults by APY, TVL, protocol, network, asset, reputation score, and more.
-  </Card>
-  <Card title="Single vault detail" icon="circle-info" href="/api-reference/detailed-vaults">
-    Full detail on a specific vault including current and historical APY, TVL, fees, rewards, and the Reputation Score.
-  </Card>
-  <Card title="Historical data" icon="chart-line" href="/api-reference/historical">
-    Time-series APY, TVL, and asset price data over configurable date ranges and granularity.
-  </Card>
-  <Card title="Benchmarks" icon="gauge" href="/api-reference/benchmarks">
-    USD and ETH benchmark rates aggregated across top vaults for performance comparison.
-  </Card>
-</CardGroup>
+`minVaultScore`: check `score.vaultScore` client-side if you need a strict threshold.
 
-You can also query reference data — supported networks, assets, and protocols — using `GET /v2/networks`, `GET /v2/assets`, and `GET /v2/protocols`. These are useful for building filter dropdowns and validating user input.
+## What each vault object contains
+
+| Data | Fields | Unit |
+| - | - | - |
+| APY, five windows | `apy.<window>.{base,reward,total}`, window = `1hour`, `1day`, `7day`, `30day`, `90day` | Decimal fraction, net of fees, not clamped |
+| Nested-vault APY | `apyComposite` (only on vaults whose asset is another vault's share token) | Decimal fraction |
+| TVL | `tvl.usd`, `tvl.native` | Integer strings: whole USD; asset base units |
+| Fees | `fees.performanceFee`, `fees.managementFee`, `fees.depositFee`, `fees.withdrawalFee` | Decimal fraction; display only (already in APY) |
+| Rewards | `rewards[].asset`, `rewards[].apy.<window>` | Decimal fraction; already included in `apy.<window>.reward` |
+| Reputation Score | `score.vaultScore` and components | Unrounded number; see [Reputation Score](/methodology/reputation-score) |
+| Risk notices | `flags[]`, `warnings[]` | — |
+| Holders | `holdersData.totalCount`, `holdersData.totalBalance`, `holdersData.topHolders[]` | Balances in LP base units |
+| Capacity | `maxCapacity`, `remainingCapacity` | Integer strings, asset base units; 2^256−1 = uncapped |
+| Freshness | `lastUpdateTimestamp` | Unix seconds |
+
+APY values are already net of performance and management fees: show `fees` next to yield, never subtract it.
+
+## Example
+
+```bash
+curl -s "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&sortBy=apy7day&sortOrder=desc&perPage=3" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
+```
+
+```python
+import os, requests
+r = requests.get("https://api.vaults.fyi/v2/detailed-vaults",
+                 headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+                 params={"allowedNetworks": "base", "allowedAssets": "USDC",
+                         "sortBy": "apy7day", "sortOrder": "desc", "perPage": 3})
+r.raise_for_status()
+for v in r.json()["data"]:
+    print(v["name"], f'{v["apy"]["7day"]["total"]:.2%}', v["tvl"]["usd"], round(v["score"]["vaultScore"], 1))
+```
+
+Single vault, real response (2026-10-23, `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845`, trimmed):
+
+```json
+{
+  "vaultId": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+  "name": "Steakhouse High Yield USDC Edition",
+  "network": { "name": "base", "chainId": 8453, "networkCaip": "eip155:8453" },
+  "asset": { "symbol": "USDC", "decimals": 6, "assetPriceInUsd": "0.99985668", "assetGroup": "USD" },
+  "apy": {
+    "7day":  { "base": 0.0316, "reward": 0, "total": 0.0316 },
+    "30day": { "base": 0.0305, "reward": 0, "total": 0.0305 }
+  },
+  "tvl": { "usd": "468033226", "native": "468100314975561" },
+  "score": { "vaultScore": 81.72160425089307 },
+  "lastUpdateTimestamp": 1792742400,
+  "isTransactional": true,
+  "flags": []
+}
+```
+
+`tvl.native` / 10^6 = 468,100,314.98 USDC.
+
+## Choosing an APY window
+
+Use `apy["7day"].total` or `apy["30day"].total` for user-facing yield: `1hour` and `1day` are noisy and spike when vaults post earnings in batches. To sort by a window, use `sortBy=apy7day` (or `apy1day`, `apy30day`, `apy90day`). How windows are computed: [Calculating APY](/methodology/calculating-apy).
+
+Screen extreme values: on 2026-10-23 the highest 7-day APY among Base USDC vaults was `1522.9882` (152,299%) on a vault with a bad-debt `flags` entry and `score.vaultScore` 33.8.
 
 ## How data is sourced
 
-Vaults.fyi indexes vault state directly from onchain contract calls, not from third-party price feeds or protocol-reported numbers. This approach means:
+- **Hourly:** vault state is read directly from contracts every hour; `lastUpdateTimestamp` shows when.
+- **One method:** APY is calculated with the same share-price formula for every protocol, so values are comparable.
+- **History:** time series start at a vault's first indexed point and are returned oldest first.
 
-- **Hourly updates.** Vault metrics refresh every hour from onchain data.
-- **Consistent methodology.** APY is calculated using the same formula across all protocols, so comparisons are meaningful.
-- **Historical depth.** Time-series data is available for backtesting, charting, and reporting without you needing to store it yourself.
-
-<Tip>
-Use the `apy7d` or `apy30d` fields rather than `apy` when you want to smooth out short-term volatility and show users a more stable yield estimate.
-</Tip>
+Details: [Indexing onchain data](/methodology/indexing-onchain-data).
 
 ## Coverage
 
-One integration gives you data across 1,000+ vaults, 80+ protocols, 20+ EVM chains, and Solana/SVM vault coverage in Beta. For the full list of supported protocols and networks, see [Supported Protocols and Networks](/concepts/supported-protocols).
+3,000+ vaults (taken from `GET /v2/vaults`), 80+ protocols and 22 EVM networks, plus Solana vaults on the Beta SVM endpoints. Use the reference endpoints for current numbers. Remember that `GET /v2/detailed-vaults` shows only four of those networks unless you pass `allowedNetworks`. Full list: [Supported protocols and networks](/concepts/supported-protocols).
+
+Related: [Vault discovery](/concepts/vault-discovery), [Benchmark rates](/methodology/benchmark-rates), [API conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Glossary](/resources/glossary).

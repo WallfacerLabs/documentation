@@ -1,10 +1,33 @@
 ---
-title: "Health"
-description: "Service health endpoint for monitoring API availability."
+title: "Health: public API liveness check"
+sidebarTitle: "Health"
+description: "Index of the public v2 health endpoint: no API key, free, not rate limited, no rate-limit headers; returns \"status\":\"Success\" when the API is up. It does not validate your key."
 ---
 
-Use the health endpoint for uptime checks and lightweight service monitoring.
+This section has one endpoint: a public liveness check for uptime monitoring. Unlike every other endpoint, it needs no API key and costs nothing.
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Check API availability | [`GET /v2/health`](/api-reference/health/health-check) | None |
+## Endpoints
+
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/health`](/api-reference/health/health-check) | Liveness check. No API key needed; returns `{"status":"Success","message":"Application is healthy"}`. Does not validate your key. | None | 0 (free) |
+
+## Things to know
+
+- `GET /v2/health` returns 200 with or without a key, and with an invalid key. It doesn't tell you whether your key works. To check a key, call `GET /v2/networks` (1 credit): 200 means the key is valid, 401 means it is invalid, and 402 means no key was sent.
+- It is free and exempt from rate limiting, so the response carries no `x-ratelimit-*` headers.
+- Only `GET` is supported. `POST /v2/health` returns a route 404, not 405.
+
+## Example
+
+```bash
+curl "https://api.vaults.fyi/v2/health"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{ "status": "Success", "message": "Application is healthy" }
+```
+
+Related: [API overview](/api-reference/overview), [Errors](/api-reference/errors).

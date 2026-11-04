@@ -48,6 +48,26 @@
             ]
           },
           {
+            "group": "Recipes",
+            "pages": [
+              "recipes/overview",
+              "recipes/find-and-rank-vaults",
+              "recipes/display-apy-correctly",
+              "recipes/paginate-all-vaults",
+              "recipes/network-and-vault-ids",
+              "recipes/deposit-transaction",
+              "recipes/redeem-and-queued-withdrawal",
+              "recipes/claim-rewards",
+              "recipes/positions-and-balances",
+              "recipes/near-real-time-share-price",
+              "recipes/vault-history-vs-benchmark",
+              "recipes/estimate-credit-cost",
+              "recipes/handle-errors-and-retries",
+              "recipes/tvl-attribution-suffix",
+              "recipes/solana-deposit"
+            ]
+          },
+          {
             "group": "Methodology",
             "pages": [
               "methodology/calculating-apy",
@@ -69,6 +89,8 @@
             "group": "AI & Agents",
             "pages": [
               "ai-agents/overview",
+              "ai-agents/rules-for-agents",
+              "ai-agents/transaction-safety",
               "ai-agents/mcp-server",
               "ai-agents/x402"
             ]
@@ -84,6 +106,7 @@
             "group": "Resources",
             "pages": [
               "resources/faq",
+              "resources/glossary",
               "resources/changelog",
               "resources/brand",
               {
@@ -108,6 +131,9 @@
         "openapi": "https://api.vaults.fyi/v2/documentation/json",
         "pages": [
           "api-reference/overview",
+          "api-reference/conventions",
+          "api-reference/errors",
+          "api-reference/versioning",
           {
             "group": "Sections",
             "pages": [

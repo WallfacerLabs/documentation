@@ -1,0 +1,190 @@
+---
+title: "Recipe: read and display APY correctly (total, base, reward, apyComposite)"
+sidebarTitle: "Display APY correctly"
+description: "Executed recipe: read apy.<window>.(base,reward,total) as decimal fractions, pick a window, handle outliers, and use apyComposite on nested vaults, in curl, Python and TypeScript."
+---
+
+This recipe answers "which APY number do I show, and how do I format it?" It reads every APY window of a vault, explains `total` vs `base` vs `reward`, and shows how `apyComposite` changes the answer for nested vaults (vaults whose deposit asset is another vault's share). Use it whenever you render a yield.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. APY values are **decimal fractions** (`0.0315` = 3.15 %), already **net of fees**. All code on this page was run on 2026-10-23; outputs are real and trimmed.
+
+## Benchmark tasks covered
+
+T03 (`total` vs `base` vs `reward`, and `apyComposite`). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+`GET /v2/detailed-vaults/{network}/{vaultId}` costs **3 credits**. If you only need APY, `GET /v2/detailed-vaults/{network}/{vaultId}/apy` costs 1 credit but has no `1hour` window and no `apyComposite` ([credits](/plans/credits)). The Python and TypeScript examples read two vaults: 6 credits.
+
+## The APY fields
+
+| Field | Meaning |
+| - | - |
+| `apy.<window>.base` | Yield from the vault's own strategy (share-price growth), decimal fraction |
+| `apy.<window>.reward` | Yield from incentive tokens, decimal fraction |
+| `apy.<window>.total` | `base + reward`. Show this one. |
+| `<window>` | `1hour`, `1day`, `7day`, `30day`, `90day` on detailed-vault responses |
+| `rewards[].apy.<window>` | Per-token breakdown of `reward`. Already included in `reward`; don't add it again. |
+| `apyComposite` | Only on nested vaults. `intrinsicApy` = the underlying vault's yield; `totalApy` = this vault compounded with it. |
+
+## curl
+
+```bash
+# APY windows for one vault, converted from decimal fraction to percent.
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+| jq '{name, apy_pct: (.apy | map_values(map_values(. * 10000 | round / 100))), hasComposite: has("apyComposite")}'
+```
+
+Output (2026-10-23, percent after conversion):
+
+```text
+{
+  "name": "Steakhouse High Yield USDC Edition",
+  "apy_pct": {
+    "1day": {
+      "base": 3.16,
+      "reward": 0,
+      "total": 3.16
+    },
+    "7day": {
+      "base": 3.15,
+      "reward": 0,
+      "total": 3.15
+...
+  },
+  "hasComposite": false
+}
+```
+
+## Python
+
+```python
+"""Read and display a vault's APY correctly (decimal fractions, already net of fees)."""
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+WINDOWS = ["1hour", "1day", "7day", "30day", "90day"]  # detailed-vault windows
+
+
+def pct(x):
+    """APY fields are decimal fractions: 0.0316 -> '3.16 %'. Never subtract fees."""
+    return f"{x * 100:.2f} %"
+
+
+def show(network, vault_id):
+    r = requests.get(f"{API}/v2/detailed-vaults/{network}/{vault_id}", headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    v = r.json()
+    print(f'{v["name"]} ({network}) asset={v["asset"]["symbol"]}')
+    for w in WINDOWS:
+        a = v["apy"].get(w)
+        if a:
+            print(f"  {w:>5}: total {pct(a['total']):>9} = base {pct(a['base'])} + reward {pct(a['reward'])}")
+    headline = v["apy"]["7day"]["total"]
+    if abs(headline) > 1:  # >100 % / year: unclamped outlier, show with a warning
+        print("  WARNING: APY outlier, review before showing to users")
+    # rewards[] itemises apy.<window>.reward per token -- it is already included in reward.
+    for rw in v.get("rewards", []):
+        print(f'  reward token {rw["asset"]["symbol"]}: 7d {pct(rw["apy"]["7day"])} (included in reward)')
+    # apyComposite appears only when the vault's asset is itself another vault's share.
+    if "apyComposite" in v:
+        comp = v["apyComposite"]
+        print(f'  apyComposite.totalApy.7day.total    {pct(comp["totalApy"]["7day"]["total"])} (both layers)')
+        print(f'  apyComposite.intrinsicApy.7day.total {pct(comp["intrinsicApy"]["7day"]["total"])} (underlying vault)')
+    print(f"  -> show users: 7-day total APY {pct(headline)} (net of fees)\n")
+
+
+show("base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845")      # Steakhouse High Yield USDC
+show("mainnet", "0x4Be55238515377Be8b7f167E226bd37a2eB09BCe")   # nested vault with apyComposite
+```
+
+## TypeScript
+
+```typescript
+// Read and display a vault's APY correctly (decimal fractions, already net of fees).
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const WINDOWS = ['1hour', '1day', '7day', '30day', '90day'] as const;
+type Apy = { base: number; reward: number; total: number };
+
+const pct = (x: number) => `${(x * 100).toFixed(2)} %`; // 0.0316 -> "3.16 %"; never subtract fees
+
+async function show(network: string, vaultId: string) {
+  const res = await fetch(`${API}/v2/detailed-vaults/${network}/${vaultId}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  const v = await res.json();
+  console.log(`${v.name} (${network}) asset=${v.asset.symbol}`);
+  for (const w of WINDOWS) {
+    const a: Apy | undefined = v.apy[w];
+    if (a) console.log(`  ${w.padStart(5)}: total ${pct(a.total).padStart(9)} = base ${pct(a.base)} + reward ${pct(a.reward)}`);
+  }
+  const headline: number = v.apy['7day'].total;
+  if (Math.abs(headline) > 1) console.log('  WARNING: APY outlier, review before showing to users');
+  for (const rw of v.rewards ?? []) {
+    console.log(`  reward token ${rw.asset.symbol}: 7d ${pct(rw.apy['7day'])} (included in reward)`);
+  }
+  if (v.apyComposite) {
+    console.log(`  apyComposite.totalApy.7day.total    ${pct(v.apyComposite.totalApy['7day'].total)} (both layers)`);
+    console.log(`  apyComposite.intrinsicApy.7day.total ${pct(v.apyComposite.intrinsicApy['7day'].total)} (underlying vault)`);
+  }
+  console.log(`  -> show users: 7-day total APY ${pct(headline)} (net of fees)\n`);
+}
+
+await show('base', '0xbeeff2490FEffa212faC2f6553682C219E6a8845'); // Steakhouse High Yield USDC
+await show('mainnet', '0x4Be55238515377Be8b7f167E226bd37a2eB09BCe'); // nested vault with apyComposite
+```
+
+### Output (2026-10-23)
+
+Python and TypeScript printed identical lines:
+
+```text
+Steakhouse High Yield USDC Edition (base) asset=USDC
+  1hour: total    3.15 % = base 3.15 % + reward 0.00 %
+   1day: total    3.16 % = base 3.16 % + reward 0.00 %
+   7day: total    3.15 % = base 3.15 % + reward 0.00 %
+  30day: total    3.05 % = base 3.05 % + reward 0.00 %
+  90day: total    2.93 % = base 2.93 % + reward 0.00 %
+  -> show users: 7-day total APY 3.15 % (net of fees)
+
+Covered Steakhouse High Yield Instant (mainnet) asset=bbqUSDC
+  1hour: total    0.00 % = base 0.00 % + reward 0.00 %
+   1day: total   -1.40 % = base -1.40 % + reward 0.00 %
+   7day: total   -1.38 % = base -1.38 % + reward 0.00 %
+  30day: total   -1.39 % = base -1.39 % + reward 0.00 %
+  90day: total   -1.38 % = base -1.38 % + reward 0.00 %
+  apyComposite.totalApy.7day.total    4.29 % (both layers)
+  apyComposite.intrinsicApy.7day.total 5.75 % (underlying vault)
+  -> show users: 7-day total APY -1.38 % (net of fees)
+```
+
+The second vault ("Covered Steakhouse High Yield Instant") accepts another vault's share token (bbqUSDC). Its own `apy.7day.total` is **−1.38 %**, but a depositor earns **4.29 %** in terms of the underlying asset (`apyComposite.totalApy`), because the underlying vault yields 5.75 % (`apyComposite.intrinsicApy`). For nested vaults, decide which one your UI means and label it.
+
+## Pitfalls
+
+- **Showing `0.0315` as "0.03 %".** Multiply by 100.
+- **Subtracting fees.** APY is already net of fees.
+- **Adding `rewards[]` to `reward`.** It is a breakdown of `reward`, not extra yield.
+- **Mixing windows.** Compare vaults on the same window (for example `7day`). `1hour` is noisy.
+- **Assuming APY ≥ 0 or ≤ 1.** Values are not clamped; negative values and values above 1 (100 %) occur. Flag outliers.
+- **Reading `apyComposite` unconditionally.** The key is absent on non-nested vaults.
+- **Flat names from older docs** (`baseApy`, `rewardApy`, `apy7d`) do not exist in responses.
+
+## Related pages
+
+- [Calculating APY](/methodology/calculating-apy): method, windows and `apyComposite`.
+- [API conventions: APY and rates](/api-reference/conventions#apy-and-rates).
+- [Errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Vault history vs benchmark](/recipes/vault-history-vs-benchmark).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

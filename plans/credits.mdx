@@ -1,99 +1,267 @@
 ---
-title: "API Credits & Compute Units Explained"
-description: "Learn how vaults.fyi Credits (Compute Units) work, and see the full table of base costs and per-datapoint costs for v2 and Beta endpoints."
+title: "API credits: cost of every endpoint"
 sidebarTitle: "Credits"
+description: "How vaults.fyi API credits are charged (base cost per call plus a cost per returned item), the cost of every v2, beta and alpha endpoint by exact path, worked examples, and how to spend fewer credits."
 ---
 
-import GeneralCreditCosts from "./data/v2-general-credit-costs.mdx";
-import DetailedVaultsCreditCosts from "./data/v2-detailed-vaults-credit-costs.mdx";
-import BenchmarksCreditCosts from "./data/v2-benchmarks-credit-costs.mdx";
-import HistoricalCreditCosts from "./data/v2-historical-credit-costs.mdx";
-import PortfolioCreditCosts from "./data/v2-portfolio-credit-costs.mdx";
-import TransactionsCreditCosts from "./data/v2-transactions-credit-costs.mdx";
-import BetaCreditCosts from "./data/beta-credit-costs.mdx";
-import LegacyV1CreditCosts from "./data/v1-credit-costs.mdx";
+This page answers "how many credits will this request cost?" for every vaults.fyi REST endpoint. It explains the charging model, lists each endpoint by its exact path, works through examples, and shows how to cut usage. Use it to estimate spend before you build a polling loop or let an agent call the API.
 
-Every vaults.fyi API request consumes Credits. Credits — also called Compute Units (CUs) — measure the compute resources consumed by each request. Subscription plans include a monthly Credit budget, while pay as you go charges a flat **$0.002 per credit**. This model lets you pay proportionally for what you actually use, rather than treating a simple lookup the same as a rich multi-vault data pull.
+Credits are also called Compute Units (CUs). Subscription plans include a monthly credit allowance; pay-as-you-go charges a flat **$0.002 per credit**. Plan prices and allowances are on [Plans and pricing](/plans/overview). All requests use `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`.
 
-## How Credits Work
+## How a request is charged
 
-Each API call consumes Credits in two parts:
+Each request costs:
 
-- **Base CU per call** — a fixed cost charged for every request to that endpoint, regardless of how many results are returned.
-- **CU per datapoint returned** — an additional cost multiplied by the number of records in the response.
+```
+credits = base cost per call + (cost per item × number of items returned)
+```
 
-**Example:** `/v2/detailed-vaults` has a base cost of 1 CU plus 3 CU per vault returned. If your query returns 50 vaults, the total cost is 1 + (50 × 3) = **151 CUs**.
+- **Base cost per call** is charged on every request to that endpoint, whatever it returns.
+- **Cost per item** applies only to the list and time-series endpoints that show one below. An item is one element of the response `data` array: one vault, one market, or one historical data point.
+- The charge is per request, so each page of a paginated list pays the base cost again.
 
-By contrast, `/v2/detailed-vaults/{network}/{vaultAddress}/apy` costs only 1 CU total because it returns a single APY value for a single vault.
+- Only requests that return HTTP 200 are charged. A request that returns 400, 404, 500 or any other non-200 status costs no credits (and an x402 payment for it is not settled).
 
-<Tip>
-  To minimize credit consumption, use targeted single-vault endpoints when you only need data for a specific address, and use the list endpoints when you need to compare across many vaults.
-</Tip>
+## Worked examples
 
-## v2 Endpoint Credit Costs
+| Request | Calculation | Credits | Pay-as-you-go |
+| - | - | -: | -: |
+| `GET /v2/detailed-vaults?perPage=50` returning 50 vaults | 1 + 50 × 3 | 151 | $0.302 |
+| `GET /v2/detailed-vaults/{network}/{vaultId}/apy` (one vault's `1day`–`90day` APY) | 1 | 1 | $0.002 |
+| `GET /v2/detailed-vaults/{network}/{vaultId}` (full detail of one vault) | 3 | 3 | $0.006 |
+| `GET /v2/historical/{network}/{vaultId}` for 30 days at the default `granularity=1hour`, `perPage=720` (720 points, one call) | 3 + 720 × 3 | 2,163 | $4.326 |
+| The same 30 days with `granularity=1day` (30 points) | 3 + 30 × 3 | 93 | $0.186 |
+| The same 30 days of APY only: `GET /v2/historical/{network}/{vaultId}/apy?granularity=1day` | 1 + 30 × 1 | 31 | $0.062 |
+| `POST /beta/advanced-analytics` returning 10 vaults with `maxDrawdown` and `composition` | 1 + 10 × (2 + 3) | 51 | $0.102 |
+
+These totals are calculated from the documented costs; the API does not return a per-request credit count.
+
+## How to spend fewer credits
+
+- **Need IDs, not metrics?** `GET /v2/vaults` costs 1 credit per call however many vaults it returns (up to `perPage=5000`), while `/v2/detailed-vaults` costs 3 per vault.
+- **One known vault?** Use the single-vault endpoints: `/apy` or `/tvl` (1 credit) instead of the full detail (3) or a list.
+- **Filter on the server.** Narrow `/v2/detailed-vaults` with `allowedNetworks`, `allowedAssets`, `minTvl` and a small `perPage`, because every returned vault costs 3.
+- **Historical data:** use `granularity=1day` or `1week` instead of the default `1hour`, a narrow `fromTimestamp`/`toTimestamp` window, and the single-series endpoints (`/apy`, `/tvl`, `/sharePrice`: 1 per point) instead of the combined endpoint (3 per point).
+- **Cache.** Indexed data refreshes about hourly, so polling the same list more often than that mostly re-buys the same data.
+
+## v2 endpoint costs
+
+Every v2 operation, by exact spec path. Use `{vaultId}` exactly as returned by the API; it is not always a plain address.
 
 ### General
 
-<GeneralCreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/vaults`](/api-reference/general/list-vaults) | 1 | — |
+| [`GET /v2/assets`](/api-reference/general/list-assets) | 1 | — |
+| [`GET /v2/networks`](/api-reference/general/list-networks) | 1 | — |
+| [`GET /v2/protocols`](/api-reference/general/list-protocols) | 1 | — |
+| [`GET /v2/curators`](/api-reference/general/list-curators) | 1 | — |
+| [`GET /v2/tags`](/api-reference/general/list-tags) | 1 | — |
 
-### Detailed Vaults
+### Detailed vaults
 
-<DetailedVaultsCreditCosts />
-
-### Benchmarks
-
-<BenchmarksCreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | 1 | 3 per vault returned |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details) | 3 | — |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}/apy`](/api-reference/detailed-vaults/get-vault-apy) | 1 | — |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}/tvl`](/api-reference/detailed-vaults/get-vault-tvl) | 1 | — |
 
 ### Historical
 
-<HistoricalCreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/historical/{network}/{vaultId}`](/api-reference/historical/get-vault-historical-data) | 3 | 3 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/apy`](/api-reference/historical/get-historical-apy) | 1 | 1 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/tvl`](/api-reference/historical/get-historical-tvl) | 1 | 1 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/sharePrice`](/api-reference/historical/get-historical-share-price) | 1 | 1 per data point |
+| [`GET /v2/historical/asset-prices/{network}/{assetAddress}`](/api-reference/historical/get-historical-asset-prices) | 1 | 1 per data point |
+
+### Benchmarks
+
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/benchmarks/{network}`](/api-reference/benchmarks/get-benchmark-rate) | 3 | — |
+| [`GET /v2/historical-benchmarks/{network}`](/api-reference/benchmarks/get-historical-benchmarks) | 3 | 3 per data point |
 
 ### Portfolio
 
-All plans can access portfolio endpoints.
-
-<PortfolioCreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/portfolio/positions/{userAddress}`](/api-reference/portfolio/list-portfolio-positions) | 5 | — |
+| [`GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-portfolio-position) | 1 | — |
+| [`GET /v2/portfolio/idle-assets/{userAddress}`](/api-reference/portfolio/list-idle-assets) | 5 | — |
+| [`GET /v2/portfolio/best-deposit-options/{userAddress}`](/api-reference/portfolio/get-best-deposit-options) | 1 | 2 per vault returned |
+| [`GET /v2/portfolio/best-vault/{userAddress}`](/api-reference/portfolio/get-best-vault) | 2 | — |
+| [`GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-total-returns) | 1 | — |
+| [`GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/list-position-events) | 3 | — |
 
 ### Transactions
 
-All plans can access transaction endpoints.
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-context) | 3 | — |
+| [`GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-payload) | 5 | — |
+| [`GET /v2/transactions/rewards/context/{userAddress}`](/api-reference/transactions/get-rewards-context) | 3 | — |
+| [`GET /v2/transactions/rewards/claim/{userAddress}`](/api-reference/transactions/claim-rewards) | 5 | — |
+| [`GET /v2/transactions/suffix/{userAddress}/{vaultId}`](/api-reference/transactions/get-transaction-suffix) | 1 | — |
 
-<TransactionsCreditCosts />
+### Near real-time (NRT)
 
-## Beta Endpoint Credit Costs
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/nrt/vault/{network}/{vaultId}`](/api-reference/nrt/get-vault-nrt-data) | 1 | — |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`](/api-reference/nrt/get-vault-nrt-share-price) | 1 | — |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/totalSupply`](/api-reference/nrt/get-vault-nrt-total-supply) | 1 | — |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/totalAssets`](/api-reference/nrt/get-vault-nrt-total-assets) | 1 | — |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice`](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | 1 | — |
 
-Beta endpoints use the same base-cost and per-datapoint model as v2 endpoints.
+### Health
 
-<BetaCreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /v2/health`](/api-reference/health/health-check) | Free (no API key needed, not rate limited) | — |
 
-### Advanced analytics
+The NRT endpoints need an API key; they are not available over x402.
 
-Both `POST /beta/advanced-analytics` and `POST /beta/advanced-analytics/{network}/{vaultId}` cost 1 base credit per request. Add the following costs for each returned item:
+The suffix endpoint costs 1 credit. It needs an API key with attribution enabled: without one it returns 400 and you are not charged. It returns an x402 challenge when called without a key, but a keyless call can't succeed, so don't buy it over x402. See [TVL attribution](/concepts/tvl-attribution).
 
-| Selected field | Credits per returned item |
-|---|---:|
-| `maxDrawdown` | 2 |
-| `detailedVault` | 3 |
-| `withdrawalPauseRatio` | 2 |
-| `composition` | 3 |
-| `utilizationRate` | 3 |
+## Beta endpoint costs
 
-The field costs are cumulative. Calculate the total request cost as `1 + number of returned items × sum of selected field costs`.
+Beta endpoints use the same model. Paths below are the exact spec paths, with every path parameter; copy them as shown. Earlier versions of this page used shortened paths that don't exist in the API. See [Beta](/api-reference/beta) for what each endpoint does.
 
-For example, a request that returns 10 items with `maxDrawdown` and `composition` costs `1 + (10 × (2 + 3)) = 51` credits.
+### Beta: Solana (SVM)
 
-## Legacy v1 API Credits
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /beta/svm/vaults`](/api-reference/svm/list-svm-vaults) | 1 | — |
+| [`GET /beta/svm/detailed-vaults`](/api-reference/svm/list-svm-detailed-vaults) | 1 | 3 per vault returned |
+| [`GET /beta/svm/detailed-vaults/{vaultAddress}`](/api-reference/svm/get-svm-detailed-vault) | 3 | — |
+| [`GET /beta/svm/portfolio/positions/{userAddress}`](/api-reference/svm/list-svm-positions) | 5 | — |
+| [`GET /beta/svm/portfolio/events/{userAddress}`](/api-reference/svm/list-svm-portfolio-events-across-supported-vaults) | 3 | — |
+| [`GET /beta/svm/portfolio/events/{userAddress}/{vaultAddress}`](/api-reference/svm/list-svm-position-events) | 1 | — |
+| [`GET /beta/svm/portfolio/idle-assets/{userAddress}`](/api-reference/svm/list-svm-idle-assets) | 5 | — |
+| [`GET /beta/svm/portfolio/idle-assets/{userAddress}/{assetAddress}`](/api-reference/svm/get-svm-idle-asset) | 1 | — |
+| [`GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}`](/api-reference/svm/get-svm-transaction-context) | 3 | — |
+| [`GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}`](/api-reference/svm/create-svm-transaction) | 5 | — |
 
-The v1 API uses a simpler flat-credit model — each endpoint has a single fixed cost with no per-datapoint multiplier, except for a few endpoints that scale with the number of results requested.
+### Beta: Borrow markets
 
-<Note>
-  The v1 (legacy) API endpoints remain fully supported and maintained. You can access the full v1 documentation in the [Legacy v1 Endpoints](/api/legacy/overview) reference.
-</Note>
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /beta/borrow/markets/`](/api-reference/borrow-markets/list-borrow-markets) | 6 | — (currently a flat 6 per call, however many markets are returned) |
+| [`GET /beta/borrow/markets/{network}`](/api-reference/borrow-markets/list-borrow-markets-by-network) | 6 | — |
+| [`GET /beta/borrow/markets/{network}/{marketId}`](/api-reference/borrow-markets/get-borrow-market) | 6 | — |
+| [`GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-asset-nrt-data) | 1 | — |
+| [`GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-historical-data) | 3 | 3 per data point |
+| [`GET /beta/borrow/portfolio/positions/{userAddress}`](/api-reference/borrow-markets/list-borrow-positions) | 6 | — |
+| [`GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}`](/api-reference/borrow-markets/get-borrow-market-position) | 6 | — |
+| [`GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-asset-position) | 1 | — |
+| [`GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/list-borrow-market-events) | 3 | — |
+| [`GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-transaction-context) | 3 | — |
+| [`GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/create-borrow-market-transaction) | 5 | — |
 
-<AccordionGroup>
-  <Accordion title="View v1 endpoint credit costs">
+### Beta: The Deep
 
-<LegacyV1CreditCosts />
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /beta/amm/deep/detailed-vaults`](/api-reference/the-deep/list-deep-detailed-vaults) | 1 | 3 per vault returned |
+| [`GET /beta/amm/deep/positions/{userAddress}/{network}/{vaultId}`](/api-reference/the-deep/get-deep-position) | 1 | — |
+| [`GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}`](/api-reference/the-deep/create-deep-deposit-transaction) | 5 | — |
+| [`GET /beta/amm/deep/withdraw/{userAddress}/{network}/{vaultId}`](/api-reference/the-deep/create-deep-withdrawal-transaction) | 5 | — |
 
-  </Accordion>
-</AccordionGroup>
+### Beta: Fixed term (Pendle)
+
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /beta/fixed-term/`](/api-reference/fixed-term-pendle/list-fixed-term-pendle-markets) | 1 | 3 per market returned |
+| [`GET /beta/fixed-term/detailed/{network}/{vaultId}`](/api-reference/fixed-term-pendle/get-fixed-term-market) | 3 | — |
+| [`GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}`](/api-reference/fixed-term-pendle/get-fixed-term-transaction-context) | 3 | — |
+| [`GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/fixed-term-pendle/create-fixed-term-transaction) | 5 | — |
+
+### Beta: Advanced analytics
+
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`POST /beta/advanced-analytics`](/api-reference/advanced-analytics/list-advanced-vault-analytics) | 1 | per item: sum of selected fields |
+| [`POST /beta/advanced-analytics/{network}/{vaultId}`](/api-reference/advanced-analytics/get-advanced-vault-analytics) | 1 | sum of selected fields |
+
+### Beta: Portfolio
+
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}`](/api-reference/portfolio/get-partial-returns) | 2 | — |
+
+Advanced analytics per-item costs depend on the `select` fields, and they add up. For each returned item, add: `maxDrawdown` 2, `detailedVault` 3, `withdrawalPauseRatio` 2, `composition` 3, `utilizationRate` 3. Total = `1 + items × (sum of selected field costs)`.
+
+The three borrow-market endpoints (`/beta/borrow/markets/`, `/{network}` and `/{network}/{marketId}`) are billed under one price of 1 + 5, applied once per call, so each call currently costs 6 credits whatever the number of markets returned. The fixed-term market list costs 1 + 3 per market returned.
+
+The beta borrow and Solana (SVM) endpoints are priced products and stay billed at the costs above.
+
+## Alpha endpoint costs
+
+| Endpoint | Base credits per call | Plus, per returned item |
+| - | -: | - |
+| [`POST /alpha/transactions/intent/getQuote`](/api-reference/cross-chain/create-transaction-intent-quote) | 0 (free during early access) | — |
+| [`POST /alpha/transactions/intent/execute`](/api-reference/cross-chain/execute-transaction-intent) | 0 (free during early access) | — |
+| [`GET /alpha/transactions/intent/status`](/api-reference/cross-chain/get-transaction-intent-status) | 0 (free during early access) | — |
+| [`GET /alpha/transactions/cctp/context/{userAddress}/{srcNetwork}/{dstNetwork}/{assetAddress}`](/api-reference/cctp-bridge/get-cctp-transaction-context) | 0 (free during early access) | — |
+| [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/cctp-bridge/create-cctp-transaction) | 0 (free during early access) | — |
+| [`GET /alpha/transactions/cctp/money-in-transit/{userAddress}`](/api-reference/cctp-bridge/list-cctp-money-in-transit) | 0 (free during early access) | — |
+| [`GET /alpha/transactions/cctp/status`](/api-reference/cctp-bridge/get-cctp-transaction-status) | 0 (free during early access) | — |
+| [`GET /alpha/historical/{network}/{vaultId}/daily-flows`](/api-reference/historical/get-historical-daily-vault-flows) | 0 (free during early access) | — |
+| [`GET /alpha/historical-positions/{userAddress}`](/api-reference/historical-positions/list-user-historical-positions) | 0 (free during early access) | — |
+| [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/historical-positions/list-user-historical-balances) | 0 (free during early access) | — |
+| [`GET /alpha/{network}/{vaultId}/holders`](/api-reference/holders/list-vault-holders) | 0 (free during early access) | — |
+
+Alpha endpoints cost 0 credits during early access, but they still need an API key; they are not available over x402.
+
+Alpha endpoints are free during early access; pricing may be introduced later and would be announced in the changelog.
+
+## Credits and x402 prices
+
+Requests sent **without** an API key to a v2 endpoint get an HTTP 402 [x402](/ai-agents/x402) challenge instead of using credits. On 2026-10-23, every 402 we captured priced the request at exactly **credits × $0.002**, expressed in `accepts[].amount` as USDC base units (6 decimals):
+
+| Request (no key) | `accepts[].amount` | = USD | Credits on this page |
+| - | -: | -: | -: |
+| `GET /v2/networks` | 2000 | $0.002 | 1 |
+| `GET /v2/detailed-vaults/base/{vaultId}/apy` | 2000 | $0.002 | 1 |
+| `GET /v2/transactions/suffix/{userAddress}/{vaultId}` | 2000 | $0.002 | 1 |
+| `GET /v2/portfolio/best-vault/{userAddress}` | 4000 | $0.004 | 2 |
+| `GET /v2/detailed-vaults/base/{vaultId}` | 6000 | $0.006 | 3 |
+| `GET /v2/benchmarks/base?code=usd` | 6000 | $0.006 | 3 |
+| `GET /v2/transactions/rewards/context/{userAddress}` | 6000 | $0.006 | 3 |
+| `GET /v2/detailed-vaults?perPage=1` | 8000 | $0.008 | 1 + 1 × 3 = 4 |
+| `GET /v2/detailed-vaults?perPage=5` | 32000 | $0.032 | 1 + 5 × 3 = 16 |
+| `GET /v2/portfolio/positions/{userAddress}` | 10000 | $0.010 | 5 |
+| `GET /v2/transactions/deposit/...` | 10000 | $0.010 | 5 |
+| `GET /v2/historical/base/{vaultId}/apy?perPage=1` | 4000 (scheme `upto`, a maximum) | $0.004 | 1 + 1 × 1 = 2 |
+| `GET /v2/historical/base/{vaultId}/apy?perPage=10` | 22000 (scheme `upto`, a maximum) | $0.022 | 1 + 10 × 1 = 11 |
+
+The x402 price is defined as the credit cost × $0.002 (2000 USDC base units per credit), with list and historical endpoints priced for the full `perPage` you request. Historical endpoints use the `upto` scheme and settle only for the data points actually returned; other endpoints, including `/v2/detailed-vaults`, charge the quoted amount even if fewer items come back. x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints need an API key. Always pay the amount in `accepts[].amount` rather than hard-coding it.
+
+x402 payments don't draw on account credits. Keyless (x402) traffic is limited to 10 requests per minute per IP.
+
+## When credits run out
+
+Before each priced request the API checks the key's credit balance. When it has reached zero, the request returns HTTP **403** with `{"error":"Forbidden","message":"This API key has exhausted its available credits. To resume service, please visit https://portal.vaults.fyi/signup to top-up your credits"}`. Don't retry a 403; top up or upgrade. Free endpoints (health, alpha) are not affected. See [Errors](/api-reference/errors#403-credits-exhausted).
+
+Pay-as-you-go keys have no spending cap: usage is billed per credit with no upper limit, so set your own budget alerts or call limits if you need one.
+
+## Legacy v1 API credits
+
+The legacy v1 API uses a flat cost per endpoint. New integrations should use v2.
+
+| Endpoint | Credits |
+| - | - |
+| `GET /v1/networks`, `/v1/tags`, `/v1/tokens`, `/v1/transactions/assets`, `/v1/transactions/vaults`, `/v1/vaults`, `/v1/vaults/{network}/{vaultAddress}/apy` | 1 |
+| `POST /v1/portfolio/best-deposit-options/{userAddress}` | 1 + 2 per vault |
+| `GET /v1/detailed/vaults` | 1 + 4 per vault |
+| `POST /v1/portfolio/best-vault/{userAddress}`, `GET /v1/top-vault/{network}/{userAddress}`, `GET /v1/vaults/{network}/{vaultAddress}/historical-apy/{timestamp}`, `GET /v1/vaults/{network}/{vaultAddress}/historical-tvl/{timestamp}` | 2 |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-apy` | 2 + 1 per data point |
+| `GET /v1/benchmarks`, `/v1/transactions/vaults/actions/details`, `/v1/vaults/{network}/{vaultAddress}`, `/v1/vaults/{network}/{vaultAddress}/holder-events/{holder}`, `/v1/vaults/{network}/{vaultAddress}/holder-total-returns/{holder}` | 3 |
+| `GET /v1/vaults/{network}/{vaultAddress}/historical-data` | 4 + 2 per data point |
+| `GET /v1/portfolio/positions/{userAddress}`, `/v1/portfolio/wallet-balances`, `/v1/transactions/vaults/claim-redeem`, `/v1/transactions/vaults/claim-rewards`, `/v1/transactions/vaults/deposit`, `/v1/transactions/vaults/redeem`, `/v1/transactions/vaults/request-redeem` | 5 |
+
+Related: [Plans and pricing](/plans/overview), [API overview](/api-reference/overview), [Errors and rate limits](/api-reference/errors), [x402](/ai-agents/x402).

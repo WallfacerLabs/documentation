@@ -1,77 +1,211 @@
 ---
-title: "Keyless API Access with x402 Pay-Per-Request"
-description: "Use the x402 protocol to access the Vaults.fyi API without an API key — pay per request in USDC on Base from your agent's onchain wallet."
+title: "x402 pay-per-request: call the vaults.fyi API without an API key"
 sidebarTitle: "x402 Pay-Per-Request"
+description: "Pay per REST request in USDC on Base with x402 v2: what the 402 challenge contains (accepts[].amount), observed prices, which endpoints are payable, verified client code for @x402/fetch and the x402 Python package, and spend limits."
 ---
 
-The Vaults.fyi API supports the [x402 payment protocol](https://www.x402.org/) for keyless, pay-per-request access using USDC on Base. Instead of managing API keys, your agent pays for each request directly from its onchain wallet. This makes x402 ideal for autonomous agents and systems that already hold assets onchain.
+This page explains how an agent can call the vaults.fyi REST API with no API key by paying for each request in USDC on Base, using the [x402](https://www.x402.org/) protocol, version 2. Use it for autonomous agents that hold their own wallet. If you have an API key, send it as `x-api-key: <key>` instead: no 402 is returned, and nothing here applies.
 
-## How it works
+What you need to know first:
 
-1. Send a request with the `x-402-auth: true` header — no API key needed.
-2. Receive a `402 Payment Required` response containing payment details, including the current `maxAmountRequired`.
-3. Sign a USDC payment on Base using your agent's wallet.
-4. Resend the original request with the `X-Payment` proof header attached.
-5. Receive a `200` response with the requested data.
+- **No opt-in header.** Every paid v2 endpoint called **without** `x-api-key` returns `402 Payment Required` with an x402 v2 challenge. Sending `x-402-auth: true` gives the same 402.
+- **The price is `accepts[].amount`**, in USDC base units (6 decimals): `"2000"` = $0.002. There is no `maxAmountRequired` field. That field belongs to x402 v1.
+- **REST only.** The MCP server (`https://mcp.vaults.fyi/mcp`) needs an API key and has no x402 option.
+- **Separate from credits, not from rate limits.** x402 payments don't draw on any account's credits. Keyless requests are limited to 10 per minute per IP.
+- **Status of this page:** the 402 challenge and the client libraries' parsing of it were verified on 2026-10-23. **A paid request was not executed end to end**, because no payment was made. The retry and settlement headers below are confirmed from the vaults.fyi API implementation.
 
-The [`x402`](https://www.npmjs.com/package/x402) JavaScript and Python libraries handle this payment flow automatically, so you don't need to implement the handshake manually.
+## How the flow works
 
-## Quick start
+1. Call any v2 endpoint without `x-api-key`, for example `GET https://api.vaults.fyi/v2/networks`.
+2. The server answers **402**. The body is JSON with `x402Version: 2`. The same JSON, base64-encoded, is in the `payment-required` response header.
+3. Choose one entry of `accepts[]`. Check `network` (`eip155:8453`, Base), `asset` (USDC, `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`), `payTo` and `amount`, and reject anything above your limit.
+4. Sign the payment with your wallet. With `exact` this is an EIP-3009 USDC authorization: no on-chain transaction from you and no gas.
+5. Repeat the original request with the signed payment attached. Send it in the `PAYMENT-SIGNATURE` header (x402 v2). The v1 `X-PAYMENT` header is not accepted: a retry that uses it gets the 402 challenge again. `x-402-auth` is not needed.
+6. On success you get the normal `200` response. The settlement receipt is in the `PAYMENT-RESPONSE` header. Payment is settled only when the request returns 200, so a request that fails (4xx or 5xx) is not charged.
 
-Install the x402 client library and make your first request:
+The client libraries below perform steps 2–6 for you.
 
-<CodeGroup>
+## The 402 challenge
 
-```javascript javascript
-import { wrapAxios } from "x402/axios";
-import axios from "axios";
-import { createWalletClient, http } from "viem";
+Real response to `GET /v2/networks` with no key (2026-10-23, trimmed: `extensions` shortened, `error` text cut):
+
+```json
+{
+  "x402Version": 2,
+  "error": "Payment required to process this request. You can use the x402 protocol for instant per-request payments, or visit https://portal.vaults.fyi/signup to top-up your account credits via our Pay-As-You-Go plan. ...",
+  "resource": {
+    "url": "https://api.vaults.fyi/v2/networks",
+    "description": "Retrieves a complete list of supported blockchain networks ...",
+    "mimeType": "application/json",
+    "serviceName": "vaults.fyi"
+  },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "2000",
+      "payTo": "0x108BCd8a07C3fdfca3Aa500784A8573123a1029F",
+      "maxTimeoutSeconds": 60,
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "extra": { "name": "USD Coin", "version": "2", "symbol": "USDC" }
+    },
+    {
+      "scheme": "batch-settlement",
+      "network": "eip155:8453",
+      "amount": "2000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0x108BCd8a07C3fdfca3Aa500784A8573123a1029F",
+      "maxTimeoutSeconds": 300,
+      "extra": { "name": "USD Coin", "version": "2", "symbol": "USDC",
+                 "receiverAuthorizer": "0x3721824a31197dcDD2984cF43b92B6cc8A87c0Fb",
+                 "withdrawDelay": 900, "minDeposit": "20000" }
+    }
+  ],
+  "extensions": { "bazaar": { "info": { "input": { "type": "http", "method": "GET", "headers": { "x-402-auth": "true" } } } } }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `x402Version` | `2`. Use an x402 **v2** client. v1 clients reject this body. |
+| `resource.url` | The resource being paid for, without the query string. |
+| `accepts[]` | Payment options. Pick one. |
+| `accepts[].scheme` | `exact`: pay exactly `amount`. `upto`: `amount` is a maximum; you are charged only for the data points actually returned (historical endpoints and `POST /beta/advanced-analytics`). `batch-settlement`: a deposit-based scheme (`extra.minDeposit`, `extra.withdrawDelay` in seconds). This page does not cover it. |
+| `accepts[].network` | CAIP-2 chain id. Always `eip155:8453` (Base) so far. |
+| `accepts[].amount` | Price in base units of `asset`. USDC has 6 decimals: `"6000"` = $0.006. |
+| `accepts[].asset` | Token contract. `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` = USDC on Base. |
+| `accepts[].payTo` | Recipient address. |
+| `accepts[].maxTimeoutSeconds` | How long the signed payment stays valid. |
+| `extensions.bazaar` | Discovery metadata (input/output schema). It lists `x-402-auth: "true"` as a request header, but the header has no effect: the 402 is returned without it, and the paid retry doesn't need it. |
+
+A **401** (not 402) means you sent an `x-api-key` that is invalid. In that case no x402 offer is made: remove the header to pay with x402, or fix the key.
+
+## Prices observed on 2026-10-23
+
+Prices come from `accepts[].amount` in real 402 responses. **Always read the price from the 402 you receive**: these values can change.
+
+| Request (no key) | Scheme(s) offered | `amount` | USD |
+|---|---|---|---|
+| `GET /v2/networks` | exact, batch-settlement | 2000 | $0.002 |
+| `GET /v2/vaults?perPage=1` | exact, batch-settlement | 2000 | $0.002 |
+| `GET /v2/detailed-vaults?perPage=1` | exact, batch-settlement | 8000 | $0.008 |
+| `GET /v2/detailed-vaults?perPage=5` | exact, batch-settlement | 32000 | $0.032 |
+| `GET /v2/detailed-vaults` (default `perPage` 50) | exact, batch-settlement | 302000 | $0.302 |
+| `GET /v2/detailed-vaults/{network}/{vaultId}` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/detailed-vaults/{network}/{vaultId}/apy` | exact, batch-settlement | 2000 | $0.002 |
+| `GET /v2/benchmarks/{network}?code=usd` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/historical/{network}/{vaultId}/apy?perPage=1` | **upto**, batch-settlement | 4000 (maximum) | up to $0.004 |
+| `GET /v2/historical/{network}/{vaultId}/apy?perPage=5` | **upto**, batch-settlement | 12000 (maximum) | up to $0.012 |
+| `GET /v2/portfolio/positions/{userAddress}` | exact, batch-settlement | 10000 | $0.010 |
+| `GET /v2/portfolio/idle-assets/{userAddress}` | exact, batch-settlement | 10000 | $0.010 |
+| `GET /v2/portfolio/best-vault/{userAddress}` | exact, batch-settlement | 4000 | $0.004 |
+| `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId}?assetAddress=…&amount=…` | exact, batch-settlement | 10000 | $0.010 |
+| `GET /v2/transactions/rewards/context/{userAddress}` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/health` | free (200 with no key) | — | $0 |
+
+The x402 price is the endpoint's credit cost on [Credits](/plans/credits) × $0.002, the pay-as-you-go credit price (2000 USDC base units per credit). List and historical endpoints are priced for the full `perPage` you request. For example, `/v2/detailed-vaults` costs 1 + 3 per vault: (1 + 3 × 50) × 2000 = 302000. List and history prices therefore grow with `perPage`. Historical endpoints use `upto` and settle only for the data points actually returned; other endpoints (including `/v2/detailed-vaults`) charge the quoted amount even if fewer items come back. Always pay the amount in `accepts[].amount`.
+
+### Which endpoints are payable
+
+- **Payable (observed 402 with an offer):** `/v2/networks`, `/v2/vaults`, `/v2/detailed-vaults`, `/v2/detailed-vaults/{network}/{vaultId}` and its `/apy`, `/v2/benchmarks/{network}`, `/v2/historical/*` (yes, historical data is payable, via `upto`), `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}`, `/v2/transactions/context/{userAddress}/{network}/{vaultId}`, `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}`, `/v2/transactions/rewards/context/{userAddress}`. The v2 OpenAPI spec declares a 402 response on every v2 operation except `/v2/health`.
+- **Also payable:** every other `/v2/*` data endpoint (for example `/v2/tags`, `/v2/assets`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/transactions/rewards/claim/{userAddress}`) and `POST /beta/advanced-analytics` (and its single-vault variant, via `upto`).
+- **Don't buy:** `/v2/transactions/suffix/{userAddress}/{vaultId}` returns a 402 challenge, but it needs an API key with attribution enabled, so a keyless call always fails with 400 (and is not charged).
+
+## TypeScript: `@x402/fetch`
+
+Tested on 2026-10-23 with `@x402/fetch@2.28.0` and `@x402/evm@2.28.0`. Run against the live API with an unfunded throwaway wallet, the library parsed the 402 and offered `exact` 2000. The paid retry was not executed.
+
+```bash
+npm install @x402/fetch@2.28.0 @x402/evm@2.28.0 viem
+```
+
+```typescript
+import { wrapFetchWithPaymentFromConfig, decodePaymentResponseHeader } from "@x402/fetch";
+import { ExactEvmScheme, UptoEvmScheme } from "@x402/evm";
 import { privateKeyToAccount } from "viem/accounts";
-import { base } from "viem/chains";
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY);
-const walletClient = createWalletClient({
-  account,
-  chain: base,
-  transport: http(),
+// A dedicated agent wallet on Base holding a small amount of USDC. Never your main wallet.
+const account = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as `0x${string}`);
+
+const MAX_PER_REQUEST = 50_000n; // 0.05 USDC in base units
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [
+    { network: "eip155:8453", client: new ExactEvmScheme(account) },
+    { network: "eip155:8453", client: new UptoEvmScheme(account) }, // needed for /v2/historical/*
+  ],
+  // Refuse any offer above the cap. The library also applies its own default cap of $1 per payment.
+  policies: [(_x402Version, requirements) => requirements.filter((r) => BigInt(r.amount) <= MAX_PER_REQUEST)],
 });
 
-const client = wrapAxios(axios, walletClient);
+const res = await fetchWithPayment("https://api.vaults.fyi/v2/networks"); // no x-api-key
+console.log(res.status, await res.json());
 
-const response = await client.get("https://api.vaults.fyi/v2/vaults", {
-  headers: { "x-402-auth": "true" },
-});
+const receipt = res.headers.get("PAYMENT-RESPONSE");
+if (receipt) console.log(decodePaymentResponseHeader(receipt));
 ```
 
-```python python
-from x402.client import Client
+If every offer is filtered out, the call throws `Failed to create payment payload: All payment requirements were filtered out by policies…` and nothing is paid.
 
-client = Client(private_key=PRIVATE_KEY, chain="base")
+## Python: `x402`
 
-response = client.get(
-    "https://api.vaults.fyi/v2/vaults",
-    headers={"x-402-auth": "true"},
-)
+Tested on 2026-10-23 with `x402==2.25.0` (requires Python 3.10+). Run against the live API with an unfunded throwaway wallet, the library parsed the 402 (`exact`, `eip155:8453`, `2000`). The paid retry was not executed.
+
+```bash
+pip install "x402[requests,evm]==2.25.0"
 ```
 
-</CodeGroup>
+```python
+import os
+import requests
+from eth_account import Account
+from x402 import x402ClientSync, max_amount
+from x402.mechanisms.evm import EthAccountSigner
+from x402.mechanisms.evm.exact import ExactEvmScheme
+from x402.mechanisms.evm.upto import UptoEvmScheme
+from x402.http.clients import wrapRequestsWithPayment
 
-For a complete working example, see the [Agentic DeFi repo](https://github.com/WallfacerLabs/agentic_defi).
+# A dedicated agent wallet on Base holding a small amount of USDC. Never your main wallet.
+signer = EthAccountSigner(Account.from_key(os.environ["AGENT_PRIVATE_KEY"]))
 
-## Pricing
+client = x402ClientSync()
+client.register("eip155:8453", ExactEvmScheme(signer=signer))
+client.register("eip155:8453", UptoEvmScheme(signer=signer))  # needed for /v2/historical/*
+client.register_policy(max_amount(50_000))  # refuse offers above 0.05 USDC (base units)
 
-All prices are in USDC on Base, charged per request. Payment is in USDC raw units (6 decimals) — for example, `5000` = $0.005 USDC. The `402` response always contains the current `maxAmountRequired`. Prices are subject to change.
+session = wrapRequestsWithPayment(requests.Session(), client)
+r = session.get("https://api.vaults.fyi/v2/networks")  # no x-api-key
+print(r.status_code, r.json())
+```
 
-| Price  | Endpoints |
-| ------ | --------- |
-| $0.005 | `/v2/networks`, `/v2/vaults`, `/v2/tags`, `/v2/assets`, `/v2/curators` |
-| $0.01  | `/v2/detailed-vaults/{network}/{vaultId}/apy`, `/v2/detailed-vaults/{network}/{vaultId}/tvl` |
-| $0.02  | `/v2/detailed-vaults/{network}/{vaultId}`, `/v2/portfolio/positions/{userAddress}` |
-| $0.025 | `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}` |
-| $0.05  | `/v2/transactions/*`, `/v2/transactions/rewards/claim/{userAddress}` |
-| $0.75  | `/v2/detailed-vaults` (paginated list of all vaults) |
-| Free   | `/v2/health` |
+If every offer is filtered out, the call raises `PaymentError: Failed to handle payment: All requirements filtered out by policies` and nothing is paid.
 
-<Warning>
-  `/v2/historical/*` endpoints are not available via x402 and require an API key. [Sign up](https://portal.vaults.fyi/signup) to get a key and access historical data endpoints.
-</Warning>
+### Notes on the `upto` scheme
+
+Historical endpoints offer only `upto` and `batch-settlement`. In both libraries the `upto` client signs a Permit2 authorization, so the wallet needs a USDC allowance for the Permit2 contract (a one-time on-chain approval that costs gas). This is inferred from the library source and was not tested. If you only register `exact`, historical requests fail with no matching scheme, and you pay nothing.
+
+### The vaults.fyi SDK's keyless mode
+
+`@vaultsfyi/sdk@2.3.14` has a keyless mode (`new VaultsSdk({ client: walletClient })`). It depends on `x402-fetch@0.7.0`, an x402 **v1** client that reads `maxAmountRequired` and sends `X-PAYMENT`. The API speaks x402 **v2** (`accepts[].amount`, `PAYMENT-SIGNATURE`), so use an x402 v2 client such as the libraries above, or an API key.
+
+The previous version of this page imported `wrapAxios` from `x402/axios` and `Client` from `x402.client`. Neither exists in the published packages.
+
+## Budget and failure handling
+
+- **Cap every payment.** Filter `accepts[]` by `amount` before signing (both examples do). Both libraries also refuse payments above $1 by default (`DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"`). A `/v2/detailed-vaults` call with `perPage=5000` would cost about $30 and is refused by that default.
+- **Cap total spend.** Track the sum of paid `amount`s per day in your agent and stop when you reach the budget.
+- **Keep `perPage` small** on list and history endpoints: their price grows with `perPage`.
+- **Do not retry a paid request blindly.** Payment is settled only when the request returns 200, so a failed paid retry (4xx or 5xx) is not charged. If settlement itself fails you get a 402 and no data. Read the response before paying again: a second successful request is a second charge.
+- **Use a dedicated wallet** with only the USDC you are willing to spend. Never load the user's main key into an x402 client.
+- **402 vs 401:** 402 means no key was sent (pay, or add `x-api-key`). 401 means an invalid key was sent; no x402 offer is made.
+
+## Related pages
+
+- [AI agents overview](/ai-agents/overview): which surface to use when
+- [Rules for agents](/ai-agents/rules-for-agents): the rules to put in an agent's context
+- [Errors](/api-reference/errors): full 402 body, 401 vs 402, retry policy
+- [Credits](/plans/credits): credit cost per endpoint (the x402 price is credits × $0.002)
+- [MCP server](/ai-agents/mcp-server): needs an API key; no x402
+
+_Last updated: 2026-10-23. Facts on this page were checked against the live API and MCP server on that date._

@@ -1,0 +1,362 @@
+---
+title: "API conventions: units, identifiers, defaults and pagination"
+sidebarTitle: "Conventions"
+description: "Rules every vaults.fyi endpoint shares: APY and amount units, timestamps, network and vault identifiers, the 4-network default scope, array params, pagination, soft errors and per-endpoint defaults."
+---
+
+This page lists the conventions shared by every vaults.fyi REST endpoint: units, identifiers, default filters, array encoding, pagination, soft errors and nullability. Read it before you parse a response or build a query. Most wrong answers from this API come from a convention, not a bug: a default that hides networks, a comma-joined array, or an APY read as a percentage.
+
+All examples use the base URL `https://api.vaults.fyi` and the header `x-api-key: $VAULTSFYI_API_KEY`. Responses are real captures from 2026-10-23, trimmed.
+
+## APY and rates
+
+| Rule | Detail |
+| - | - |
+| Unit | Decimal fraction. `0.0315` means 3.15%. Multiply by 100 to display. |
+| Fees | APY is **net** of performance and management fees. The `fees` object is for display; do not subtract it again. |
+| Shape | `apy.<window>.{base, reward, total}`. `base` is organic yield, `reward` is incentive yield, and `total = base + reward`. |
+| Windows on `/v2/detailed-vaults` and `/v2/detailed-vaults/{network}/{vaultId}` | `1hour`, `1day`, `7day`, `30day`, `90day` (five) |
+| Windows on `/v2/detailed-vaults/{network}/{vaultId}/apy` and benchmarks | `1day`, `7day`, `30day`, `90day` (no `1hour`) |
+| `apyInterval` query param | `1day`, `7day`, `30day`, `90day`; default `7day`. Some spec descriptions omit `90day`, but it is accepted. |
+| `sortBy` on `/v2/detailed-vaults` | `tvl`, `apy1day`, `apy7day`, `apy30day`, `apy90day`. `sortBy=apy` returns 400. |
+| Range | Not clamped. Live values range from −1 to above 1,500 (Apostro Resolv USDC `apy.7day.total = 1522.99`, i.e. 152,299%). Treat values above 1 (100%) as suspect and check `warnings`. |
+
+Fields named `apyComposite.totalApy` and `apyComposite.intrinsicApy` appear only on nested vaults. There are no top-level `baseApy`, `rewardApy` or `totalApy` fields.
+
+Other rates use the same decimal-fraction unit: fees (`performanceFee: 0.1` = 10%), beta borrow `supplyRate` / `borrowRate` / `utilizationRate`, and beta fixed-term `fixedApy`. Beta SVM APYs have used decimal fractions since week 33 of 2026 (see the [changelog](/resources/changelog)).
+
+Real response from `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/apy` (complete):
+
+```json
+{
+  "1day":  { "base": 0.0316, "reward": 0, "total": 0.0316 },
+  "7day":  { "base": 0.0315, "reward": 0, "total": 0.0315 },
+  "30day": { "base": 0.0305, "reward": 0, "total": 0.0305 },
+  "90day": { "base": 0.0293, "reward": 0, "total": 0.0293 }
+}
+```
+
+## Token amounts and decimals
+
+| Field or param | Format | Example |
+| - | - | - |
+| `tvl.native`, `balanceNative`, `positionValueInAsset`, `lpToken.balanceNative`, `holdersData.totalBalance`, `returnsNative`, NRT `totalAssets` | Integer string in base units of that token | USDC (6 decimals): `"5709308677428"` = 5,709,308.677428 USDC |
+| NRT `totalSupply` | Integer string in the **LP token's** base units (usually 18), not the asset's | `"461739224418397752974334633"` |
+| Transaction `amount` query param | Integer string in base units | `amount=1000000` = 1 USDC. `amount=1.5` → 400 "Expected bigint" |
+| `remainingCapacity`, `maxCapacity` | Integer string in base units; uint256 max (`115792089237316195423570985008687907853269984665640564039457584007913129639935`) means unlimited | Overflows a JavaScript `Number`; use `BigInt` |
+| x402 `accepts[].amount` | Integer string in USDC base units | `"2000"` = $0.002 |
+
+To convert, divide by `10 ** decimals`, using the `decimals` of the object the amount belongs to (`asset.decimals` or `lpToken.decimals`). Parse with `BigInt` (JavaScript) or `int` / `Decimal` (Python), never with a float.
+
+## USD values and prices
+
+USD values are **strings**: `tvl.usd` (whole USD, e.g. `"468440351"`), `balanceUsd` (variable precision, e.g. `"13850.55495425"`), and `assetPriceInUsd` (`"0.99985668"`). Parse them as decimals. Exceptions: NRT `underlyingAssetPrice` is a JSON number; beta Deep `tvlInUsd` is a JSON number; beta SVM `tvl.usd` has two decimals (`"476469868.00"`).
+
+## Timestamps and dates
+
+- Timestamps in requests and responses are **Unix seconds** (`timestamp`, `lastUpdateTimestamp`, `creationData.deploymentTimestamp`, `expiry`).
+- Query params are `fromTimestamp` / `toTimestamp`, in seconds. A millisecond value returns 400 with "Timestamp must be a number greater than 0 and less than 1e11".
+- `fromTimestamp` defaults to `0`, so historical endpoints start at the beginning of history. Results are ordered **oldest first**. To get recent data, pass `fromTimestamp`.
+- `fromTimestamp > toTimestamp` returns 200 with no data, not an error.
+- `endDate: 4946619450` (year 2126) on `flags` and `score.penaltyComponents` means "no end date".
+- Exception: alpha `/alpha/historical/{network}/{vaultId}/daily-flows` takes `fromDate` / `toDate` as `YYYY-MM-DD` strings.
+
+Real response from `GET /v2/historical/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/apy?fromTimestamp=1792540800&toTimestamp=1792713600&granularity=1day&apyInterval=7day&perPage=5` (complete):
+
+```json
+{
+  "itemsOnPage": 3,
+  "data": [
+    { "timestamp": 1792540800, "blockNumber": "52875727", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } },
+    { "timestamp": 1792627200, "blockNumber": "52918927", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } },
+    { "timestamp": 1792713600, "blockNumber": "52962127", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } }
+  ]
+}
+```
+
+There is no `nextPage` key, so this is the last page.
+
+## Reputation Score
+
+`score.vaultScore` is the Reputation Score, an unrounded number (e.g. `33.84391737297204`). It ranges from 0 to 100 (observed 27.5–99.1 in live data on 2026-10-23). Sub-scores (`vaultTvlScore`, `protocolTvlScore`, `holderScore`, `assetScore`) use the same scale (observed between 0 and 100). `score.networkScore` is deprecated and no longer counts toward `vaultScore`. Check `score.vaultScore` client-side if you need a strict threshold. See [Reputation Score](/methodology/reputation-score).
+
+## Networks
+
+| Form | Example | Accepted |
+| - | - | - |
+| Network name (slug) | `base`, `mainnet`, `arbitrum`, `mega-eth` | Everywhere a network is accepted |
+| CAIP-2 | `eip155:8453` | Everywhere except `/beta/borrow/*` query filters, which take names only (`allowedNetworks=eip155:1` there returns **400** `invalid_enum_value`, observed 2026-10-23) |
+| Bare chain ID | `8453` | **Never.** In a path it returns 400; in `allowedNetworks` it is echoed in `errors.unsupportedNetworks` |
+| `ethereum` | — | **Never.** Ethereum L1 is `mainnet` (or `eip155:1`) |
+
+Where networks appear:
+
+- **Path** `{network}` (detailed vaults, historical, benchmarks, NRT, portfolio and transaction paths, beta borrow and fixed-term, alpha holders and flows). An invalid value returns 400 listing all 44 valid options (22 names and 22 CAIP-2 IDs).
+- **Query** `network` (single value) on `/v2/vaults` and `/v2/assets`.
+- **Query** `allowedNetworks` / `disallowedNetworks` (arrays) on detailed vaults, portfolio, beta and alpha lists. Unknown values return 200 with an empty result and `errors.unsupportedNetworks`. Exception: on `/beta/borrow/*` the network filters are a strict enum of names; an unknown value or a CAIP-2 ID returns 400.
+- **Path** `{srcNetwork}` / `{dstNetwork}` on alpha CCTP. Gnosis is in the enum but rejected ("Network gnosis is not supported for CCTP").
+- **Solana** has no network param. It is served only by `/beta/svm/*`.
+
+`GET /v2/networks` returns the 22 supported EVM networks with `name`, `chainId` and `networkCaip`. Responses carry the same three fields in every `network` object.
+
+Some networks listed by `GET /v2/networks` currently have **no indexed vaults** (observed 2026-10-24: `swellchain`). Passing one to a list endpoint is harmless: it is echoed in `errors.unsupportedNetworks` and the other networks still return rows, so treat that echo as a warning, not an error.
+
+### Default network scope: 4 networks
+
+These endpoints return data **only** for `base`, `mainnet`, `arbitrum` and `optimism` unless you pass `allowedNetworks`:
+
+- `/v2/detailed-vaults`
+- `/v2/portfolio/positions/{userAddress}`
+- `/v2/portfolio/idle-assets/{userAddress}`
+- `/v2/portfolio/best-vault/{userAddress}`
+- `/v2/portfolio/best-deposit-options/{userAddress}`
+- `/beta/fixed-term/`
+- `/beta/advanced-analytics`
+- `/alpha/historical-balances/{userAddress}/{timestamp}`
+
+`/v2/vaults`, `/v2/assets`, `/beta/borrow/markets/` and `/beta/borrow/portfolio/positions/{userAddress}` have **no** default network scope.
+
+Example. The largest USDT0 vault (Aave Plasma USDT0, about $813M TVL) is invisible under the default scope:
+
+```bash
+# 0 results: plasma is outside the default 4 networks
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/detailed-vaults?allowedAssets=USDT0&sortBy=tvl&sortOrder=desc&perPage=1"
+# {"itemsOnPage":0,"data":[],"errors":{"unsupportedNetworks":[],"unsupportedAssets":[],"unsupportedProtocols":[]}}
+
+# 1 result once plasma is listed
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/detailed-vaults?allowedAssets=USDT0&allowedNetworks=plasma&sortBy=tvl&sortOrder=desc&perPage=1"
+# {"itemsOnPage":1,"nextPage":1,"data":[{"name":"Aave Plasma USDT0","network":{"name":"plasma",...},"tvl":{"usd":"813496145",...}}],...}
+```
+
+To cover **every** network, repeat `allowedNetworks` once for each network name that appears in `GET /v2/vaults` (every network that has vaults; `/v2/vaults` has no default scope and returns all vaults in one 1-credit call with `perPage=5000`). Do not take the list from `GET /v2/networks` without handling networks that have no vaults (see above). Passing `disallowedNetworks` without `allowedNetworks` also replaces the default scope with "all networks except these" (verified 2026-10-24: `disallowedNetworks=mainnet` returned vaults on 20 networks).
+
+There is no `allowedNetworks=all` value.
+
+The 4-network default and ascending sort order are part of the v2 contract and won't change without notice (see [Versioning](/api-reference/versioning)). Still pass `allowedNetworks` explicitly so your results don't depend on the default.
+
+## Vault, asset and market identifiers
+
+| Identifier | Where it comes from | Notes |
+| - | - | - |
+| `vaultId` (EVM, path `{vaultId}`) | `data[].vaultId` from `/v2/vaults` or `/v2/detailed-vaults` | Usually the vault contract address (case-insensitive). Some are **not addresses**: `/v2/vaults?network=base` returned IDs such as `0x559756d476D5ed4533edC3Ac98E5A9468176378c-25`. Always copy `vaultId` from a list response; don't derive it from `address`. An invalid ID returns 400 "Value is not a valid vault id". |
+| `address` | Same objects | The contract address. It equals `vaultId` for most vaults, but use `vaultId` in paths. |
+| `vaultAddress` (path) | `/beta/svm/vaults` | Solana base58 address. Used only by `/beta/svm/*`. |
+| `userAddress` (path) | The wallet | EVM: `0x` + 40 hex characters, case-insensitive. ENS names (`vitalik.eth`) return 400. SVM: base58. |
+| `assetAddress` | `asset.address` of the vault, or `/v2/assets` | Token contract on that network. Native ETH appears as `0x0000000000000000000000000000000000000000` in asset lists and asset-price history (verified). For a native-ETH vault (such as Lido stETH) the transaction endpoints take the zero address as `assetAddress`; the payload sends the amount as `tx.value` with no approve step. Use the WETH address for WETH vaults, and don't use `0xEeee…EeEe`. Safest: copy the vault's `asset.address` from the transaction context. Observed 2026-10-30: a Lido deposit of 0.5 ETH returned `tx: {to, chainId, value: "500000000000000000"}` with no `data`. `tx.data` can be absent and `tx.value` can be non-zero: pass `data` only when present and always pass `value` (missing means 0). A value-only deposit has no calldata attribution suffix. |
+| `assetCaip` / `tokenCaip` | Responses | CAIP-19, e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`, native ETH `eip155:1/slip44:60`, SVM `solana:5eykt4Us…/token:<mint>`. Response-only; no endpoint takes CAIP-19 as input. Silent trap: `allowedAssets=eip155:8453/erc20:0x8335…` returns **200 with empty `data`** and the value in `errors.unsupportedAssets` (observed 2026-10-23). Convert instead: the CAIP-2 prefix (`eip155:8453`) is the `network` / `allowedNetworks` value, the address after `erc20:` is `assetAddress` (transactions, asset prices), and filters need the ticker symbol from `/v2/assets` (`allowedAssets=USDC`). |
+| `allowedAssets` / `disallowedAssets` | Ticker symbols | Symbols, case-insensitive (`usdc` works). An asset **address** is not accepted: it is echoed in `errors.unsupportedAssets`. |
+| `allowedProtocols` / `disallowedProtocols` | `/v2/protocols` | A protocol `name` (`morpho`) or a `protocolId` (`morpho-v2`). Some IDs contain spaces (`aave-collateral vault-v3`) and must be URL-encoded. |
+| `curators` | `name` from `/v2/curators` | Full organisation names, e.g. `Steakhouse Financial`; a partial name such as `Steakhouse` matches nothing. Unknown names return an empty result with **no** `errors` echo, so resolve user input against `/v2/curators` first (case-insensitive substring match on `name`/`displayName`, then send the exact `name`). |
+| `tags` | `/v2/tags` | Exact tag names from `/v2/tags` (`Liquid Staking`, `RWA`). Matching is case-insensitive (observed 2026-10-23: `liquid staking` returns the same vaults as `Liquid Staking`), but abbreviations do not match: `tags=lst` returns 200 with empty `data`. |
+| `marketId`, `assetId` (beta borrow) | `data[].marketId` and `assetsData[].marketAssetId` from `/beta/borrow/markets/` | `marketId` looks like `<rootAddress>-<marketHash>`. |
+
+Path order is fixed: **user, then network, then vault**. For example `/v2/transactions/context/{userAddress}/{network}/{vaultId}` and `/v2/portfolio/positions/{userAddress}/{network}/{vaultId}`. Putting the network first returns 400.
+
+## Array query parameters: repeat the key
+
+Every array parameter (`allowedNetworks`, `allowedAssets`, `allowedProtocols`, `tags`, `curators`, `claimIds` and the `disallowed*` variants) must be sent as a **repeated key**:
+
+```text
+✅ allowedNetworks=base&allowedNetworks=arbitrum
+❌ allowedNetworks=base,arbitrum
+❌ allowedNetworks[]=base&allowedNetworks[]=arbitrum
+```
+
+Neither wrong form fails loudly:
+
+- The **comma** form returns 200 with zero results, and the whole string is treated as one unknown network.
+- The **bracket** form (`allowedNetworks[]=`) is ignored like any unknown parameter name. You get the default 4-network scope; `allowedNetworks[]=base&allowedNetworks[]=arbitrum` returned Lido stETH on `mainnet` first.
+
+Real response from `GET /v2/detailed-vaults?allowedNetworks=base,arbitrum&perPage=1` (complete):
+
+```json
+{"itemsOnPage":0,"data":[],"errors":{"unsupportedNetworks":["base,arbitrum"],"unsupportedAssets":[],"unsupportedProtocols":[]}}
+```
+
+How common clients serialize lists:
+
+- Python `requests`: `params={"allowedNetworks": ["base", "arbitrum"]}` sends repeated keys.
+- JavaScript `URLSearchParams`: call `append` once per value. `new URLSearchParams({allowedNetworks: ["base","arbitrum"]})` produces the **comma** form.
+- `axios`: set `paramsSerializer: { indexes: null }`. The default adds `[]` to the key, which the API silently ignores.
+- curl: write the key twice.
+
+## Booleans and enums
+
+- Booleans are the literal strings `true` and `false`. `yes`, `1` or `True` return 400.
+- Enums are case-sensitive: `sortOrder=DESC` returns 400; use `desc`.
+- Unknown **query parameter names** are ignored silently. `network=base` on `/v2/detailed-vaults` is not a filter (that endpoint uses `allowedNetworks`), so you get the unfiltered default list.
+- `minTvl` is an integer in USD. `minTvl=1000.5` returns 400.
+
+## Pagination
+
+| Item | Behavior |
+| - | - |
+| Request params | `page` (0-based, default `0`) and `perPage` (default 50 on most endpoints) |
+| `perPage` maximum | 5000 on `/v2/vaults`, `/v2/assets`, `/v2/detailed-vaults`, `/beta/svm/*` lists, `/beta/fixed-term/`, `/beta/amm/deep/detailed-vaults`, `/beta/advanced-analytics`; 20000 on `/v2/historical/*`, `/v2/historical-benchmarks/*`, `/beta/borrow/markets/historical/*`; 1000 on `/beta/borrow/markets/*` lists, borrow events and SVM events, and `/alpha/{network}/{vaultId}/holders` (default 100); 366 on alpha daily flows (default 100) |
+| `perPage` minimum | 1. `perPage=0` returns 400 "Number must be greater than 0", although the spec says minimum 0. |
+| Response envelope | `{ "itemsOnPage": n, "nextPage"?: n+1, "data": [...], "errors"?: {...} }` |
+| Last page | `nextPage` is **omitted**, never `null`. The server omits it even when the last page is exactly full. |
+| Total count | None. Page until `nextPage` is absent. |
+| Past the end | 200 with `itemsOnPage: 0`, `data: []` |
+| Ordering | Stable across pages for the same query. Historical series are oldest first. |
+| Not paginated | `/v2/portfolio/*` returns `{ "data": [...], "errors": {...} }`. `/v2/portfolio/events/...` returns `{ asset, lpToken, data, items }`, where `items` is the total count. |
+
+Safe loop in Python. It collects every page and fails loudly on unsupported filter values:
+
+```python
+import os, time, requests
+
+def fetch_all(path, params, per_page=1000):
+    """Collect every item of a paginated vaults.fyi list endpoint."""
+    items, page = [], 0
+    while True:
+        r = requests.get(
+            f"https://api.vaults.fyi{path}",
+            headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+            params={**params, "page": page, "perPage": per_page},
+            timeout=60,
+        )
+        r.raise_for_status()
+        body = r.json()
+        errors = {k: v for k, v in (body.get("errors") or {}).items() if v}
+        if errors:  # unknown filter values come back as 200 + errors, not 400
+            raise ValueError(f"unsupported filter values: {errors}")
+        items.extend(body["data"])
+        if "nextPage" not in body:  # omitted (never null) on the last page
+            return items
+        page = body["nextPage"]
+        time.sleep(0.2)  # stay well under the rate limit
+
+# requests sends a list as repeated keys: allowedNetworks=base&allowedNetworks=arbitrum
+vaults = fetch_all("/v2/detailed-vaults", {
+    "allowedNetworks": ["base", "arbitrum"],
+    "allowedAssets": ["USDC"],
+    "sortBy": "tvl",
+    "sortOrder": "desc",
+})
+print(len(vaults))
+```
+
+The same loop in TypeScript:
+
+```typescript
+async function fetchAll(path: string, params: Record<string, string | number | (string | number)[]>, perPage = 1000) {
+  const items: any[] = [];
+  let page = 0;
+  while (true) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      for (const one of ([] as (string | number)[]).concat(v)) qs.append(k, String(one)); // repeat the key
+    }
+    qs.set("page", String(page));
+    qs.set("perPage", String(perPage));
+    const res = await fetch(`https://api.vaults.fyi${path}?${qs}`, {
+      headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! },
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const body = await res.json();
+    const errors = Object.entries(body.errors ?? {}).filter(([, v]) => (v as unknown[]).length);
+    if (errors.length) throw new Error(`unsupported filter values: ${JSON.stringify(errors)}`);
+    items.push(...body.data);
+    if (body.nextPage === undefined) return items; // omitted (never null) on the last page
+    page = body.nextPage;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+const vaults = await fetchAll("/v2/detailed-vaults", {
+  allowedNetworks: ["base", "arbitrum"],
+  allowedAssets: ["USDC"],
+  sortBy: "tvl",
+  sortOrder: "desc",
+});
+console.log(vaults.length);
+```
+
+Both loops were run against the live API on 2026-10-23, with `perPage=2` and `minTvl=100000000` to force several small pages. Do not write `while body["nextPage"] is not None` or `while (body.nextPage !== null)`: the first raises `KeyError` and the second loops forever on `page=undefined`.
+
+Large pages are heavy. A `/v2/detailed-vaults` page with `perPage=200` is about 680 KB, and each returned vault costs 3 credits. Request only what you need.
+
+## Soft errors: the `errors` object
+
+List endpoints with filters return HTTP 200 even when a filter value is unknown. The bad value is echoed in `errors`:
+
+| Key | Endpoints |
+| - | - |
+| `errors.unsupportedNetworks`, `errors.unsupportedAssets`, `errors.unsupportedProtocols` | `/v2/detailed-vaults`, `/v2/portfolio/*`, `/beta/advanced-analytics`, and other vault lists with these filters |
+| `errors.unsupportedCollateralAssets`, `errors.unsupportedBorrowAssets` | `/beta/borrow/markets/` lists |
+
+Example: `allowedNetworks=ethereum` returns `{"itemsOnPage":0,"data":[],"errors":{"unsupportedNetworks":["ethereum"],...}}`.
+
+Rule: if `data` is empty, check `errors` before you conclude that nothing matches. Unknown `curators` and unknown parameter names are not echoed at all. For a checklist of other silent-empty causes, see [Errors → Debugging empty results](/api-reference/errors#debugging-empty-results).
+
+## Defaults per endpoint
+
+Defaults hide data. Values come from the OpenAPI specs and were confirmed live where noted. "4 networks" means base, mainnet, arbitrum, optimism.
+
+| Endpoint | `allowedNetworks` | `minTvl` (USD) | Sort default | `allowVaultsWithWarnings` | `onlyAppFeatured` | Other defaults |
+| - | - | - | - | - | - | - |
+| `GET /v2/vaults` | all networks (single `network` filter) | none | none | n/a | not applied | `allowCorrupted=false` |
+| `GET /v2/assets` | all networks | none | none | n/a | n/a | — |
+| `GET /v2/detailed-vaults` | 4 networks (live) | 100000 (live) | `sortOrder=asc` (live); no `sortBy`, so order is unspecified | `true` | not applied | `allowCorrupted=false` |
+| `GET /v2/portfolio/positions/{userAddress}` | 4 networks (live) | 100000 | `sortOrder=asc` | `true` | not applied | `apyInterval=7day`, `minUsdAssetValueThreshold=1`, `allowCorrupted=false` |
+| `GET /v2/portfolio/best-vault/{userAddress}` | 4 networks | 100000 | by APY | **`false`** | **`true`** | `apyInterval=7day`, `minUsdAssetValueThreshold=1` |
+| `GET /v2/portfolio/best-deposit-options/{userAddress}` | 4 networks | 100000 | by APY | **`false`** | **`true`** | `apyInterval=7day`, `minUsdAssetValueThreshold=1`, `maxVaultsPerAsset=3` |
+| `GET /v2/portfolio/idle-assets/{userAddress}` | 4 networks | n/a | `sortDirection=asc` (not `sortOrder`) | n/a | n/a | `minUsdAssetValueThreshold=0.5` |
+| `GET /v2/historical/...` | path | n/a | oldest first | n/a | n/a | `fromTimestamp=0`, `granularity=1hour`, `apyInterval=7day` |
+| `GET /v2/historical-benchmarks/{network}` | path | n/a | oldest first | n/a | n/a | `fromTimestamp=0`; `code` required |
+| `GET /beta/fixed-term/` | 4 networks | 100000 | **`sortBy=tvl`, `sortOrder=desc`** | n/a | n/a | — |
+| `GET /beta/svm/detailed-vaults` | n/a (Solana) | 100000 | `sortOrder=asc` | n/a | n/a | — |
+| `POST /beta/advanced-analytics` | 4 networks | 100000 | `sortOrder=asc` | `true` | not applied | `allowCorrupted=false` |
+| `GET /beta/borrow/markets/` | all networks | none | — | n/a | n/a | `perPage` ≤ 1000 |
+| `GET /beta/borrow/portfolio/positions/{userAddress}` | all networks | n/a | `sortOrder=asc` | n/a | n/a | `minUsdAssetValueThreshold=1` |
+| `GET /alpha/historical-balances/{userAddress}/{timestamp}` | 4 networks | 100000 | `sortOrder=asc` | `true` | not applied | `apyInterval=7day`, `minUsdAssetValueThreshold=1` |
+
+Consequences:
+
+- **Ranking:** without `sortBy`, list order is unspecified (not ranked), so always pass `sortBy` and `sortOrder`. Without `sortOrder=desc`, `sortBy=apy7day` returns the *lowest* APY first.
+- **Small vaults:** pass `minTvl=0` to include vaults under $100k. On portfolio positions, the default `minTvl=100000` also hides a wallet's positions in small vaults.
+- **Warnings:** `/v2/detailed-vaults` includes vaults with active warnings by default (for example, vaults flagged for bad debt or compromised keys). Pass `allowVaultsWithWarnings=false`, or inspect `warnings` and `flags`, before you recommend a vault.
+- **Best-vault endpoints differ:** they default to app-featured vaults without warnings (`onlyAppFeatured=true`, `allowVaultsWithWarnings=false`) but do not filter on `isTransactional`, so they can return a vault with `isTransactional: false`; pass `onlyTransactional=true` if you will build a deposit. `best-vault` picks, per asset you hold, the vault with the highest total APY for `apyInterval` (default `7day`), then returns the asset/vault pair with the highest projected annual earnings.
+- In the spec, the `allowVaultsWithWarnings` and `onlyAppFeatured` defaults on the best-vault endpoints are typed as the strings `'false'` and `'true'`. Send the literal strings `true` or `false`.
+
+## Nullable and optional fields
+
+- Across all 2xx responses captured on 2026-10-23, no field documented as non-nullable came back `null`.
+- Most absent values are **omitted**, not `null`. Check that a key exists before reading it. Examples: `nextPage`, `tx.value` on ERC-20 transaction steps, `curator`, `apyComposite` (nested vaults only), `remainingCapacity`, beta SVM `lpToken`.
+- Fields declared nullable in the spec: the benchmark `apy` object, and beta advanced-analytics `utilizationRate` and `withdrawalPauseRatio` (`withdrawalPauseRatio: null` was seen live).
+- Some arrays can be empty: `rewards: []`, `warnings: []`, `penaltyComponents: []`.
+- Strings can be empty: `protocol.product` and `protocol.version` are `""` for some protocols, and some beta SVM assets have an empty `name` or `symbol`.
+
+## Positions: wallet balance vs position size
+
+In `/v2/portfolio/positions/{userAddress}` and `/v2/portfolio/positions/{userAddress}/{network}/{vaultId}`:
+
+| Field | Meaning |
+| - | - |
+| `asset.balanceNative`, `asset.balanceUsd` | The wallet's **idle balance of the underlying asset**, not the position. The same value repeats on every position that shares the asset. |
+| `asset.positionValueInAsset` | Position size in the underlying asset's base units. |
+| `lpToken.balanceNative`, `lpToken.balanceUsd` | Vault shares held (LP-token base units) and their USD value. |
+| `asset.unclaimedNative`, `asset.unclaimedUsd` | Pending or claimable amounts, separate from the position. |
+
+Real data for vitalik.eth (`0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`, trimmed): the same `balanceNative` appears on four ETH positions, while each position's size differs:
+
+| Vault | `asset.balanceNative` | `asset.balanceUsd` | `asset.positionValueInAsset` | `lpToken.balanceUsd` |
+| - | - | - | - | - |
+| Lido stETH | `5773252986299759339` | `13850.55495425` | `10424842274072` | `0.0250101374648113525898504` |
+| ether.fi eETH | `5773252986299759339` | `13850.55495425` | `0` | `0` |
+| rsETH | `5773252986299759339` | `13850.55495425` | `32476954343655` | `0.0779151445382917279043085` |
+| Origin Ether (OETH) | `5773252986299759339` | `13850.55495425` | `2` | `0.0000000000000047981805014` |
+
+Summing `asset.balanceUsd` would report about $55,400 of positions. The real position value is a few cents. To total a portfolio, sum `lpToken.balanceUsd`, or convert `positionValueInAsset` with `asset.decimals` and `asset.assetPriceInUsd`.
+
+Beta SVM positions (`/beta/svm/portfolio/positions/{userAddress}`) are different: there `asset.balanceNative` **is** the position value, and `positionValueInAsset`, when present, equals it. See [Beta](/api-reference/beta).
+
+## Related pages
+
+- [API overview](/api-reference/overview): base URL, auth and the first request.
+- [Errors and rate limits](/api-reference/errors): status codes, body shapes and retry policy.
+- [Versioning and stability](/api-reference/versioning): what v2, beta and alpha promise.
+- [Glossary](/resources/glossary): terms and their field names.

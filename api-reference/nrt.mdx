@@ -1,22 +1,60 @@
 ---
-title: "Near Real-Time"
-description: "Sub-second vault metrics: share price, total assets, total supply, and underlying asset price."
+title: "Near real-time (NRT): live vault share price, assets and supply"
+sidebarTitle: "Near Real-Time"
+description: "Index of the v2 NRT endpoints that read a vault's share price, total assets, total supply and underlying price live from chain, with units per field and links to every endpoint page."
 ---
 
-Near real-time vault metrics sourced directly from onchain state — updated far more frequently than the standard indexed data. Use these endpoints when your product needs the most current share price or TVL figures, such as deposit previews, live dashboards, or liquidation monitoring.
+This section lists the v2 near-real-time (NRT) endpoints. They read vault state from chain instead of from the hourly index. Use them when you need the current share price or totals, for example for deposit previews or live dashboards.
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Fetch all current vault metrics in one response | [`GET /v2/nrt/vault/{network}/{vaultId}`](/api-reference/nrt/get-vault-nrt-data) | Path: `network`, `vaultId` |
-| Fetch the current share price | [`GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`](/api-reference/nrt/get-vault-nrt-share-price) | Path: `network`, `vaultId` |
-| Fetch the current total supply | [`GET /v2/nrt/vault/{network}/{vaultId}/totalSupply`](/api-reference/nrt/get-vault-nrt-total-supply) | Path: `network`, `vaultId` |
-| Fetch the current total assets | [`GET /v2/nrt/vault/{network}/{vaultId}/totalAssets`](/api-reference/nrt/get-vault-nrt-total-assets) | Path: `network`, `vaultId` |
-| Fetch the current underlying asset price | [`GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice`](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | Path: `network`, `vaultId` |
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. NRT endpoints need an API key; they are not offered over x402.
 
-## Related Beta endpoints
+## Endpoints
 
-Borrow market live data is currently exposed through the Beta borrow market surface.
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/nrt/vault/{network}/{vaultId}`](/api-reference/nrt/get-vault-nrt-data) | Read share price, total assets, total supply and underlying price in one call, live from chain (e.g. deposit previews). | Path: `network`, `vaultId` | 1 |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`](/api-reference/nrt/get-vault-nrt-share-price) | Read only the live `sharePrice` (underlying assets per one whole share, a number). | Path: `network`, `vaultId` | 1 |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/totalSupply`](/api-reference/nrt/get-vault-nrt-total-supply) | Read only the live `totalSupply` of vault shares (integer string in LP-token base units, usually 18 decimals). | Path: `network`, `vaultId` | 1 |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/totalAssets`](/api-reference/nrt/get-vault-nrt-total-assets) | Read only the live `totalAssets` held by the vault (integer string in underlying-asset base units). | Path: `network`, `vaultId` | 1 |
+| [`GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice`](/api-reference/nrt/get-vault-nrt-underlying-asset-price) | Read only the live USD price of one whole underlying token (a number, unlike `assetPriceInUsd` strings elsewhere). | Path: `network`, `vaultId` | 1 |
 
-| Capability | How to call | Status |
-|------------|-------------|--------|
-| Fetch near-real-time borrow market asset data | [`GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
+Each NRT call costs 1 credit and needs an API key; NRT is not available over [x402](/ai-agents/x402). Requests that don't return 200 are not charged.
+
+## Units
+
+| Field | Type | Unit |
+| - | - | - |
+| `sharePrice` | number | Underlying assets per one whole share (e.g. `1.0139`) |
+| `totalSupply` | integer string | Vault shares in **LP-token** base units (usually 18 decimals), not asset units |
+| `totalAssets` | integer string | Underlying asset in its base units (USDC: 6 decimals) |
+| `underlyingAssetPrice` | number | USD per one whole underlying token. Elsewhere, prices are strings (`assetPriceInUsd`). |
+
+## Example
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/nrt/vault/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{
+  "totalSupply": "461739224418397752974334633",
+  "totalAssets": "468178256927439",
+  "sharePrice": 1.013945135111877,
+  "underlyingAssetPrice": 0.99985668
+}
+```
+
+`totalAssets` / 10^6 = 468,178,256.93 USDC. `totalSupply` / 10^18 = 461,739,224.42 shares. Their ratio matches `sharePrice`.
+
+Values are read from the chain's latest block when you call the endpoint, with no response cache, so they are typically at most a block or a second old. `sharePrice` is the amount of underlying asset per one whole share, adjusted for decimals. `totalSupply` is in share-token base units: use the share token's decimals, not the asset's. NRT returns no APY.
+
+## Related beta endpoints
+
+| Endpoint | Use it when | Status | Credits |
+| - | - | - | - |
+| [`GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-asset-nrt-data) | Live rates and liquidity for one asset in a market. `assetId` = `assetsData[].marketAssetId`. | Beta | 1 |
+
+Related: [Historical](/api-reference/historical) (indexed time series), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

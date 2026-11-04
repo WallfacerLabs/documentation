@@ -1,0 +1,117 @@
+---
+title: "Recipe: TVL attribution suffix for calldata you build yourself"
+sidebarTitle: "TVL attribution suffix"
+description: "Executed recipe: get the attribution suffix from GET /v2/transactions/suffix/:userAddress/:vaultId (hex without 0x) and append it to self-encoded calldata; Transactions API payloads already include it."
+---
+
+This recipe answers "I build vault transactions myself; how do I get the deposits attributed to my app?" It fetches the attribution suffix and appends it to calldata you encode yourself. If you use the Transactions API payloads, **do nothing**: they already include it. Use it in apps with their own transaction builder.
+
+Requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. All code on this page was run on 2026-10-23; outputs are real. Nothing was signed.
+
+## Benchmark tasks covered
+
+T20 (TVL attribution with your own transaction builder). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY` (attribution is tied to the key's account).
+- curl, Python 3.9+ with `requests`, or Node.js 18+ with `viem`.
+
+## Credit cost
+
+The suffix endpoint costs **1 credit** ([credits](/plans/credits)); earlier docs called it free. It needs an API key with attribution enabled (otherwise 400, not charged). The suffix is deterministic for your API key, the user and the vault, so cache it.
+
+## The endpoint
+
+`GET /v2/transactions/suffix/{userAddress}/{vaultId}` returns `{ "suffix": "<hex>" }`. The hex has **no `0x` prefix**. There is **no network segment** in this path.
+
+## curl
+
+```bash
+# Attribution suffix for calldata you build yourself (Transactions API payloads already include it).
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/transactions/suffix/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
+```
+
+Output (2026-10-23):
+
+```json
+{"suffix":"232c5f404de80be3c7ef2001de2d09ce535a2a0fffc69deb"}
+```
+
+## Python
+
+```python
+"""Append the vaults.fyi attribution suffix to calldata you encode yourself."""
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"
+
+r = requests.get(f"{API}/v2/transactions/suffix/{USER}/{VAULT_ID}", headers=HEADERS, timeout=30)
+r.raise_for_status()
+suffix = r.json()["suffix"]  # hex string WITHOUT 0x
+
+# ERC-4626 deposit(uint256 assets, address receiver) for 25 USDC, encoded by hand.
+calldata = "0x6e553f65" + f"{25_000_000:064x}" + USER[2:].lower().rjust(64, "0")
+tx_data = calldata + suffix  # concatenate; do not add another 0x
+print("suffix", suffix, f"({len(suffix) // 2} bytes)")
+print("data ends with suffix:", tx_data.endswith(suffix), "| total bytes:", (len(tx_data) - 2) // 2)
+```
+
+Output:
+
+```text
+suffix 232c5f404de80be3c7ef2001de2d09ce535a2a0fffc69deb (24 bytes)
+data ends with suffix: True | total bytes: 92
+```
+
+## TypeScript (viem)
+
+```typescript
+// Append the vaults.fyi attribution suffix to calldata you encode yourself.
+import { encodeFunctionData, erc4626Abi, type Hex } from 'viem';
+
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // no network segment in this path
+
+const res = await fetch(`${API}/v2/transactions/suffix/${USER}/${VAULT_ID}`, { headers });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const { suffix } = (await res.json()) as { suffix: string }; // hex WITHOUT 0x
+
+const calldata = encodeFunctionData({ abi: erc4626Abi, functionName: 'deposit', args: [25_000_000n, USER] });
+const withSuffix = (calldata + suffix) as Hex; // plain concatenation: never insert a second 0x
+console.log('suffix', suffix, `(${suffix.length / 2} bytes, starts with 0x? ${suffix.startsWith('0x')})`);
+console.log('calldata', calldata.length, 'chars ->', withSuffix.length, 'chars; ends with suffix:', withSuffix.endsWith(suffix));
+```
+
+Output:
+
+```text
+suffix 232c5f404de80be3c7ef2001de2d09ce535a2a0fffc69deb (24 bytes, starts with 0x? false)
+calldata 138 chars -> 186 chars; ends with suffix: true
+```
+
+The suffix adds 24 bytes after the ABI-encoded arguments; contracts ignore trailing calldata, and vaults.fyi reads it to attribute the deposit.
+
+## Pitfalls
+
+- **Adding `0x` again.** Concatenate the raw hex.
+- **Appending to Transactions API payloads.** They already carry it; a double suffix is wasted gas and may break attribution.
+- **Adding a network segment.** The path is `/suffix/{userAddress}/{vaultId}` only.
+- **Using it with smart-wallet batching.** Keep the suffix on the inner vault call (pass each vault call's `data` through unchanged) and generate it for the address the vault sees as the depositor: for a smart wallet, the smart-account address, not the signer.
+
+## Related pages
+
+- [TVL attribution](/concepts/tvl-attribution).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
+- [Build a deposit](/recipes/deposit-transaction).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
