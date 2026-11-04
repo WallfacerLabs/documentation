@@ -1,29 +1,81 @@
 ---
-title: "Detailed Vaults"
-description: "Comprehensive vault data including APY, TVL, the Reputation Score, fees, holder data, and protocol details."
+title: "Detailed vaults: rank, filter and inspect vaults"
+sidebarTitle: "Detailed Vaults"
+description: "Index of the v2 detailed-vault endpoints: rank and filter vaults by APY, TVL and Reputation Score (1 + 3 credits per vault), or fetch one vault, its APY or its TVL, with links to every endpoint page."
 ---
 
-Full vault objects with performance metrics, the Reputation Score, fee structures, holder data, and protocol info. Use these endpoints to build vault comparison views, detail pages, or yield aggregators.
+This section lists the v2 endpoints that return full vault analytics: APY windows, TVL, Reputation Score, fees, rewards, holders, warnings and flags. Use `/v2/detailed-vaults` to rank and filter many vaults, and the single-vault endpoints when you already know `network` and `vaultId`.
 
-APY fields in detailed-vault responses are net of performance and management fees. Use the `fees` object to display the fee breakdown alongside yield; do not subtract it from APY again. See [How Vaults.fyi Calculates APY](/methodology/calculating-apy) for the full methodology.
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key. APY values are decimal fractions net of fees (`0.0315` = 3.15%); token amounts are integer strings in base units; timestamps are Unix seconds. See [Conventions](/api-reference/conventions).
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List and filter vaults with full analytics | [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | None. Optional query filters include `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `minTvl`, `maxApy`, `onlyTransactional`, `onlyAppFeatured`, `page`, `perPage`, `sortBy`, and `sortOrder`. Protocol filters accept either a broad protocol name or a full [protocol ID](/concepts/supported-protocols#protocol-names-and-ids) |
-| Get one vault's full detail object | [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details) | Path: `network`, `vaultId` |
-| Get one vault's APY breakdown | [`GET /v2/detailed-vaults/{network}/{vaultId}/apy`](/api-reference/detailed-vaults/get-vault-apy) | Path: `network`, `vaultId` |
-| Get one vault's TVL data | [`GET /v2/detailed-vaults/{network}/{vaultId}/tvl`](/api-reference/detailed-vaults/get-vault-tvl) | Path: `network`, `vaultId` |
+## Endpoints
 
-## Related Alpha and Beta endpoints
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/detailed-vaults`](/api-reference/detailed-vaults/list-detailed-vaults) | Rank and filter vaults with APY, TVL, Reputation Score, fees and warnings. Defaults: 4 networks, `minTvl=100000`, `sortOrder=asc`. | None | 1 + 3 per vault returned |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}`](/api-reference/detailed-vaults/get-vault-details) | Get the full detail object for one known vault. A vault that doesn't exist returns 400 "… not found". | Path: `network`, `vaultId` | 3 |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}/apy`](/api-reference/detailed-vaults/get-vault-apy) | Cheapest way to read one vault's current APY (`1day`, `7day`, `30day`, `90day`; no `1hour`). | Path: `network`, `vaultId` | 1 |
+| [`GET /v2/detailed-vaults/{network}/{vaultId}/tvl`](/api-reference/detailed-vaults/get-vault-tvl) | Read one vault's current TVL (`usd` string, `native` base units). | Path: `network`, `vaultId` | 1 |
 
-Use these endpoints when you need newer vault-like data surfaces that are still in Alpha or Beta.
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit. A `/v2/detailed-vaults` page with `perPage=50` costs up to 151 credits, so request only as many vaults as you need.
 
-| Capability | How to call | Status |
-|------------|-------------|--------|
-| List Solana/SVM detailed vaults | [`GET /beta/svm/detailed-vaults`](/api-reference/beta#solana-vaults) | Beta |
-| Fetch one Solana/SVM detailed vault | [`GET /beta/svm/detailed-vaults/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| Fetch fixed-term detailed vault data | [`GET /beta/fixed-term/detailed/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
-| List Deep detailed vaults | [`GET /beta/amm/deep/detailed-vaults`](/api-reference/beta#the-deep) | Beta |
-| List borrow markets and market metadata | [`GET /beta/borrow/markets/`](/api-reference/beta#borrow-markets) | Beta |
-| Fetch advanced analytics for one vault | [`POST /beta/advanced-analytics/{network}/{vaultId}`](/api-reference/beta#advanced-analytics) | Beta |
-| List vault holders and LP-token balances | [`GET /alpha/{network}/{vaultId}/holders`](/api-reference/alpha#holders) | Alpha |
+## Defaults that hide vaults
+
+`GET /v2/detailed-vaults` applies these defaults when you omit the parameter:
+
+| Parameter | Default | Effect |
+| - | - | - |
+| `allowedNetworks` | `base`, `mainnet`, `arbitrum`, `optimism` | Vaults on the other 18 networks are excluded. Repeat the key for each network you need. |
+| `minTvl` | `100000` (USD, integer) | Vaults under $100k TVL are excluded. Pass `minTvl=0` to include them. |
+| `sortOrder` | `asc` | With `sortBy=apy7day` the lowest APY comes first. Send `sortOrder=desc` to rank. |
+| `allowVaultsWithWarnings` | `true` | Vaults with active warnings are included. Pass `false`, or inspect `warnings` and `flags`. |
+| `allowCorrupted` | `false` | Vaults with corrupted data are excluded. |
+| `perPage` | `50` (max 5000) | `nextPage` is omitted on the last page. |
+
+Other rules:
+
+- `sortBy` accepts `tvl`, `apy1day`, `apy7day`, `apy30day`, `apy90day`. `sortBy=apy` returns 400.
+- Array filters (`allowedNetworks`, `allowedAssets`, `allowedProtocols`, `tags`, `curators`) must be repeated keys. `allowedNetworks=base,arbitrum` returns 0 results.
+- `allowedAssets` takes ticker symbols (case-insensitive), not addresses.
+- Unknown filter values return 200 with empty `data` and the value in `errors.unsupportedNetworks`, `unsupportedAssets` or `unsupportedProtocols`.
+- `minVaultScore`: check `score.vaultScore` client-side if you need a strict threshold.
+
+## APY in detailed-vault responses
+
+- `apy` has five windows on list and detail responses: `1hour`, `1day`, `7day`, `30day`, `90day`. The `/apy` sub-resource has four (no `1hour`).
+- Each window is `{base, reward, total}`, with `total = base + reward`, as a decimal fraction **net of fees**. The `fees` object is for display; don't subtract it again. See [How vaults.fyi calculates APY](/methodology/calculating-apy).
+- Values are not clamped. Rows with 7-day APY above 1,500 (150,000%) exist. Treat APY above 1 (100%) as suspect.
+
+## Example
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/apy"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{
+  "1day":  { "base": 0.0316, "reward": 0, "total": 0.0316 },
+  "7day":  { "base": 0.0315, "reward": 0, "total": 0.0315 },
+  "30day": { "base": 0.0305, "reward": 0, "total": 0.0305 },
+  "90day": { "base": 0.0293, "reward": 0, "total": 0.0293 }
+}
+```
+
+A full ranked-list example with its real response is on the [API overview](/api-reference/overview#your-first-request).
+
+## Related beta and alpha endpoints
+
+| Endpoint | Use it when | Status | Credits |
+| - | - | - | - |
+| [`GET /beta/svm/detailed-vaults`](/api-reference/svm/list-svm-detailed-vaults) | Rank and filter Solana vaults with APY and TVL. Default `minTvl=100000`, `sortOrder=asc`. | Beta | 1 + 3 per vault returned |
+| [`GET /beta/svm/detailed-vaults/{vaultAddress}`](/api-reference/svm/get-svm-detailed-vault) | Full detail for one Solana vault. | Beta | 3 |
+| [`GET /beta/fixed-term/detailed/{network}/{vaultId}`](/api-reference/fixed-term-pendle/get-fixed-term-market) | One fixed-term market (`fixedApy` decimal fraction, `expiry` Unix seconds). Not found returns 404. | Beta | 3 |
+| [`GET /beta/amm/deep/detailed-vaults`](/api-reference/the-deep/list-deep-detailed-vaults) | List Deep AMM vaults. `apy` is flat `{7day, 30day}`; `tvlInUsd` is a number. Latency around 10 s. | Beta | 1 + 3 per vault returned |
+| [`GET /beta/borrow/markets/`](/api-reference/borrow-markets/list-borrow-markets) | List borrow markets on all networks (no default network scope; `perPage` ≤ 1000). | Beta | 6 per call (flat) |
+| [`POST /beta/advanced-analytics/{network}/{vaultId}`](/api-reference/advanced-analytics/get-advanced-vault-analytics) | The same analytics for one vault. | Beta | 1 + sum of selected fields |
+| [`GET /alpha/{network}/{vaultId}/holders`](/api-reference/holders/list-vault-holders) | Holders of one vault and their LP-token balances (`perPage` ≤ 1000, default 100). | Alpha | 0 (free during early access) |
+
+Related: [Conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Reputation Score](/methodology/reputation-score).

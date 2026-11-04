@@ -1,0 +1,1536 @@
+# vaults.fyi docs: Use cases, case studies, brand kit, glossary, FAQ, changelog
+
+Part of https://docs.vaults.fyi/llms-full.txt (core). Same page format: each page starts with `# Title` and a `Source:` line.
+
+# Why use vaults.fyi
+Source: https://docs.vaults.fyi/why-vaultsfyi
+
+> Decide whether vaults.fyi fits your product: what it replaces, who uses it, which capabilities are GA (v2) vs Beta, and the cheapest first integration for each use case.
+
+This page helps you decide whether vaults.fyi fits your product and which part of the API to start with. It covers what vaults.fyi replaces, who it is for, which capabilities are generally available (v2) versus Beta, and a concrete first integration per use case. vaults.fyi is a REST API at `https://api.vaults.fyi` (key in the `x-api-key` header) that returns normalized data for 3,000+ DeFi yield vaults on 80+ protocols and 22 EVM networks, builds unsigned vault transactions, and reports wallet positions. Solana vaults are available on the Beta SVM endpoints.
+
+## What vaults.fyi replaces
+
+| Without vaults.fyi | With vaults.fyi |
+| - | - |
+| One adapter, transaction builder and data pipeline per protocol | One schema for every vault (`GET /v2/detailed-vaults`) and one transaction pattern (`context` → `{action}`) |
+| Protocol-reported or forward-looking APYs that are not comparable | Realized APY computed the same way for every vault from onchain share prices, net of fees, in five windows (`1hour`, `1day`, `7day`, `30day`, `90day`) |
+| A hand-maintained allowlist for risk screening | Reputation Score (`score.vaultScore`), `flags`, `warnings`, holder data and benchmarks to screen with |
+| No view after the user deposits | Positions, returns, events, idle tokens and reward claims per wallet (`/v2/portfolio/*`) |
+
+## Who uses it
+
+### Wallets, exchanges and consumer apps
+
+- Turn idle wallet balances into deposit suggestions (`GET /v2/portfolio/idle-assets/{userAddress}`, `GET /v2/portfolio/best-deposit-options/{userAddress}`).
+- Let users deposit, redeem and claim rewards without custody: the API returns unsigned calls that the user's wallet signs and sends directly to the protocol contract.
+- Show positions, returns and history after deposit.
+- Measure the TVL your app drives with the attribution suffix ([TVL attribution](/concepts/tvl-attribution)).
+
+Guide: [For wallets and apps](/use-cases/for-wallets-and-apps).
+
+### Analysts and data teams
+
+- Query APY, TVL, fees, rewards and metadata across the market without running an indexer.
+- Separate base yield from reward yield: `apy.<window>.base` and `apy.<window>.reward` for the windows `1hour`, `1day`, `7day`, `30day` and `90day` (the per-vault `/apy` endpoint returns `1day` to `90day` only).
+- Pull historical APY, TVL and share price (`GET /v2/historical/{network}/{vaultId}`).
+- Compare against USD and ETH benchmark rates (`GET /v2/benchmarks/{network}?code=usd`).
+
+Guide: [For analysts](/use-cases/for-analysts).
+
+### Protocols and curators
+
+- Get your vaults in front of the wallets and apps that integrate vaults.fyi (listing: see [FAQ](/resources/faq)).
+- See which partners route deposits into your vaults via the attribution portal.
+- Show performance against benchmarks.
+
+Guide: [For protocols](/use-cases/for-protocols).
+
+### AI agents
+
+- Discover and compare vaults with structured filters, then fetch transaction context and unsigned payloads for the user to approve.
+- Use the hosted MCP server (`Authorization: Bearer <key>`) or REST (`x-api-key`), or pay per request with x402 and no key.
+
+Guides: [AI agents overview](/ai-agents/overview), [Rules for agents](/ai-agents/rules-for-agents), [Transaction safety](/ai-agents/transaction-safety).
+
+## Capabilities and stability
+
+| Capability | What you get | Stability |
+| - | - | - |
+| Market data | APY, TVL, fees, rewards, capacity, assets, protocols, curators, networks, tags | v2 (GA) |
+| Risk context | `score` object (Reputation Score and components), `flags`, `warnings`, `holdersData`, benchmarks | v2 (GA) |
+| History | APY, TVL, share price, asset prices, historical benchmarks | v2 (GA) |
+| Near-real-time state | Share price, total assets, total supply, asset price read from chain | v2 (GA) |
+| Transactions | Unsigned `deposit`, `redeem`, `request-redeem`, `claim-redeem`, `request-deposit`, `claim-deposit`, `start-redeem-cooldown`, `claim-rewards` calls; no vaults.fyi wrapper contract | v2 (GA) |
+| Portfolio | Positions, idle assets, total returns, events, best vault, best deposit options | v2 (GA) |
+| Borrowing | Borrow markets, positions, `supply`/`withdraw`/`borrow`/`repay` payloads | Beta |
+| Solana vaults | SVM vault data, positions and transactions | Beta |
+| Advanced analytics | Max drawdown, withdrawal-pause ratio, composition, utilization | Beta |
+| Attribution | Calldata suffix plus reporting in portal.vaults.fyi | v2 endpoint + portal |
+| Agent access | Hosted MCP server, x402 pay-per-request | — |
+
+Beta endpoints work but may change before general availability. See [Versioning](/api-reference/versioning).
+
+### Partner fees
+
+Integrator fees are arranged with the vaults.fyi team: [contact the team](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus).
+
+## Start small: the first integration per use case
+
+| Goal | First calls | Credit cost (from [Credits](/plans/credits)) |
+| - | - | - |
+| Show a vault list | `GET /v2/detailed-vaults` | 1 + 3 per vault returned |
+| Show one vault | `GET /v2/detailed-vaults/{network}/{vaultId}` | 3 |
+| Build a deposit | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`, then `GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId}?assetAddress=<token>&amount=<base units>` | 3 + 5 |
+| Show a wallet's positions | `GET /v2/portfolio/positions/{userAddress}` | 5 |
+| Keyless agent access | Any paid endpoint without a key returns HTTP 402 with an x402 price; see [x402](/ai-agents/x402) | per request, priced in the 402 body |
+
+Every request needs `x-api-key` (except x402 and `GET /v2/health`). Results from detailed-vaults and portfolio endpoints default to four networks (`base`, `mainnet`, `arbitrum`, `optimism`) and `minTvl=100000`; pass `allowedNetworks` (repeat the key per value) and `minTvl=0` to widen. Full rules: [API conventions](/api-reference/conventions). A request without a key returns HTTP 402 (x402 challenge), not 401: [Errors](/api-reference/errors).
+
+## Teams using vaults.fyi
+
+[Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper Earn](/resources/case-studies/jumper-earn), [Kraken Wallet](/resources/case-studies/kraken-wallet), [Gauntlet](/resources/case-studies/gauntlet), [Maple Finance](/resources/case-studies/maple-finance) and [KPK](/resources/case-studies/kpk) use vaults.fyi for yield analytics, dashboards, transaction flows and portfolio views.
+
+Next: [Introduction](/introduction) (first request), [SDK quickstart](/sdk/quickstart), [Embeddable widget](/use-cases/embeddable-widget).
+
+
+# Embed Yield and Borrowing in Wallets and Consumer Apps
+Source: https://docs.vaults.fyi/use-cases/for-wallets-and-apps
+
+> Give users earn and borrow features with the data, risk context, transaction payloads, portfolio tracking, attribution, and fee logic your team needs.
+
+Vaults.fyi gives wallets, exchanges, neobanks, fintech apps, portfolio tools, and aggregators the building blocks for embedded earn and borrow experiences across 80+ protocols, 20+ EVM chains, and Solana/SVM vault coverage in Beta. Use normalized vault and market data as the foundation, then add transaction payloads, portfolio tracking, borrowing views, attribution, or fee logic as your product evolves.
+
+## Why it matters
+
+Consumer platforms already have the user relationship, asset context, and trust surface for earn and borrow features. The hard part is turning fragmented DeFi markets into product-safe options: which opportunities to show, how to explain them, how to route the user, and how to track what happens after capital moves.
+
+Vaults.fyi gives your team the components to do that without rebuilding the market stack. Start with ranked vaults, APY windows, TVL, protocol metadata, rewards, fees, capacity, and risk/return context. Then add the workflows that matter for your roadmap: non-custodial execution, portfolio tracking, TVL attribution, borrowing views, and monetization.
+
+Use Vaults.fyi to:
+
+* Match yield opportunities to the assets a user already holds.
+* Filter out vaults that do not meet your risk/return policy.
+* Compare APY, TVL, fees, rewards, capacity, curators, networks, and protocols with one schema.
+* Prepare non-custodial transactions for deposits, withdrawals, and reward claims when you want execution.
+* Show position balances, returns, and history when you want portfolio tracking.
+* Measure retained TVL when you want partner reporting, rebates, or commercial attribution.
+
+## What you can build
+
+- [Yield discovery](/concepts/vault-discovery.md): Surface ranked vault opportunities filtered by asset, network, APY, and reputation score. Users see exactly where their idle funds can earn.
+
+- [Embeddable widget](/use-cases/embeddable-widget.md): Launch a branded Earn surface with curated discovery, positions, and transaction-ready flows without designing the full UI from scratch.
+
+- [Data-only yield views](/api-reference/detailed-vaults.md): Build discovery screens, internal allowlists, comparison tables, or routing logic from normalized vault data without adding transactions.
+
+- [1-click deposits and withdrawals](/concepts/transaction-flows.md): Generate ready-to-sign deposit and redeem payloads for any supported vault. Transactions go directly from the user's wallet to the target protocol.
+
+- [Portfolio tracking](/concepts/portfolio-tracking.md): Show users their current positions, accrued returns, and PnL across all yield strategies they've entered through your app.
+
+- [Borrowing](/concepts/borrowing.md): Show borrow markets, supplied and borrowed positions, risk metrics, and supported supply, withdraw, borrow, and repay actions.
+
+- [TVL attribution](/concepts/tvl-attribution.md): Track the deposits, withdrawals, and retained TVL your app drives into each vault, protocol, curator, and network.
+
+- [Monetization](#monetize-yield-integrations): Attach flat or percentage-based fees to deposit and withdrawal transactions. Configure fee logic through the API without touching smart contracts.
+
+## How integration works
+
+Most teams start by fetching vault data. The later steps are optional modules you can add when your product needs execution, attribution, portfolio tracking, or borrowing.
+
+**1. Fetch vaults**
+
+Call `GET /v2/detailed-vaults` to retrieve a filtered, ranked list of vaults with APY, TVL, the Reputation Score, and protocol metadata. Apply filters for asset, network, or minimum reputation score to match your users' needs.
+
+**2. Optional: generate a transaction payload**
+
+Call the transactions endpoint with the vault address, user wallet, and deposit amount. The API returns a ready-to-sign payload with no intermediary contracts involved.
+
+**3. Optional: sign and submit**
+
+Pass the payload to the user's wallet for signing. Your app broadcasts the transaction. The user interacts directly with the target protocol.
+
+**4. Optional: track attributed TVL**
+
+Transactions generated through Vaults.fyi include TVL tracking automatically, so you can measure retained balances and vault-level flows in portal.vaults.fyi. If you build vault transactions yourself, append a free attribution suffix instead. Learn more in [TVL Attribution](/concepts/tvl-attribution.md).
+
+**5. Optional: track positions**
+
+Use the portfolio endpoints to display the user's current balance in each vault, yield earned since deposit, and estimated annual return.
+
+**6. Optional: add borrowing views**
+
+Use the Beta borrowing API to show supported borrow markets, supplied and borrowed positions, risk metrics, and available supply, withdraw, borrow, or repay actions.
+
+## Non-custodial by design
+
+All transaction payloads route funds directly from the user's wallet to the target protocol. Vaults.fyi never holds or controls user funds. This means:
+
+* No intermediary smart contracts inflating gas costs
+* Fewer attack surfaces compared to proxy or aggregator architectures
+* Full UX control stays with your app
+
+> [!NOTE]
+>
+> Both externally owned accounts (EOAs) and smart wallets are supported. For smart wallets, you can bundle fee transactions with the user's deposit in a single atomic operation.
+
+## Monetize yield integrations
+
+You can attach fees to any deposit or withdrawal routed through your app. The API supports multiple fee structures so you can design the model that fits your business.
+
+- [Flat fees](#monetize-yield-integrations): Charge a fixed amount per deposit or withdrawal, regardless of transaction size.
+
+- [Performance fees](#monetize-yield-integrations): Take a percentage of yield earned over time, aligning your revenue with user outcomes.
+
+Fee logic is implemented directly in the API payload. No custom smart contract development required. For bespoke fee modules, the Vaults.fyi team works with you to design and validate the implementation.
+
+> [!TIP]
+>
+> With EIP-7702, you can implement fee flows for traditional EOAs without requiring users to migrate to a smart wallet. This expands your monetization reach across all wallet types.
+
+## Who's already using this
+
+[Arbitrum Earn](/resources/case-studies/arbitrum.md) uses Vaults.fyi to bring native yield discovery and execution into the Arbitrum Portal. [Kraken Wallet](https://www.kraken.com/wallet) surfaces yield opportunities directly inside the wallet interface, while [Jumper Earn](https://jumper.exchange/) integrates the same API to power its cross-chain yield aggregation experience.
+
+> [!NOTE]
+>
+> [Sign up](https://portal.vaults.fyi/signup) to get API access. Pricing details are on the [Plans](/plans/overview.md) page.
+
+
+# vaults.fyi for analysts and researchers: normalized yield, TVL and benchmark data
+Source: https://docs.vaults.fyi/use-cases/for-analysts
+
+> How analysts use vaults.fyi: normalized APY (base, reward, total; five windows), TVL, Reputation Score and benchmark rates across 3,000+ vaults, with full-market pull guidance (all networks, minTvl=0, nextPage), daily history and credit budgets; tested Python and TypeScript examples.
+
+This page explains what data analysts, researchers and allocators can pull from vaults.fyi, which endpoints to use, how to avoid silently incomplete datasets, and what a pull costs. Use it to plan a dashboard, backtest or report; the linked recipes and tutorial contain tested code.
+
+All REST requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY` (not `Authorization: Bearer`, which is only for the MCP server). APY values are decimal fractions (`0.0315` = 3.15 %), net of fees. Timestamps are Unix seconds. The index refreshes about hourly.
+
+## What data is available
+
+| Data | Fields | Notes |
+| - | - | - |
+| APY | `apy.<window>.{base, reward, total}`, windows `1hour`, `1day`, `7day`, `30day`, `90day` | Realized share-price yield plus rewards; `apyComposite` on nested vaults ([calculating APY](/methodology/calculating-apy)) |
+| TVL | `tvl.usd` (integer-USD string), `tvl.native` (base units) | |
+| Reputation Score | `score.vaultScore` (0 to 100, unrounded; observed 27.5–99.1) and four components: protocol TVL history 45 %, vault TVL history 25 %, holder distribution 15 %, asset 15 % | [Reputation Score](/methodology/reputation-score) |
+| Benchmarks | USD and ETH benchmark per network: the TVL-weighted APY of the five largest vaults of that denomination | [Benchmark rates](/methodology/benchmark-rates) |
+| History | APY, TVL, share price per vault; asset prices; benchmarks | Oldest first; `granularity` `1hour` (default), `1day`, `1week` |
+| Holders | `holdersData` on detailed vaults; per-holder list on Alpha | [Alpha](/api-reference/alpha) |
+| Utilization, drawdown, composition | Beta advanced analytics | [Beta](/api-reference/beta) |
+
+## Key endpoints
+
+| Endpoint | Returns | Credits |
+| - | - | - |
+| `GET /v2/vaults` | Identity of every vault (all networks by default), no metrics | 1 per call |
+| `GET /v2/detailed-vaults` | Current APY, TVL, score, rewards, fees, warnings | 1 + 3 per vault |
+| `GET /v2/historical/{network}/{vaultId}/apy` (also `/tvl`, `/sharePrice`) | One series per vault | 1 + 1 per point |
+| `GET /v2/historical/{network}/{vaultId}` | APY, TVL and share price together | 3 + 3 per point |
+| `GET /v2/benchmarks/{network}?code=usd` | Current benchmark (`code` required: `usd` or `eth`) | 3 |
+| `GET /v2/historical-benchmarks/{network}?code=usd` | Benchmark history | 3 + 3 per point |
+| `GET /v2/portfolio/positions/{userAddress}` | One wallet's current vault positions | 5 |
+
+## Full-market pulls: avoid silent gaps
+
+`/v2/detailed-vaults` searches only base, mainnet, arbitrum and optimism and only vaults with TVL ≥ $100,000 unless told otherwise. For a full dataset:
+
+- pass every network as a repeated `allowedNetworks` key (take names from `/v2/vaults`, which lists all networks with vaults),
+- set `minTvl=0`,
+- page with `page=0,1,…` until `nextPage` is absent (there is no total count),
+- treat non-empty `errors.unsupported*` as a failed query.
+
+Budget: about 3 credits per vault, so all 3,662 vaults ≈ 11,000 credits per snapshot; cheaper: list identities with `/v2/vaults` (1 credit) and fetch detail for the subset you study. Respect `x-ratelimit-remaining` and `x-ratelimit-reset` ([errors](/api-reference/errors#429-rate-limit-exceeded)).
+
+## Fetch 90 days of daily APY
+
+Tested Python (REST), from the [vault history vs benchmark](/recipes/vault-history-vs-benchmark) recipe:
+
+```python
+"""90 days of daily APY for one vault, compared with the network's USD benchmark."""
+import os
+import time
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+NETWORK, VAULT_ID = "base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC
+
+to_ts = int(time.time()) // 86400 * 86400  # Unix SECONDS (milliseconds -> 400)
+from_ts = to_ts - 90 * 86400
+
+# 1) History. granularity defaults to 1hour and perPage to 50: set both or you get 50 hourly points.
+points, page = [], 0
+while True:
+    r = requests.get(
+        f"{API}/v2/historical/{NETWORK}/{VAULT_ID}/apy",
+        headers=HEADERS,
+        params={"granularity": "1day", "apyInterval": "7day", "fromTimestamp": from_ts,
+                "toTimestamp": to_ts, "perPage": 100, "page": page},
+        timeout=30,
+    )
+    r.raise_for_status()
+    body = r.json()
+    points += body["data"]  # oldest first
+    if "nextPage" not in body:
+        break
+    page = body["nextPage"]
+print(f"{len(points)} daily points, cost ~{1 + len(points)} credits (1 per call + 1 per point)")
+print("first", time.strftime("%Y-%m-%d", time.gmtime(points[0]["timestamp"])), f'{points[0]["apy"]["total"] * 100:.2f} %')
+print("last ", time.strftime("%Y-%m-%d", time.gmtime(points[-1]["timestamp"])), f'{points[-1]["apy"]["total"] * 100:.2f} %')
+
+# 2) Current vault APY and the benchmark, SAME window (7day). code is required: usd or eth.
+vault = requests.get(f"{API}/v2/detailed-vaults/{NETWORK}/{VAULT_ID}", headers=HEADERS, timeout=30).json()
+bench = requests.get(f"{API}/v2/benchmarks/{NETWORK}", headers=HEADERS, params={"code": "usd"}, timeout=30).json()
+v7, b7 = vault["apy"]["7day"]["total"], bench["apy"]["7day"]["total"]
+spread_bp = round((v7 - b7) * 10_000)  # decimal fractions -> basis points
+print(f"vault 7d {v7 * 100:.2f} % vs USD benchmark 7d {b7 * 100:.2f} % -> {spread_bp:+d} bp "
+      f'({"beating" if v7 > b7 else "below"} benchmark)')
+```
+
+Output (2026-10-23):
+
+```text
+90 daily points, cost ~91 credits (1 per call + 1 per point)
+first 2026-07-25 2.54 %
+last  2026-10-23 3.15 %
+vault 7d 3.15 % vs USD benchmark 7d 4.07 % -> -92 bp (below benchmark)
+```
+
+TypeScript, the same recipe:
+
+```typescript
+// 90 days of daily APY for one vault, compared with the network's USD benchmark.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+
+async function get(path: string, params: Record<string, string | number> = {}) {
+  const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  const res = await fetch(`${API}${path}${qs.size ? `?${qs}` : ''}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+const toTs = Math.floor(Date.now() / 1000 / 86400) * 86400; // Unix SECONDS, midnight UTC
+const fromTs = toTs - 90 * 86400;
+
+type Point = { timestamp: number; apy: { base: number; reward: number; total: number } };
+const points: Point[] = [];
+let page = 0;
+while (true) {
+  // granularity defaults to 1hour and perPage to 50 -- set both explicitly.
+  const body = await get(`/v2/historical/${NETWORK}/${VAULT_ID}/apy`, {
+    granularity: '1day', apyInterval: '7day', fromTimestamp: fromTs, toTimestamp: toTs, perPage: 100, page,
+  });
+  points.push(...body.data); // oldest first
+  if (body.nextPage === undefined) break;
+  page = body.nextPage;
+}
+const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+console.log(`${points.length} daily points, cost ~${1 + points.length} credits`);
+console.log('first', day(points[0].timestamp), `${(points[0].apy.total * 100).toFixed(2)} %`);
+console.log('last ', day(points.at(-1)!.timestamp), `${(points.at(-1)!.apy.total * 100).toFixed(2)} %`);
+
+const vault = await get(`/v2/detailed-vaults/${NETWORK}/${VAULT_ID}`);
+const bench = await get(`/v2/benchmarks/${NETWORK}`, { code: 'usd' }); // code is required
+const v7: number = vault.apy['7day'].total;
+const b7: number = bench.apy['7day'].total;
+const spreadBp = Math.round((v7 - b7) * 10_000);
+console.log(`vault 7d ${(v7 * 100).toFixed(2)} % vs USD benchmark 7d ${(b7 * 100).toFixed(2)} % -> ${spreadBp >= 0 ? '+' : ''}${spreadBp} bp (${v7 > b7 ? 'beating' : 'below'} benchmark)`);
+```
+
+What changed from the previous version of this page: the key goes in `x-api-key` (the old `Authorization: Bearer` header gets a 402), `granularity=1day` is set (the default hourly granularity returned only the oldest few days), the field is `apy.reward` (not `apy.rewards`), and the example uses a real vault instead of `0xBEEF...`.
+
+## Research notes
+
+- **APY windows are realized yields.** `7day` is the annualized share-price growth over the last 7 days plus rewards; not a forecast.
+- **APY is unclamped.** Small vaults produce extreme values; filter by `minTvl` and score.
+- **Strict score thresholds:** check `score.vaultScore` client-side if your study needs one.
+- **Benchmarks are not risk-adjusted.** They are TVL-weighted averages of the top five vaults.
+- **History starts at each vault's indexing start**; page 0 is the oldest data.
+
+## Get access
+
+Analyst is the plan aimed at research and data teams (250,000 credits a month); pay-as-you-go is $0.002 per credit ([plans](/plans/overview)). Create a key at [portal.vaults.fyi](https://portal.vaults.fyi/signup).
+
+## Related pages
+
+- [Data analytics tutorial (SDK)](/sdk/tutorials/data-analytics).
+- [Paginate all vaults](/recipes/paginate-all-vaults), [display APY correctly](/recipes/display-apy-correctly), [estimate credit cost](/recipes/estimate-credit-cost).
+- [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
+- [Yield and market data](/concepts/yield-and-market-data).
+
+_Last updated: 2026-10-23. Facts on this page were checked against the live API on that date; any code shown was executed then._
+
+
+# vaults.fyi for protocols and curators: get listed, check your vault data, track attribution
+Source: https://docs.vaults.fyi/use-cases/for-protocols
+
+> How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/{network}/{vaultId}, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi.
+
+This page explains how a protocol or curator gets vaults into vaults.fyi, how to check what integrators see about a vault, and how to measure the capital partners route to it. Use it when you want wallets, apps, analysts and agents building on vaults.fyi to surface your vaults.
+
+REST requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. APY values are decimal fractions net of fees.
+
+## Why it matters
+
+Every integration built on the API (wallets, Earn surfaces, aggregators, analytics tools, agents) queries the same normalized dataset. A listed vault appears in their results when it matches their filters: asset, network, TVL, Reputation Score, warnings and APY. Teams using vaults.fyi include [Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper Earn](/resources/case-studies/jumper-earn), [Kraken Wallet](/resources/case-studies/kraken-wallet), [Gauntlet](/resources/case-studies/gauntlet), [Maple Finance](/resources/case-studies/maple-finance) and [KPK](/resources/case-studies/kpk).
+
+## Getting listed
+
+1. **Check the data requirements.** vaults.fyi indexes vaults from onchain data: TVL, share supply, price per share, deposit limit, available liquidity, the underlying token, the share token and reward emissions must be readable from the vault's contracts (ERC-4626 vaults expose most of this). The full list is in the [FAQ](/resources/faq#what-does-a-vault-need-to-be-listed). Priority goes to protocols with significant traction and customer demand.
+2. **Submit the protocol.** Use the [protocol request form](https://listings.vaults.fyi/), or contact [@vaultsfyi](https://twitter.com/vaultsfyi) on X or Farcaster. The team reviews each protocol before integrating it.
+3. **Verify indexing.** Once listed, check the vault with the call below.
+
+Once a protocol and network are supported, its vaults are listed automatically when the deposit asset is on the reviewed asset list, the vault holds non-trivial TVL, and it has produced fresh hourly data in the last 60 days. Audit status is not a listing input. Earlier versions of this page listed an audit requirement and a minimum TVL; those were wrong.
+
+## Check how your vault appears
+
+Look the vault up directly by network and `vaultId` (3 credits). There is no "filter by vault address" on the list endpoint: unknown query parameters are ignored and you would get the default list.
+
+```bash
+# Check how your vault appears in the API: one vault by network + vaultId (3 credits).
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+| jq '{name, protocol: .protocol.name, isTransactional, apy7d: .apy["7day"].total, tvlUsd: .tvl.usd,
+       vaultScore: .score.vaultScore, warnings: [.warnings[]?], holders: .holdersData.totalCount}'
+```
+
+Output (2026-10-23, Steakhouse High Yield USDC on Base):
+
+```json
+{
+  "name": "Steakhouse High Yield USDC Edition",
+  "protocol": "morpho",
+  "isTransactional": true,
+  "apy7d": 0.0315,
+  "tvlUsd": "468440351",
+  "vaultScore": 81.7485752746402,
+  "warnings": [],
+  "holders": 45152
+}
+```
+
+What integrators filter on, and where it comes from:
+
+| Field | Meaning |
+| - | - |
+| `apy.<window>.total` | Realized yield (share price + rewards), net of fees ([calculating APY](/methodology/calculating-apy)) |
+| `tvl.usd` | TVL in USD |
+| `score.vaultScore` | Reputation Score (0 to 100; observed 27.5–99.1): protocol TVL history 45 %, vault TVL history 25 %, holder distribution 15 %, asset 15 %, minus penalties ([Reputation Score](/methodology/reputation-score)) |
+| `warnings[]`, `flags[]` | Risk signals; many integrators hide vaults with warnings (`allowVaultsWithWarnings=false`) |
+| `isTransactional` | Whether the Transactions API can build deposits for the vault |
+
+## Benchmark context
+
+Each network has a USD and an ETH benchmark: the TVL-weighted APY of the five largest vaults of that denomination with at least $1M TVL ([benchmark rates](/methodology/benchmark-rates)). Integrators and analysts compare vaults against it; the [vault history vs benchmark](/recipes/vault-history-vs-benchmark) recipe shows the call.
+
+## Holders and flows
+
+The portfolio endpoints are per wallet: they show one user's positions, not your vault's depositor base. For vault-level data:
+
+- `holdersData.totalCount` and `holdersData.topHolders[]` on `GET /v2/detailed-vaults/{network}/{vaultId}`,
+- `GET /alpha/{network}/{vaultId}/holders`: holder list with balances (Alpha),
+- `GET /alpha/historical/{network}/{vaultId}/daily-flows`: daily inflows and outflows (Alpha).
+
+Alpha endpoints may change without notice ([versioning](/api-reference/versioning)).
+
+## Attribution of partner flows
+
+Deposits built through the Transactions API, or tagged with the attribution suffix, are attributed to the integrating account. Attributed TVL is shown in [portal.vaults.fyi](https://portal.vaults.fyi) by protocol, curator, vault and user; it is not available through the API (large partners can ask the team about API access). See [TVL attribution](/concepts/tvl-attribution).
+
+## Related pages
+
+- [Supported protocols and networks](/concepts/supported-protocols) and [FAQ](/resources/faq).
+- [Reputation Score](/methodology/reputation-score), [calculating APY](/methodology/calculating-apy).
+- [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Facts on this page were checked against the live API on that date; any code shown was executed then._
+
+
+# Embeddable Widget
+Source: https://docs.vaults.fyi/use-cases/embeddable-widget
+
+> Add a branded yield experience to your app with curated vault discovery, transactions, and position views.
+
+The vaults.fyi widget gives wallets, exchanges, and consumer apps a configurable interface for surfacing yield opportunities, supporting user actions, and showing positions.
+
+> [!NOTE]
+>
+> The widget is currently available to select partners. [Contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to learn more.
+
+## Widget vs. API or SDK
+
+Use the widget when you want a branded Earn experience without designing every vault list, deposit form, position view, and transaction state yourself. Use the API or SDK when you want full control over the interface and business logic.
+
+| Integration path | Best for |
+| - | - |
+| Embeddable widget | Branded Earn surfaces, partner launches, curated vault lists, portfolio views, and transaction-ready flows with less product and frontend work |
+| API or SDK | Fully custom discovery, routing, portfolio, transaction, attribution, or analytics experiences built inside your own application |
+
+## A yield experience configured for your product
+
+![Embeddable widget deposit screen configured for a Gauntlet USDC vault on Base](https://mintcdn.com/vaultsfyi/oGJ_S3SuMwwlsoXJ/images/widget_screen4.png?fit=max\&auto=format\&n=oGJ_S3SuMwwlsoXJ\&q=85\&s=8a7a1bcf8f05495a35f10e3cd3746be7)
+
+Choose the opportunity set that fits your users. Configure:
+
+* `allowedNetworks`, including EVM networks and Solana/SVM coverage
+* `allowedAssets`, `allowedProtocols`, `allowedVaults`, curators, and tags
+* `minTvlUsd`, `minReputationScore`, and APY filters
+* APY window, sort order, and number of opportunities shown
+* Discover and Positions views
+* Visible columns and data displayed in each view
+
+![Widget configuration screen showing filters for Solana, networks, assets, protocols, minimum TVL, and reputation score](https://mintcdn.com/vaultsfyi/oGJ_S3SuMwwlsoXJ/images/widget_config1.png?fit=max\&auto=format\&n=oGJ_S3SuMwwlsoXJ\&q=85\&s=442b64154154a125207d081b87faf9d1)
+
+Surface a focused set of vault opportunities from 80+ protocols, 20+ EVM chains, and Solana/SVM coverage.
+
+## Match your product’s brand
+
+![Widget preview showing live mode, brand styling controls, React embed code, and event log](https://mintcdn.com/vaultsfyi/oGJ_S3SuMwwlsoXJ/images/widget_full5.png?fit=max\&auto=format\&n=oGJ_S3SuMwwlsoXJ\&q=85\&s=e4ea011bc9e335dd611ed2e70e8d5879)
+
+Configure the widget’s presentation to fit your application:
+
+* Light or dark mode
+* Accent color
+* Font and corner radius
+* Widget title
+* Optional vaults.fyi attribution
+* Visible columns for APY, TVL, protocol, curator, score, redemption type, balances, and returns
+
+## Support discovery, positions, and transactions
+
+The widget can present a compact Discover experience, a user’s existing positions, or both.
+
+For transaction-enabled integrations, it supports host-controlled signing and custody handoff flows. Your product keeps control of the wallet experience while vaults.fyi provides the underlying opportunity data and transaction context.
+
+## How integration works
+
+**1. Configure the opportunity set**
+
+Choose the networks, assets, protocols, vaults, curators, tags, TVL thresholds, reputation score threshold, APY window, sort order, and views available in the widget.
+
+**2. Apply your brand settings**
+
+Set the theme, accent color, font, corner radius, widget title, attribution preference, and visible data fields.
+
+**3. Embed the widget**
+
+Add the generated embed code or React component to your app. Your team controls where the widget appears and which mode is shown.
+
+**4. Connect wallet context**
+
+Let the widget use the connected wallet context or pass the relevant wallet state from your host app, including EVM and Solana accounts where supported.
+
+**5. Handle transactions**
+
+For live transaction flows, vaults.fyi provides the opportunity data and transaction context while your product controls signing, broadcasting, and custody handoff.
+
+## Non-custodial by design
+
+Vaults.fyi does not custody user funds. Transaction-enabled widget flows use vaults.fyi infrastructure for data and transaction preparation, while your app keeps control of the wallet experience. Users sign with their own wallet, and funds route to the target protocol contracts.
+
+## Built on vaults.fyi coverage
+
+The widget uses vaults.fyi’s normalized vault data and transaction infrastructure across supported EVM networks and Solana/SVM coverage. Teams can keep their interface focused while extending coverage as their product grows.
+
+## Get the widget
+
+[Contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to learn more. Include the target users, chains and assets, desired views, wallet model, signing or custody requirements, and brand constraints you want the widget to support.
+
+Our team can help you create a branded Earn experience.
+
+
+# Glossary
+Source: https://docs.vaults.fyi/resources/glossary
+
+> Every vaults.fyi term with a one-line definition, the exact response field or parameter, the endpoint that returns it, and its unit: APY windows, base units, vaultId, score.vaultScore, positions, transactions, x402.
+
+This page defines the terms used across the vaults.fyi docs and API. For each term it gives a one-line definition, the exact field or parameter name, the endpoint that returns or accepts it, and the unit. Use it to map a word in a question ("reward APY", "position size", "queued withdrawal") to the field you must read. All REST endpoints live at `https://api.vaults.fyi` and need the `x-api-key` header. Units follow three rules everywhere: APY and rates are **decimal fractions** (`0.0316` = 3.16%), token amounts are **integer strings in base units** (1 USDC = `"1000000"`), and timestamps are **Unix seconds**. Full rules are in [API conventions](/api-reference/conventions); status codes are in [Errors](/api-reference/errors).
+
+Field paths use dots for nesting and `[]` for arrays. `<window>` is one of `1hour`, `1day`, `7day`, `30day`, `90day`.
+
+## Vaults and identifiers
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Vault | A yield-bearing product users deposit into and withdraw from (ERC-4626 vault, lending market, staking token, RWA token). | `data[]` items | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | — |
+| vaultId | The identifier used in every `{vaultId}` path parameter. Usually the contract address; can be a non-address id (for example `0x5597...378c-25`). Copy it, never construct it. | `vaultId` | `GET /v2/detailed-vaults`, `GET /v2/vaults` | string |
+| Vault address | The vault contract address. Not always equal to `vaultId`. | `address` | same as above | `0x` address |
+| Network | The chain a vault is on. Send the slug or the CAIP-2 id; a bare chain id or `ethereum` is rejected (use `mainnet`). | `network.name`, `network.networkCaip`, `network.chainId`; params `network`, `allowedNetworks` | `GET /v2/networks` | slug (`base`) or CAIP-2 (`eip155:8453`) |
+| Default network scope | The four networks searched when `allowedNetworks` is omitted: `base`, `mainnet`, `arbitrum`, `optimism`. Applies to detailed-vaults and portfolio list endpoints, not to `GET /v2/vaults`. | `allowedNetworks` (repeat the key per value) | `GET /v2/detailed-vaults`, `GET /v2/portfolio/positions/{userAddress}` and other portfolio lists | — |
+| Asset (deposit asset, underlying) | The token users deposit and withdraw. TVL and balances are denominated in it. | `asset.address`, `asset.symbol`, `asset.decimals`, `asset.assetCaip` | detailed-vault, portfolio and transaction responses | `assetCaip` is CAIP-19 |
+| Asset group | Denomination class of an asset; picks the benchmark (`USD` → `code=usd`, `ETH` → `code=eth`). | `asset.assetGroup` | detailed-vault responses | `USD`, `ETH`, `BTC`, `EURO`, `OTHER` |
+| LP token (share token) | The token a depositor receives for a vault position. | `lpToken.address`, `lpToken.symbol`, `lpToken.decimals` | detailed-vault and portfolio responses | `lpToken.decimals` can differ from `asset.decimals` (18 vs 6) |
+| Protocol | The DeFi protocol behind a vault. `name` matches every product; `protocolId` matches one product and may contain spaces (URL-encode). | `protocol.name`, `protocol.protocolId`, `protocol.displayName`; params `allowedProtocols`, `disallowedProtocols` | `GET /v2/protocols` | string |
+| Curator | The risk manager that allocates a curated vault's funds. | `curator.name`, `curator.displayName`; param `curators` | `GET /v2/curators` | string |
+| Tag | Category of yield mechanism (for example `Liquid Staking`, `RWA`). | `tags[]`; param `tags` | `GET /v2/tags` | Title-Case string |
+| Nested vault | A vault whose deposit asset is another tracked vault's share token (for example an Aave market for weETH). | `apyComposite`, `childrenVaults[]` | detailed-vault responses | — |
+| Transactional vault | A vault for which the Transactions API can build calls. | `isTransactional`; param `onlyTransactional=true` | detailed-vault responses, `GET /v2/vaults` | boolean |
+| App-featured vault | A vault shown on app.vaults.fyi. `best-vault` and `best-deposit-options` default to featured vaults only. | `isAppFeatured`; param `onlyAppFeatured` | detailed-vault responses | boolean |
+| Corrupted vault | A vault whose indexed data is known to be unreliable. Excluded unless `allowCorrupted=true`. | `isCorrupted`; param `allowCorrupted` | detailed-vault responses | boolean |
+
+## Yield
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| APY | Realized annual yield from the vault's onchain share-price change over a trailing window, **net of fees**, not clamped (negative and >1 values occur). | `apy.<window>.total` | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | decimal fraction |
+| APY window | The trailing period an APY covers. Detailed-vault objects have five; the per-vault `/apy` endpoint and benchmarks have four (no `1hour`). | `<window>` key in `apy`; params `apyInterval` (`1day`, `7day`, `30day`, `90day`; default `7day`) and `sortBy` (`apy1day`, `apy7day`, `apy30day`, `apy90day`) | `GET /v2/detailed-vaults/{network}/{vaultId}/apy` returns `1day`–`90day` at the top level | `1hour`, `1day`, `7day`, `30day`, `90day` |
+| Base APY | Yield from share-price growth (interest, strategy returns, staking). | `apy.<window>.base` | detailed-vault responses | decimal fraction |
+| Reward APY | Yield from reward-token incentives, converted into the deposit asset. Already included in `total`. | `apy.<window>.reward`; per token `rewards[].apy.<window>` (a number, not an object) | detailed-vault responses | decimal fraction |
+| Total APY | `base + reward` for a window. Use this for display. | `apy.<window>.total` | detailed-vault responses | decimal fraction |
+| Single-window APY | Portfolio and historical endpoints return one window, chosen with `apyInterval`, without the window key. | `apy.base`, `apy.reward`, `apy.total` | `GET /v2/portfolio/positions/{userAddress}`, `GET /v2/historical/{network}/{vaultId}` | decimal fraction |
+| Composite APY (`apyComposite`) | Present only on nested vaults. `intrinsicApy` is the underlying vault's own yield; `totalApy` is this vault's APY compounded with it. | `apyComposite.intrinsicApy.<window>.{base,reward,total}`, `apyComposite.totalApy.<window>.{base,reward,total}`, `apyComposite.vault.vaultId`, `apyComposite.asset` | detailed-vault responses | decimal fraction |
+| Fees | Performance, management, deposit and withdrawal fees. Already reflected in APY; display only, never subtract. | `fees.performanceFee`, `fees.managementFee`, `fees.depositFee`, `fees.withdrawalFee` | detailed-vault responses | decimal fraction |
+| Share price | Assets per whole share. Not a field of the detailed-vault object. | `sharePrice` | `GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`, `GET /v2/historical/{network}/{vaultId}/sharePrice`, portfolio events | number |
+| Benchmark | TVL-weighted average APY of the five largest qualifying vaults of one denomination on one network. `code` is required. | `apy.<window>.{base,reward,total}`, `timestamp`; param `code` = `usd` or `eth` | `GET /v2/benchmarks/{network}`, `GET /v2/historical-benchmarks/{network}` | decimal fraction; Unix seconds |
+
+## Size, risk and freshness
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| TVL | Total value locked in a vault. | `tvl.usd`, `tvl.native`; params `minTvl` (default `100000`), `maxTvl` | detailed-vault responses, `GET /v2/detailed-vaults/{network}/{vaultId}/tvl` | `usd`: whole-USD integer string; `native`: asset base units |
+| Base units | The smallest unit of a token (wei for 18-decimal tokens). Human amount = base units ÷ 10^`decimals`. | every `*Native` field, `tvl.native`, `positionValueInAsset`, transaction `amount` | all | integer string; parse with `BigInt` / `int` |
+| Capacity | Deposit cap and room left under it. 2^256−1 means uncapped. | `maxCapacity`, `remainingCapacity` | detailed-vault responses | asset base units |
+| Reputation Score | One number per vault: 0.45 × `protocolTvlScore` + 0.25 × `vaultTvlScore` + 0.15 × `holderScore` + 0.15 × `assetScore` − `totalScorePenalty`, floored at 0. Higher means a longer, larger track record. | `score.vaultScore`; param `minVaultScore` (check `score.vaultScore` client-side if you need a strict threshold) | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | unrounded number from 0 to 100; observed 27.5–99.1 |
+| Score components | The four weighted inputs and the deprecated network score (0 weight). | `score.protocolTvlScore`, `score.vaultTvlScore`, `score.holderScore`, `score.assetScore`, `score.networkScore` | same | number |
+| Score penalty | Points deducted for active or decaying flags; only the largest penalty applies. | `score.totalScorePenalty`, `score.penaltyComponents[]` | same | points |
+| Flag | A vaults.fyi notice about an incident or risk, with severity and expiry. | `flags[].content`, `flags[].severity` (`info`, `warning`, `critical`), `flags[].endDate`, `flags[].resolution` | detailed-vault responses | `endDate` Unix seconds; `4946619450` = no expiry |
+| Warnings | Plain-text copies of active non-`info` flags. `allowVaultsWithWarnings` defaults to `true` on detailed-vaults and `false` on best-vault / best-deposit-options. | `warnings[]`; param `allowVaultsWithWarnings` | detailed-vault responses | string |
+| Holders | Holder count and balances of the vault's share token. | `holdersData.totalCount`, `holdersData.totalBalance`, `holdersData.topHolders[]` | detailed-vault responses | balances in LP base units |
+| Last update | When the hourly indexer last updated the vault. | `lastUpdateTimestamp` | detailed-vault responses | Unix seconds |
+| NRT (near-real-time) | Chain state read on request instead of from the hourly index. | `totalSupply` (LP base units), `totalAssets` (asset base units), `sharePrice` (number), `underlyingAssetPrice` (number, USD) | `GET /v2/nrt/vault/{network}/{vaultId}` | as listed |
+| Max drawdown (Beta) | Largest peak-to-trough drop in share price over 30, 90 or 365 days. | `maxDrawdown.mdd30days`, `maxDrawdown.mdd90days`, `maxDrawdown.mdd365days` | `POST /beta/advanced-analytics/{network}/{vaultId}` | decimal fraction |
+| Composition (Beta) | Where a vault's assets are allocated. | `composition[].name`, `composition[].allocation`, `composition[].vaultId`, `composition[].asset.positionValueInAsset` | `POST /beta/advanced-analytics/{network}/{vaultId}` | allocation: decimal fraction; amounts: base units |
+
+## Wallets and positions
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| userAddress | The wallet in every portfolio and transaction path. ENS names are rejected. | path param `userAddress` | `/v2/portfolio/*`, `/v2/transactions/*` | `0x` + 40 hex |
+| Position | A wallet's holding in one vault. Portfolio endpoints are not paginated. | `data[]` | `GET /v2/portfolio/positions/{userAddress}`, `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}` | — |
+| Position size | How much the wallet holds in the vault. **Use these, not `asset.balanceNative`.** | `asset.positionValueInAsset` (asset base units), `lpToken.balanceUsd` (USD), `lpToken.balanceNative` (LP base units) | same | as listed |
+| Wallet idle balance (in a position object) | The wallet's balance of the deposit token **outside** the vault, repeated on every position with the same asset. Never sum it as position value. | `asset.balanceNative`, `asset.balanceUsd` | `GET /v2/portfolio/positions/{userAddress}` | base units; USD decimal string |
+| Idle asset | A token in the wallet that is not deposited in a vault. | `data[].balanceNative`, `data[].balanceUsd`; params `minUsdAssetValueThreshold` (default `0.5`), `sortDirection` | `GET /v2/portfolio/idle-assets/{userAddress}` | base units; USD |
+| Total returns | Lifetime yield earned by a wallet in one vault. Needs `userEventsIndexed: true` on the vault. | `returnsNative` | `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}` | asset base units |
+| Partial returns (Beta) | Yield earned in a time window. | `returnsNative`, `fromTimestamp`, `toTimestamp` | `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}` | asset base units; Unix seconds |
+| Position event | A deposit or withdrawal by the wallet in one vault. | `data[].eventType` (`deposit` or `withdrawal`), `data[].assetAmountNative`, `data[].lpTokenAmount`, `data[].timestamp`, `items` (total count) | `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}` | base units; Unix seconds |
+| Best deposit options | Ranked vaults for each token the wallet holds. | `userBalances[].asset`, `userBalances[].depositOptions[]`, `depositOptions[].projectedUsdAnnualEarnings`; params `maxVaultsPerAsset` (default 3), `onlyTransactional` | `GET /v2/portfolio/best-deposit-options/{userAddress}` | USD decimal string |
+| Best vault | The single best vault for the wallet's best-matching holding. Can be non-transactional unless `onlyTransactional=true`. | `vault`, `asset` | `GET /v2/portfolio/best-vault/{userAddress}` | — |
+
+## Transactions
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Transaction context | Pre-flight state for one wallet and vault: next actions, balances, pending requests. Call it first. | `currentDepositStep`, `depositSteps[]`, `currentRedeemStep`, `redeemSteps[]`, `asset.balanceNative`, `pendingRequests`, `vaultSpecificData` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | — |
+| Action | The operation to build. | path param `action`: `deposit`, `request-deposit`, `claim-deposit`, `redeem`, `start-redeem-cooldown`, `request-redeem`, `claim-redeem`, `claim-rewards` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | — |
+| Redeem | The vault withdrawal action. MCP tools call it "withdraw"; in the Beta borrow API `withdraw` means removing supplied assets from a borrow market. | `redeem` | same | — |
+| Amount | How much to deposit or withdraw. A decimal such as `1.5` returns 400. `all=true` acts on the whole position. | query params `amount`, `all`; required `assetAddress` | same | integer string, base units. Deposits: asset units. `redeem` / `request-redeem`: vault-share (LP) units on most vaults; asset units on asset-based lending markets such as Aave and Compound v3 |
+| Payload (actions) | The unsigned transactions to sign and send **in order**, waiting for each receipt. `tx.value` is omitted for ERC-20 actions (treat as 0). | `currentActionIndex`, `actions[].name`, `actions[].tx.to`, `actions[].tx.chainId`, `actions[].tx.data`, `actions[].tx.value` | same | `chainId` number; `value` wei string when present |
+| Queued withdrawal | A withdrawal that must be requested, then claimed after the vault processes it: `request-redeem` → poll context until `pendingRequests.redeems[].status` is `ready` → `claim-redeem`. | `pendingRequests.redeems[].status` (`pending`, `ready`), `pendingRequests.redeems[].estimatedResolution` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | — |
+| Cooldown | A waiting period some vaults require before redeem: `start-redeem-cooldown`, then `redeem` when ready. | `vaultSpecificData.cooldownData.status` | same | — |
+| Simulate (deprecated) | A query parameter that no longer does anything. The API does not simulate and does not check balances. | `simulate` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | — |
+| Attribution suffix | Bytes appended to calldata that attribute a transaction to your API key. Payloads from `/v2/transactions/*` already include it. | `suffix` | `GET /v2/transactions/suffix/{userAddress}/{vaultId}` | hex string without `0x` (48 hex chars observed) |
+| Rewards claim | Claim reward tokens across vaults for a wallet. | `claimable.<network>[].claimId`, `claimable.<network>[].asset.claimableAmount`, `claimable.<network>[].asset.claimableAmountInUsd`; param `claimIds` (repeat the key) | `GET /v2/transactions/rewards/context/{userAddress}`, `GET /v2/transactions/rewards/claim/{userAddress}` | base units; USD decimal string |
+| Deposit / redeem step type | Coarse hint of the flow shape. An `instant` deposit can still be two transactions (approve, then deposit). | `transactionalProperties.depositStepsType`, `transactionalProperties.redeemStepsType` (`instant`, `complex`) | detailed-vault responses | — |
+
+## Borrowing (Beta)
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Borrow market | A lending market where users supply and borrow assets. | `marketId`, `assetsData[]` | `GET /beta/borrow/markets/` | — |
+| marketAssetId (assetId) | The asset id inside a market, usually the token address. | `assetsData[].marketAssetId`; path param `assetId` | same | address string |
+| Supply / borrow rate | Current annual rates for suppliers and borrowers. | `supplyRate`, `borrowRate`, `utilizationRate` | same | decimal fraction |
+| Health factor, LTV | Liquidation safety of a wallet's market position. | `healthFactor`, `ltv` | `GET /beta/borrow/portfolio/positions/{userAddress}` | number; decimal fraction |
+| Borrow actions | Actions for borrow markets. | path param `action`: `supply`, `withdraw`, `borrow`, `repay` | `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}` | `amount` in base units |
+
+## API mechanics
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| API key | REST credential. Send it in `x-api-key`. The MCP server instead uses `Authorization: Bearer <key>`, which REST does not accept. | header `x-api-key` | all REST endpoints except `GET /v2/health` | — |
+| x402 | Pay-per-request access without a key. A request with no key returns HTTP 402 with a payment challenge. | `x402Version`, `accepts[].amount`, `accepts[].scheme`, `accepts[].network`, `accepts[].asset` | any paid endpoint without a key | `accepts[].amount`: USDC base units (`"2000"` = $0.002) |
+| Credits | Units each request costs against your plan. | — | see [Credits](/plans/credits) | credits per call |
+| Rate-limit headers | Remaining quota on authenticated responses. | headers `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset` | authenticated responses | requests; seconds |
+| Pagination | List responses: read `nextPage`; it is **absent** (not `null`) on the last page; no total count. | `itemsOnPage`, `nextPage`, `data`; params `page` (from 0), `perPage` (default 50, max 5000) | `GET /v2/detailed-vaults`, `GET /v2/vaults`, `GET /v2/historical/{network}/{vaultId}` and other lists | — |
+| Soft errors | Unrecognised filter values return HTTP 200 with fewer results and the value echoed here. | `errors.unsupportedNetworks`, `errors.unsupportedAssets`, `errors.unsupportedProtocols` | list and portfolio endpoints | — |
+| Array parameter | Multi-value query parameter. Repeat the key (`allowedNetworks=base&allowedNetworks=arbitrum`); a comma list returns 0 results. | `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `tags`, `curators`, `claimIds` | all list endpoints | — |
+| Stability level | `/v2` is generally available; `/beta` works but may change; `/alpha` is experimental. | path prefix | — | see [Versioning](/api-reference/versioning) |
+
+Related: [Introduction](/introduction), [API conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Vault discovery](/concepts/vault-discovery), [Portfolio tracking](/concepts/portfolio-tracking), [Transaction flows](/concepts/transaction-flows), [Reputation Score](/methodology/reputation-score), [Calculating APY](/methodology/calculating-apy).
+
+
+# FAQ
+Source: https://docs.vaults.fyi/resources/faq
+
+> Short answers to common vaults.fyi questions: 402 vs 401, why results come from only 4 networks, last-page detection, units of APY and amounts, data freshness, APY differences, and how vaults get listed.
+
+This page answers the questions developers and agents most often ask about the vaults.fyi API and data: errors, missing results, units, freshness, how yields are calculated and how vaults are listed. Each answer stands alone and links to the page with full detail. REST requests go to `https://api.vaults.fyi` with the key in the `x-api-key` header.
+
+## Using the API
+
+### Why do I get HTTP 402 instead of 401?
+
+A request **without** an `x-api-key` header returns **402 Payment Required** with an x402 payment challenge (`x402Version: 2`, price in `accepts[].amount`, USDC base units on Base). This lets agents pay per request without a key. Send `x-api-key: <key>` to use your plan instead. A request with an **invalid** key returns **401** (message "An API key is required"). `GET /v2/health` needs no key. `Authorization: Bearer` works only for the MCP server, not for REST. See [Errors](/api-reference/errors) and [x402](/ai-agents/x402).
+
+### Why are results only from Base, Ethereum, Arbitrum and Optimism?
+
+`GET /v2/detailed-vaults` and the `/v2/portfolio/*` list endpoints default to `allowedNetworks` = `base`, `mainnet`, `arbitrum`, `optimism`. Pass the networks you want, repeating the key: `allowedNetworks=base&allowedNetworks=plasma&allowedNetworks=bsc`. `GET /v2/vaults` and `GET /v2/assets` have no default scope. Network ids: [Supported protocols and networks](/concepts/supported-protocols).
+
+### Why is a vault I know about missing from the list?
+
+Common causes, in order: its network is outside the default four; its TVL is below the default `minTvl=100000` (USD; pass `minTvl=0`); it is marked `isCorrupted` (excluded unless `allowCorrupted=true`); you passed a comma-separated array (`allowedNetworks=base,arbitrum` returns 0 results; repeat the key instead); or a filter value was not recognised (check `errors.unsupportedNetworks`, `errors.unsupportedAssets`, `errors.unsupportedProtocols` in the 200 response). `allowedAssets` takes token symbols, not addresses.
+
+### How do I know I reached the last page?
+
+List responses are `{itemsOnPage, nextPage, data, errors?}`. On the last page `nextPage` is **absent** (the key is missing, not `null`). There is no total count. Loop while the key is present:
+
+```python
+page = 0
+while True:
+    body = requests.get(url, headers=H, params={**params, "page": page}).json()
+    rows.extend(body["data"])
+    if "nextPage" not in body:
+        break
+    page = body["nextPage"]
+```
+
+`/v2/portfolio/*` endpoints are not paginated. See [API conventions](/api-reference/conventions).
+
+### Is APY a percentage?
+
+No. APY is a decimal fraction: `0.0316` = 3.16%. It is in `apy.<window>.{base,reward,total}` with windows `1hour`, `1day`, `7day`, `30day`, `90day`, net of fees and not clamped (negative and very large values occur). See [Calculating APY](/methodology/calculating-apy).
+
+### Are amounts in wei?
+
+Token amounts are integer strings in the token's **base units** (the smallest unit, "wei" for 18-decimal tokens): 1 USDC (6 decimals) = `"1000000"`, 1 ETH = `"1000000000000000000"`. This applies to transaction `amount` parameters (a decimal such as `1.5` returns 400) and to response fields such as `tvl.native`, `balanceNative` and `positionValueInAsset`. USD values (`tvl.usd`, `balanceUsd`) are decimal strings. Timestamps are Unix seconds.
+
+### Why does my positions total look far too high?
+
+In position objects, `asset.balanceNative` and `asset.balanceUsd` are the wallet's idle balance of the deposit token, repeated on every position with that token. Use `asset.positionValueInAsset` (asset base units) or `lpToken.balanceUsd` (USD) for position size. See [Portfolio tracking](/concepts/portfolio-tracking).
+
+### Does the API check balances or simulate transactions?
+
+No. `GET /v2/transactions/{action}/...` returns a payload even for amounts far above the wallet's balance, and the `simulate` parameter is deprecated and ignored. Check `asset.balanceNative` from the context call and verify every action before signing. See [Transaction flows](/concepts/transaction-flows) and [Transaction safety](/ai-agents/transaction-safety).
+
+### How do I filter by Reputation Score?
+
+Pass `minVaultScore` to narrow the list. Check `score.vaultScore` client-side if you need a strict threshold. See [Reputation Score](/methodology/reputation-score).
+
+### What are the rate limits?
+
+Authenticated responses carry `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-reset` (seconds until reset). Read them instead of assuming a number; limits depend on your plan. See [Plans](/plans/overview) and [Errors](/api-reference/errors).
+
+## Data and methodology
+
+### Why do yields on vaults.fyi differ from other sources?
+
+vaults.fyi calculates every vault's APY the same way: realized yield from the change in onchain share price over trailing windows (`1hour`, `1day`, `7day`, `30day`, `90day`), net of fees. Protocol UIs often show forward-looking or instantaneous rates from their interest-rate model, which can differ, especially right after rates change. See [Calculating APY](/methodology/calculating-apy).
+
+### How often does data update?
+
+Vault data is indexed from chain once per hour. Each vault's `lastUpdateTimestamp` (Unix seconds) shows the last index. For current chain state between updates, use the near-real-time endpoints (`GET /v2/nrt/vault/{network}/{vaultId}` and its `/sharePrice`, `/totalAssets`, `/totalSupply`, `/underlyingAssetPrice` variants). See [Indexing onchain data](/methodology/indexing-onchain-data).
+
+### How does vaults.fyi get its data?
+
+It runs purpose-built contracts as static calls (no gas, no onchain writes) through Infura, Alchemy and Ankr RPC providers. One call can read a value and feed it into the next calculation at a single block height. Results are stored and used for APY, TVL and scores. See [Indexing onchain data](/methodology/indexing-onchain-data).
+
+### What causes sudden APY spikes?
+
+Some vaults post earnings in batches rather than continuously. When a batch lands after hours or days, the share price jumps and short-window APY spikes temporarily. Use `apy["7day"]` or `apy["30day"]` for these vaults.
+
+## Listing and support
+
+### How are new vaults added?
+
+Based on customer requests, with priority for protocols with significant traction. Coverage started with stablecoin, ETH and liquid-staking vaults on established protocols (Aave, Compound, MakerDAO, Yearn, Lido stETH, Rocket Pool rETH) and has grown from there. Protocol teams can submit the [protocol request form](https://listings.vaults.fyi/); the team reviews each protocol before integrating.
+
+### What does a vault need to be listed?
+
+All key data must be readable onchain from the vault's contract address (or a set of addresses). The following are onchain values the vault must expose. They are **not** API field names.
+
+- TVL, denominated in the underlying token
+- Total supply of the vault's share (LP) token, if it has one
+- Price per share (normally TVL ÷ total supply, or an equivalent growth indicator)
+- Maximum amount any user can deposit
+- Liquidity directly available for withdrawal
+- Address of the underlying ERC-20 token
+- Vault name
+- Address of the share (LP) token
+- Addresses of reward tokens, and their emission rate per second
+
+ERC-4626 vaults expose most of this directly. If reading the data needs a chain of calls across contracts, contact the team with instructions.
+
+### How do I request a vault or feature, or follow updates?
+
+Contact [@vaultsfyi](https://twitter.com/vaultsfyi) on X or Farcaster, or submit the [protocol request form](https://listings.vaults.fyi/). Weekly API and app changes are in the [Changelog](/resources/changelog).
+
+Related: [Introduction](/introduction), [Glossary](/resources/glossary), [API conventions](/api-reference/conventions).
+
+
+# Vaults.fyi API & App Changelog
+Source: https://docs.vaults.fyi/resources/changelog
+
+> A week-by-week log of all API and app updates shipped by vaults.fyi, including new protocols, endpoints, and product improvements.
+
+This page tracks all notable updates to the vaults.fyi API and application, organized by week.
+
+***
+
+## Week 40, 2026 — Sep 29–Oct 5
+
+**API**
+
+* Expanded **composition analytics for supported Morpho V2 vaults**. `select.composition` can now include allocations held through Morpho V1 vault adapters alongside idle assets, with allocation percentages calculated against live onchain total assets.
+
+* Added **two Base vaults**: KPK USDC Yield and AlphaGrowth Base AI. The tracker now covers **1,847 vaults across 20 networks**.
+
+**App**
+
+* Launched **X-Ray**, a read-only wallet exposure analyzer for Morpho vault positions. Enter an EVM address or ENS name to see exposure grouped by underlying Morpho market, filter by network or asset, and trace each market back to the source vaults.
+
+***
+
+## Week 39, 2026 — Sep 22–28
+
+**API**
+
+* Improved **same-chain transaction intents** in Alpha. Rhinestone-backed intent flows can now return usable quotes for supported same-chain position changes instead of rejecting the provider's settlement path.
+
+* Added dedicated **pricing support for tGLD, weETHs, and USST**, improving current and historical USD valuations for vaults using these assets.
+
+* Added **13 vaults** across Ethereum, Base, and Unichain. The tracker now covers **1,846 vaults across 20 networks**. The largest additions included Sky USDS Farm, Staked Frax USD, Noon Ecosystem Vault, and Clearstar cbXRP Yield Vault.
+
+***
+
+## Week 38, 2026 — Sep 15–21
+
+**API**
+
+* Added **curator display names** to V2. `GET /v2/curators` and both detailed-vault routes now return optional `curator.displayName` alongside the canonical `curator.name`, giving integrators presentation-ready curator labels without changing identifiers used for filtering.
+
+* Added **Aave V4 Standard Spoke borrowing** in Beta on Ethereum. Supported markets can now expose market data, wallet positions, and transaction payloads for supply, withdraw, borrow, and repay flows.
+
+* Expanded **borrow risk data** with optional `borrowRateMultiplier`, exposing the collateral risk multiplier applied to the base borrow rate where the protocol provides one.
+
+* Added **three Ink xStocks vaults** for SPYx, QQQx, and NVDAx, including asset pricing and queued-withdrawal support.
+
+* Fixed **TOKE pricing** using TOKE/WETH liquidity, improving USD valuation for vault rewards paid in TOKE.
+
+* Expanded vault coverage by **14 vaults**, bringing the tracked total to **1,837 vaults across 20 networks**. The largest additions included Sentora x Spark RLUSD, Axis Origin USDx, Compound Institutional USDC, and RockawayX Confidential RWA USDC.
+
+**App**
+
+* Added curator display names across vault cards, curator filters, opportunity metadata, and analytics views. Also fixed a crash when the curator filter had no available entries.
+
+* Updated **borrow-market charts** to match the vault performance experience, with separate expandable views for borrow APY, utilization, and total supplied.
+
+***
+
+## Week 37, 2026 — Sep 8–14
+
+**API**
+
+* Added **Solana vault LP-token metadata** in Beta. Detailed vault responses now include an optional `lpToken` object with the token’s mint address, name, symbol, decimals, and CAIP-19 identifier where available.
+
+* Expanded **Solana portfolio data** in Beta. Idle-asset responses now include token names, symbols, and logos where available. Position responses also expose `asset.positionValueInAsset`, expressing the position value in underlying asset units at the asset’s precision. This mirrors `balanceNative`, not an additional balance.
+
+* Optimized **Solana portfolio position lookups** by batching balance requests and reusing protocol connections, reducing RPC overhead when retrieving wallet positions.
+
+* Updated **borrow portfolio filtering** so wallet-wide position lists include only markets with outstanding debt. Supply-only and collateral-only markets are excluded from these lists.
+
+* Fixed **native-token wallet balances in borrow portfolio responses**, using the chain’s native balance lookup instead of treating native assets as ERC-20 tokens.
+
+**App**
+
+* Expanded **vault performance charts** so yield, TVL, and share price are visible together on opportunity pages, with an expanded view for each chart.
+
+* Improved **borrow market comparisons** with charts showing supply and borrow APY together, plus total supplied and total borrowed balances.
+
+***
+
+## Week 36, 2026 — Sep 1–7
+
+**API**
+
+* Added **borrow support for Fluid** in Beta, covering supported single-collateral, single-debt markets, with position tracking and supply, withdraw, borrow, and repay transaction flows.
+
+* Improved **borrow transaction context** with protocol-specific action steps, including collateral and controller activation where required. Integrators can follow the returned sequence when preparing transactions.
+
+* Improved **vault composition accuracy** across supported multi-strategy vaults. Allocation discovery now includes positions held directly by the vault, and small incidental balances no longer hide underlying Morpho market allocations.
+
+* Fixed **Jupiter Lend pricing** on Solana, addressing missing asset prices and USD TVL that caused affected vaults to disappear from discovery and become unavailable through transaction routes.
+
+* Added **ether.fi eBTC withdrawal-queue support on Optimism**, extending queued redemption support through the shared Transactions API.
+
+* Improved **Kamino transaction payload generation** for deposits and withdrawals, using address lookup tables to produce more compact transactions.
+
+***
+
+## Week 35, 2026 — Aug 25–31
+
+**API**
+
+* Added full **protocol IDs** to API responses and filtering. `protocol.protocolId` distinguishes protocol products and versions, while `allowedProtocols` and `disallowedProtocols` can now target either a broad protocol name or a specific protocol ID.
+
+* Added **Aave V4 transaction support**. Supported Aave V4 Standard Spoke opportunities can now provide instant deposit and withdrawal context and payloads through the shared Transactions API.
+
+* Expanded **Advanced Analytics composition coverage** with persisted allocation data. `select.composition` can now return stored underlying positions for more custody-based and composite strategies, alongside existing protocol-specific composition sources.
+
+**App**
+
+* Added **Fixed Term to Discover**. Users can now browse active Pendle principal-token markets, filter and sort by asset, network, APY, TVL, liquidity, or maturity, and open dedicated market pages with projected yield, maturity context, and related opportunities.
+
+* Improved **Reputation Score display** by withholding ratings when holder data is unavailable, rather than showing an incomplete score as if it were fully assessed.
+
+***
+
+## Week 34, 2026 — Aug 18–24
+
+**API**
+
+* Expanded **fixed-term market data** in Beta. `GET /beta/fixed-term/` and `GET /beta/fixed-term/detailed/{network}/{vaultId}` now return richer Pendle market, asset, liquidity, maturity, protocol, and yield context through a more consistent response model.
+
+* Added **Flying Tulip coverage**, including analytics for Flying Tulip Lend markets and the sftUSD savings vault, plus transaction support for supported Flying Tulip Lend deposit and withdrawal flows.
+
+* Added **Sky stUSDS coverage**, making stUSDS opportunities available through vault discovery and related vault data surfaces.
+
+* Expanded **vault composition coverage** for Yearn V3 and restored accurate allocation discovery for additional supported protocols, including Overnight Plus. Advanced Analytics can now explain the underlying positions of more multi-strategy vaults.
+
+* Corrected **Wildcat capacity data** so remaining deposit capacity is based on the market's actual deposit limit rather than its current liquid assets. This prevents markets with available capacity from appearing full.
+
+* Improved **Aave borrow position health factors**. Supply-only positions with no debt now return the appropriate no-debt health state instead of an invalid or misleading value.
+
+* Added optional **API usage alerts** for customers who want email notifications when their keys encounter repeated credit or rate-limit errors.
+
+***
+
+## Week 33, 2026 — Aug 11–17
+
+**API**
+
+* Added **fixed-term market discovery** in Beta with `GET /beta/fixed-term/`. Integrators can discover active Pendle principal-token markets with current fixed APY, maturity, TVL, and liquidity, then filter and sort the results for fixed-yield experiences.
+
+* Expanded **borrow market filtering**. Beta borrow discovery now supports protocol filters alongside the broader vault-style network, asset, TVL, pagination, and sorting controls.
+
+* Standardized **SVM APY values** to the same decimal format used by V2 endpoints. For example, a 5% APY is now returned as `0.05` instead of `5`. This is a breaking correction for Beta SVM clients using the previous display-percent format.
+
+* Added **curator metadata to SVM vault responses**, helping integrators show who manages supported Solana vault strategies.
+
+* Improved **Drift APY accuracy** by including unsettled funding in vault equity snapshots, reducing cases where short-window APY appeared flat despite active funding gains or losses.
+
+* Added normalized **Veda fee metadata** to detailed-vault responses, giving integrators clearer performance- and management-fee information for supported Veda/BoringVault opportunities.
+
+* Expanded **composition analytics** across more multi-strategy protocols, including Yearn V2, Notional, Mellow, Syrup, Upshift, and additional Morpho V2 vaults.
+
+***
+
+Older entries (31 weeks) are omitted here because they cite endpoints and paths that have since moved; read them at https://docs.vaults.fyi/resources/changelog.md.
+
+
+# Customer Case Studies
+Source: https://docs.vaults.fyi/resources/case-studies
+
+> How Arbitrum, Jumper Earn, Kraken Wallet, Gauntlet, KPK, Otus, and Maple Finance use the vaults.fyi API for yield discovery, analytics, benchmarking, transactions, and agent-managed yield.
+
+Leading teams across ecosystem portals, wallets, trading platforms, research firms, and block explorers use the vaults.fyi API to power yield discovery, personalized insights, independent data validation, and onchain transactions.
+
+- [Arbitrum](/resources/case-studies/arbitrum.md): Native yield discovery inside the Arbitrum Portal, powered by standardized market data, transaction payloads, position tracking, and attribution.
+
+- [Jumper Earn](/resources/case-studies/jumper-earn.md): Unified cross-chain yield discovery and execution powered by vaults.fyi market data, transaction payloads, position tracking, and attribution.
+
+- [Kraken Wallet](/resources/case-studies/kraken-wallet.md): Personalized DeFi yield suggestions surfaced inside the wallet UI, with multi-chain coverage across Ethereum, Base, Optimism, Arbitrum, and Polygon.
+
+- [Gauntlet](/resources/case-studies/gauntlet.md): Normalized yield data integrated into quantitative research models for DeFi risk analysis — safeguarding over \$42B in digital assets.
+
+- [KPK](/resources/case-studies/kpk.md): Unified vault data, transaction flows, and position tracking supporting KPK’s DAO treasury mandates and the infrastructure behind the KPK app.
+
+- [Otus](/resources/case-studies/otus.md): Agent-managed Smart Yield account powered by vaults.fyi discovery, Reputation Scores, transaction payloads, portfolio tracking, and attribution.
+
+- [Maple Finance](/resources/case-studies/maple-finance.md): Real-time benchmark comparisons and independent third-party APY validation for syrupUSDC, building investor trust through transparent performance data.
+
+Ready to build? [Sign up](https://portal.vaults.fyi/signup) to get an API key and start integrating.
+
+
+# Arbitrum: Native Yield Discovery in the Arbitrum Portal
+Source: https://docs.vaults.fyi/resources/case-studies/arbitrum
+
+> How Arbitrum Earn uses the vaults.fyi API to surface standardized DeFi opportunities, transaction payloads, position tracking, and attribution inside the Arbitrum Portal.
+
+[Arbitrum](https://arbitrum.io/) has one of DeFi's richest and most diverse ecosystems. The opportunity was making that ecosystem easier to access from one native surface.
+
+Arbitrum Earn brings yield discovery into the Arbitrum Portal, giving users a cleaner way to compare opportunities, understand key metrics, and move from discovery to execution without leaving the ecosystem experience.
+
+![Arbitrum Portal Screen Position](https://mintcdn.com/vaultsfyi/iaDHUkJH8PdInkGw/images/arbitrum_portal_screen_position.png?fit=max\&auto=format\&n=iaDHUkJH8PdInkGw\&q=85\&s=93eb4aeb962b0ffcbd120b1c7e9f87a7)
+
+## The Challenge: Making DeFi Easier to Navigate
+
+Yield opportunities on Arbitrum span many protocols, assets, and strategy types. For users, that creates discovery friction: each protocol has its own interface, terminology, data model, and execution flow.
+
+Arbitrum Earn addresses that by presenting opportunities in a consistent format. Users can compare APY, TVL, asset, and protocol details side by side, then move from discovery to execution on a single Arbitrum-native surface.
+
+![Arbitrum Portal Screen Discover](https://mintcdn.com/vaultsfyi/iaDHUkJH8PdInkGw/images/arbitrum_portal_screen_discover.png?fit=max\&auto=format\&n=iaDHUkJH8PdInkGw\&q=85\&s=223561de8f0054f7e41e253019dcdbab)
+
+Protocol selection for Earn uses vaults.fyi's Reputation Scores as one input. Users see a curated set of opportunities in the interface, while Reputation Scores stay in the background rather than appearing as a user-facing ranking.
+
+## The Solution: One API for Standardized Yield Infrastructure
+
+Arbitrum Earn runs on the vaults.fyi API. Rather than build and maintain a separate integration for every protocol, the Portal uses one API layer for standardized yield data, transaction payloads, and position tracking across the ecosystem.
+
+The integration also preserves self-custody. Transactions route directly to the underlying protocol, with no vaults.fyi proxy contract, no intermediary contract holding funds, and no additional wrappers on top. The position a user opens through Arbitrum Earn is the same underlying protocol position they would receive by going to the protocol directly.
+
+## Better Discovery and Attribution for the Ecosystem
+
+Arbitrum Earn helps protocols reach users who already hold assets on Arbitrum. Being included in an ecosystem-level earn surface means users can find a protocol's opportunities in context, next to other relevant options, without needing to know every protocol interface in advance.
+
+For the Arbitrum ecosystem, Earn creates a shared layer for yield discovery and execution that can expand as new protocols, assets, and opportunities come online.
+
+It also creates the foundation for measurable distribution. vaults.fyi attribution can show which surfaces, campaigns, and integrators drive deposits into protocols. That helps ecosystems understand what is working, helps protocols reward distribution partners, and gives integrators a clear record of the TVL they create.
+
+## API Capabilities Used
+
+* **Market data:** Standardized APY, TVL, asset, protocol, and vault metadata for yield discovery and comparison.
+* **Transaction support:** Ready-to-sign payloads that let users deposit into supported opportunities directly from the Portal experience.
+* **Position tracking:** Portfolio visibility across supported vault positions without protocol-specific indexing work.
+* **Attribution and TVL tracking:** Measurement of deposits driven by ecosystem surfaces, campaigns, and integrators.
+
+## What's Next
+
+Bringing Earn to the Portal is the first step in a longer collaboration between Arbitrum and vaults.fyi. The teams are working alongside Offchain Labs and the broader Arbitrum ecosystem to keep making DeFi yield more accessible to users across the network.
+
+The first user benefit is simple access to yield. Over time, the same infrastructure can support better incentive programs, smarter ecosystem growth, and more ways for users to discover productive opportunities on Arbitrum.
+
+***
+
+Want to add native yield discovery and execution to your ecosystem portal? [Get API access](https://portal.vaults.fyi/signup) to explore the market data, transaction, position tracking, and attribution APIs powering Arbitrum Earn.
+
+
+# Jumper Earn: Cross-Chain Yield Discovery Powered by vaults.fyi
+Source: https://docs.vaults.fyi/resources/case-studies/jumper-earn
+
+> How Jumper Earn uses the vaults.fyi API to unify yield discovery, transaction execution, position tracking, and attribution across DeFi chains and protocols.
+
+[Jumper Earn](https://jumper.exchange/earn/) is a personalized yield discovery and execution engine that moves users from idle assets to earning positions through a single, intent-based workflow. By integrating the vaults.fyi API, Jumper accesses standardized yield data, ready-to-sign transaction payloads, position tracking, and attribution infrastructure — without maintaining protocol-specific integrations.
+
+![Jumper Screen4](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/jumper_screen4.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=f6cda09a842337599b7dfa6425f2ff49)
+
+## The Problem: Fragmented Cross-Chain Yields
+
+Despite DeFi's growth, yield opportunities remain scattered across chains and protocols. Users face compounding sources of friction:
+
+* **Discovery fragmentation:** Yields are spread across dozens of networks and protocols, each with different interfaces and standards.
+* **Asset mismatch:** Users rarely hold the exact token a vault requires, making swaps or bridges a prerequisite.
+* **Execution complexity:** Moving from an asset on Chain A to a vault on Chain B can require five or more manual steps: approve → swap → bridge → swap → deposit.
+* **Data staleness:** Inaccurate or delayed yield data leads to failed or suboptimal transactions.
+
+These frictions reduce the conversion from yield discovery to actual deposits and create substantial integration overhead for any application trying to unify the experience.
+
+## How Jumper Uses the vaults.fyi API
+
+### Market and Vault Data
+
+Jumper uses vaults.fyi as its data layer for vault metadata and strategy descriptions, real-time and historical APY and TVL, and yield and incentive breakdowns. This standardized coverage enables consistent comparisons across protocols and removes the need for custom data pipelines per integration.
+
+![Jumper Screen2](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/jumper_screen2.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=43192fed93b85784a4d8411fd4ae575f)
+
+### Transaction Payloads
+
+For supported vaults, vaults.fyi provides ready-to-sign calldata for token approvals, deposits, and withdrawals — including multi-step flows where users enter a redemption queue. These payloads feed directly into Jumper's routing engine. For cross-chain or multi-step flows, Jumper orchestrates via LI.FI Composer, bundling actions into a single user-facing confirmation.
+
+![Jumper Screen1](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/jumper_screen1.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=ac77412e2151fb59365c614df02ea3c2)
+
+### Position Tracking
+
+vaults.fyi position endpoints power Jumper's portfolio visibility: detecting existing vault positions, tracking deposited balances, and supporting cross-chain views — without requiring direct integration with each protocol's indexing logic.
+
+![Jumper Screen3](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/jumper_screen3.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=e1c59b80d13ff849fcee44ea2bc82893)
+
+### Attribution and TVL Tracking
+
+vaults.fyi provides infrastructure for measuring distribution and adoption. Jumper uses it to track inflows originating from Jumper Earn, monitor net TVL associated with its integration, and attribute deposits to specific vault providers. This creates a shared, onchain-based source of truth for both integrators and vault curators — eliminating the need for manually reported analytics.
+
+## Example User Flow
+
+1. **Wallet connection:** Jumper detects existing assets and vault positions.
+2. **Yield discovery:** Relevant vaults are surfaced based on the user's holdings.
+3. **Execution:** The user selects a vault and confirms. Swaps, bridges, and deposits are orchestrated using vaults.fyi payloads where applicable.
+4. **Post-execution tracking:** Positions are tracked via vaults.fyi and other sources.
+
+## Results
+
+* **Reduced integration overhead** — a single API replaced many custom protocol integrations.
+* **Improved conversion** — streamlined discovery-to-deposit flows reduced time-to-yield for users.
+* **Measurable distribution** — attribution and TVL tracking gave both Jumper and vault providers a neutral source of truth.
+* **Consistent yield data** — standardized APY and TVL improved comparability and user decision-making.
+
+***
+
+Jumper Earn shows how integrators can deliver end-to-end yield experiences by combining vaults.fyi for data, transaction support, and attribution with Jumper and LI.FI for routing and cross-chain execution. [Get API access](https://portal.vaults.fyi/signup) to build a similar integration.
+
+
+# Kraken Wallet: Personalized DeFi Yield Inside a Self-Custody Wallet
+Source: https://docs.vaults.fyi/resources/case-studies/kraken-wallet
+
+> How Kraken Wallet uses the vaults.fyi API to surface personalized DeFi earning opportunities inside its native wallet UI across Ethereum, Base, Optimism, Arbitrum, and Polygon.
+
+[Kraken Wallet](https://www.kraken.com/wallet) is a self-custody wallet built to connect users to the decentralized web safely and securely. Through the vaults.fyi API, Kraken powers analytics, personalized yield suggestions, and portfolio tracking across multiple protocols and networks — all within the native wallet interface.
+
+This integration is a core part of Kraken's strategy to establish itself as a leading wallet for DeFi, treating Earn as a first-class product experience rather than an afterthought.
+
+![Image](https://mintcdn.com/vaultsfyi/OXWJB6gJZqbYX-wQ/images/kraken_earn_1.png?fit=max\&auto=format\&n=OXWJB6gJZqbYX-wQ\&q=85\&s=083c6d332543a2eb665433149e452543)
+
+![Kraken Wallet Screen4](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/kraken_wallet_screen4.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=eac97ee67bd5841099cbb93cef894683)
+
+![Kraken Wallet Screen3](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/kraken_wallet_screen3.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=64d26c4ea4d02636a8354f39e3847381)
+
+## How It Works
+
+**Token-level yield suggestions.** When users view their balances and select a specific asset, the vaults.fyi API surfaces relevant Earn opportunities for that token, meeting users at the moment of intent.
+
+**Explore tab.** Powered by vaults.fyi market data, the Explore tab lets users browse DeFi opportunities across major protocols without leaving the wallet.
+
+**Multi-chain coverage.** The integration spans Ethereum Mainnet, Base, Optimism, Arbitrum, and Polygon, giving users a cross-chain view of yield opportunities from a single interface.
+
+**Curated protocol selection.** Users can access yields from dozens of leading protocols and filter by their preferences.
+
+## API Capabilities Used
+
+The integration relies on core vaults.fyi API categories:
+
+* **Market data:** APY, TVL, and vault metadata (icons, descriptions, etc.) across protocols and networks.
+* **Portfolio tracking:** Accurate position values, transaction events, and returns accrued on each yield-bearing position.
+
+## Why Kraken Built This with vaults.fyi
+
+Building DeFi yield analytics in-house would require maintaining protocol-specific indexers, normalizing yield calculations across incompatible schemas, and tracking coverage across five networks continuously. By integrating vaults.fyi, Kraken reduced that to a single API, enabling the team to focus on product experience rather than data infrastructure.
+
+**For users, this means:**
+
+* Personalized earning suggestions based on actual holdings.
+* Yield discovery without leaving the wallet.
+* Multi-chain opportunities in one place.
+* Real-time data from verified onchain sources.
+
+***
+
+Ready to add DeFi yield discovery to your wallet or app? [Get API access](https://portal.vaults.fyi/signup) to explore the market data and portfolio endpoints Kraken uses.
+
+
+# Gauntlet: Normalized Onchain Yield Data for DeFi Risk Research
+Source: https://docs.vaults.fyi/resources/case-studies/gauntlet
+
+> How Gauntlet uses the vaults.fyi API to access normalized yield data across protocols for quantitative DeFi research and risk modeling.
+
+[Gauntlet](https://www.gauntlet.xyz/) is a leader in data-driven onchain yield strategy. The team provides applied research and risk management services to clients including Coinbase, Morpho, Uniswap, Arbitrum, and NEAR, with models safeguarding over **\$42 billion** in digital assets across the crypto ecosystem.
+
+To enhance internal research and protocol modeling, Gauntlet integrated the vaults.fyi API as a data source. This provides their team with normalized, up-to-date yield data across dozens of protocols and networks, without the overhead of maintaining bespoke indexers or reconciling disparate sources.
+
+![Gauntlet App](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/gauntlet_app.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=5a685df79d426c09a7d9f4af1235cc58)
+
+## The Challenge: Fragmented, High-Maintenance Yield Data
+
+Gauntlet's models depend on high-quality onchain data, but aggregating yield data at scale presents compounding challenges:
+
+* **Data fragmentation:** Yield mechanisms differ widely across protocols, making standardized comparisons difficult without normalization for metrics such as supply/borrow APYs, staking rewards, and real-world asset returns.
+* **Maintenance burden:** In-house indexers require constant updates as protocols evolve, consuming engineering resources that could go toward modeling.
+* **Cross-chain complexity:** Coverage across multiple L1s and L2s multiplies the surface area to monitor, and errors at the data layer propagate into research outputs.
+
+For a firm where data quality directly affects the integrity of risk models, these aren't just operational problems. They're risks.
+
+## The Solution: A Single API for Normalized Yield Data
+
+By integrating vaults.fyi, Gauntlet can:
+
+* Access normalized APY data across protocols and blockchain networks through a single interface.
+* Pull historical yield trends to analyze volatility, time-based behavior, and protocol-specific risk.
+* Incorporate live and historical vault data into quantitative models without building custom pipelines per protocol.
+* Eliminate maintenance overhead as protocols update, upgrade, or launch new products.
+
+This lets Gauntlet focus on what it does best — building simulations and strategies — while relying on vaults.fyi for the underlying yield data infrastructure.
+
+## Outcome
+
+vaults.fyi serves as a data partner supporting Gauntlet's research across DeFi. As Gauntlet pushes the frontier of onchain economic modeling, normalized yield data from vaults.fyi feeds directly into the risk models that protect billions in digital assets.
+
+***
+
+Integrating DeFi yield data into your research stack? [Get API access](https://portal.vaults.fyi/signup) to explore the historical and market data endpoints Gauntlet uses.
+
+
+# KPK: From Treasury Data to Full-Stack Yield Infrastructure
+Source: https://docs.vaults.fyi/resources/case-studies/kpk
+
+> How KPK's relationship with vaults.fyi expanded from normalized yield data into non-custodial DAO treasury workflows, vault integrations, position tracking, and the APIs supporting app.kpk.io.
+
+[KPK](https://kpk.io/) works with vaults.fyi across several workflows: market data, monitoring, position tracking, and vault integrations. The relationship started with a focused data need and expanded into one of the integration layers KPK uses to support its curated vault products.
+
+![KPK App](https://mintcdn.com/vaultsfyi/Z6RjNl_FF-y949Jw/images/kpk_app.png?fit=max\&auto=format\&n=Z6RjNl_FF-y949Jw\&q=85\&s=4b44427806b6d3ceadb046d316f62211)
+
+**Who Is KPK**
+
+KPK is a non-custodial onchain asset manager. Founded in 2021 as karpatkey, KPK manages capital for DAOs and institutions through treasury mandates, funds, and vaults.
+
+In 2025, KPK expanded beyond DAO treasury management into curated vaults for DeFi protocols and retail participants.
+
+**The Starting Point**
+
+KPK first came to vaults.fyi for its analytics. Their team needed normalized yield, TVL, vault metadata, and historical APY data across protocols and chains.
+
+That data supported internal allocation work for KPK's treasury and vault teams. Building and maintaining those integrations in-house would have pulled engineering time away from strategy design, risk management, and customer-facing product work. Vaults.fyi handled the data layer so KPK could focus on the work their clients and depositors rely on them to do.
+
+**How The Relationship Expanded**
+
+**1. Deeper Vault Coverage**\
+As KPK expanded its vault products, vaults.fyi expanded coverage around the protocols and products that mattered most to them. That includes the vaults KPK wanted to monitor internally, the products they wanted to expose to depositors, and the APIs, SDKs, and tools they needed to make those products accessible to integrators.
+
+The same coverage supports discovery, reporting, and integration. KPK can track their own products in the same normalized system that third-party platforms can use to discover and route into those vaults.
+
+**2. Data and Monitoring for DAO Treasury Workflows**
+
+KPK uses vaults.fyi to support DAO treasury workflows that depend on accurate, normalised data. The treasury team pulls address holdings, position data, and historical metrics through the API to monitor exposures and run internal calculations. When execution is needed, KPK signs from its own wallet and executes against the underlying protocol, fully non-custodial throughout.
+
+That matters for teams operating DAO treasuries across multiple vault protocols. They need reliable data, consistent vault metadata, and a workflow that does not require rebuilding every protocol integration from scratch.
+
+**3. Portfolio And Position Tracking**
+
+KPK also uses vaults.fyi position data to support portfolio visibility. The API can return balances, accrued yield, and historical performance across supported vault positions.
+
+For KPK, that data can supplement customer reporting and internal monitoring. For integrators, the same infrastructure makes vault positions easier to show inside wallets, dashboards, and custom applications.
+
+**4. Infrastructure For KPK's Own App**
+
+KPK's vault portal at [app.kpk.io](https://app.kpk.io/) uses vaults.fyi APIs as its underlying yield infrastructure. Vault metadata, market data, transaction payloads, and position tracking all come from the same API surface.
+
+That lets KPK own the user experience and curation layer while vaults.fyi handles the integration layer underneath. KPK focuses on strategy design, curation, and the depositor experience. Vaults.fyi provides one of the integration layers that helps make those vaults accessible across surfaces.
+
+**Why It Matters**
+
+KPK shows one expansion path for serious vault teams. Data is the entry point. Once a team works with the data layer, the same infrastructure can support monitoring, attribution, and custom distribution.
+
+That expansion compounds because each layer uses the same underlying integrations, which reduces duplication across data, monitoring, and distribution workflows.
+
+*"vaults.fyi has been a useful data partner from the start. Their coverage across protocols meant we could move quickly on [app.kpk.io](https://app.kpk.io/) and on internal monitoring without rebuilding every integration ourselves."* — João Bandeira, Product Engineering Lead, KPK
+
+**What's Next**
+
+KPK and vaults.fyi continue to expand the relationship as KPK launches new vault structures and distribution paths. The next stage is deeper integrator support, better fee accounting feedback loops, and clearer reporting around the TVL that each channel drives.
+
+The relationship started with a single data feed. It now points toward a broader infrastructure partnership for curated vault products.
+
+
+# Otus: Smart Yield Account Powered by vaults.fyi
+Source: https://docs.vaults.fyi/resources/case-studies/otus
+
+> How Otus uses the vaults.fyi API to power Smart Yield, an agent-managed stablecoin account backed by DeFi yield infrastructure.
+
+[Otus](https://www.otus.io/) is building a consumer finance app around one account that can access DeFi yield. Users deposit stablecoins, and Otus manages allocation and rebalancing across an approved set of yield sources.
+
+Otus uses vaults.fyi as the yield infrastructure behind that experience. The Otus team can focus on agent logic, embedded wallets, and consumer UX while vaults.fyi handles vault discovery, risk signals, transaction payloads, position tracking, and attribution across supported DeFi protocols.
+
+## How it works
+
+Smart Yield combines embedded wallets, agent decisioning, and vaults.fyi transaction infrastructure.
+
+**Example User Flow**
+
+1. A user opens a Smart Yield account and deposits stablecoins.
+2. The Otus agent evaluates a whitelisted set of yield sources.
+3. vaults.fyi provides vault metadata, market data, and Reputation Scores to help narrow the approved universe.
+4. vaults.fyi returns ready-to-sign transaction payloads for deposits, rebalances, and withdrawals.
+5. Otus signs and submits transactions through its Privy-powered wallet experience.
+6. vaults.fyi portfolio endpoints track where funds sit and what each user has earned.
+
+![Otus Case Study Screenshot 1](https://mintcdn.com/vaultsfyi/aTXppGt3_h2pc549/images/otus_case_study_screenshot.png?fit=max\&auto=format\&n=aTXppGt3_h2pc549\&q=85\&s=ab6aab2a028972277857645300c45cab)
+
+The result is a single user-facing balance backed by multiple DeFi vaults, with the custody and signing experience kept separate from the yield infrastructure.
+
+## API capabilities used
+
+The Otus integration uses several vaults.fyi API categories:
+
+* **Vault discovery:** Live and historical APY, TVL, protocol, asset, fee, and metadata across supported EVM vaults.
+* **Reputation Scores:** Protocol, network, and vault-level signals used to narrow the agent's approved universe.
+* **Transaction payloads:** Ready-to-sign deposit, redeem, and claim transactions that Otus routes through its wallet stack.
+* **Portfolio tracking:** Unified position and return data across the underlying protocols a user may be allocated to.
+* **TVL attribution:** Reporting on deposits routed through Otus, with vault-level and address-level detail for reconciliation.
+* **Referral and rebate support:** Attribution data that can support referral and rebate programs where available.
+
+## Risk scoring and curation
+
+Otus does not expose the full DeFi yield universe directly to users. It filters vaults into a conservative set focused on established lending and savings protocols, including over-collateralized money markets. Reputation Scores help the Otus agent evaluate protocol health, network health, and vault history before a strategy can enter the approved set.
+
+Otus focuses on saver-style yields from established markets and treats unusually high-risk sources as out of scope.
+
+## Why Otus built this with vaults.fyi
+
+Smart Yield depends on breadth and reliability. The agent needs current data, risk context, transaction execution, and position tracking across many protocols, not a single hardcoded vault. Building that in-house would mean maintaining protocol-specific integrations, monitoring rate changes, normalizing portfolio data, and building attribution workflows across multiple DeFi systems.
+
+With vaults.fyi, Otus gets one API layer for discovery, risk filtering, transactions, portfolio tracking, attribution, and referral or rebate support. That lets the team keep its engineering focus on the agent and account experience.
+
+***
+
+Ready to build an agent-managed yield account? [Get API access](https://portal.vaults.fyi/signup) to start integrating.
+
+
+# Maple Finance: Independent APY Benchmarking for Institutional DeFi
+Source: https://docs.vaults.fyi/resources/case-studies/maple-finance
+
+> How Maple Finance uses the vaults.fyi API to benchmark syrupUSDC yields against the DeFi market and provide independently verified APY data — building investor trust through third-party transparency.
+
+[Maple Finance](https://maple.finance/) is a leading onchain asset manager offering institutional products across secured lending, structured products, and institutional staking. Maple blends DeFi efficiency with the underwriting standards and custody solutions expected by sophisticated capital allocators.
+
+To benchmark syrupUSDC's performance and display competitive yields transparently, Maple integrated the vaults.fyi API as both a market intelligence tool and an independent, third-party data source.
+
+## The Challenge: Benchmarking Yield and Building Investor Trust
+
+For institutional asset managers, context matters. Investors want to know how yields compare to other available opportunities — and they need confidence that the numbers aren't self-reported.
+
+Maple faced two specific challenges:
+
+* **Competitive benchmarking:** Accessing real-time stablecoin yields across DeFi to measure syrupUSDC's performance against the market.
+* **Independent validation:** Displaying externally sourced APY data to reduce reliance on self-reported metrics and build investor trust.
+
+Without a standardized, comprehensive DeFi yield dataset, solving both would have required significant development and ongoing data sourcing effort.
+
+## The Solution: Third-Party Yield Data from vaults.fyi
+
+By integrating vaults.fyi, Maple Finance now has:
+
+* **Real-time benchmarks** — live comparison of syrupUSDC against leading stablecoin vaults across DeFi.
+* **Independent APY validation** — third-party metrics that transparently display syrupUSDC's performance without relying on internal figures.
+* **Historical yield tracking** — time-series data to analyze syrupUSDC's competitiveness over time.
+
+The integration was completed in days, enabling Maple to streamline performance monitoring and confidently surface independent data to investors. Maple published yield comparisons using vaults.fyi onchain data in their [Maple Yield Performance 2024](https://maple.finance/insights/maple-yield-performance-2024) report.
+
+![Maple 2024 Report](https://mintcdn.com/vaultsfyi/hj3ZsHX8FvK7H-F8/images/maple_2024_report.png?fit=max\&auto=format\&n=hj3ZsHX8FvK7H-F8\&q=85\&s=98f19315d184669fda0ba986d3a3b1df)
+
+## Why Independent Validation Matters
+
+Using a third-party data source signals to investors that Maple isn't grading its own homework. As vaults.fyi aggregates yield data directly from onchain sources using a consistent methodology, the numbers displayed on Maple's platform carry independent credibility — the same standard institutional investors expect in traditional finance.
+
+This approach aligns Maple with an emerging practice in DeFi: leveraging neutral, onchain-based data providers to validate performance rather than relying solely on protocol-reported figures.
+
+**Key outcomes:**
+
+* Instant market context for benchmarking syrupUSDC against competing vaults.
+* Third-party APY data that builds user and investor trust.
+* No custom data infrastructure to build or maintain.
+* Integration completed in days rather than weeks.
+
+***
+
+Looking to benchmark your protocol's yield against the DeFi market? [Get API access](https://portal.vaults.fyi/signup) to explore the benchmarks and market data endpoints Maple uses.
+
+
+# Brand Kit
+Source: https://docs.vaults.fyi/resources/brand
+
+> Logos, colors, and typography for vaults.fyi. For press coverage, integration listings, and co-marketing.
+
+## Logos
+
+### Logo lockup
+
+The logo lockup pairs the symbol with the "vaults.fyi" wordmark. Three color variants are available depending on background.
+
+**On light background**
+
+![vaults.fyi logo — on light background](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-384px-color.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=36ec8009284a17de79a921cf82a9e0c7)
+[SVG](/images/Logo-24px-color.svg)
+[PNG](/images/Logo-384px-color.png)
+
+**On dark background**
+
+![vaults.fyi logo — on dark background](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-384px-color-darkbg.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=d9aaba8f5a98c8ffa4757be8aae9ce35)
+[SVG](/images/Logo-24px-color-darkbg.svg)
+[PNG](/images/Logo-384px-color-darkbg.png)
+
+**On brand blue**
+
+![vaults.fyi logo — on brand blue](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-384px-white.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=83209def8b210124b3bf53b5ccc42449)
+[SVG](/images/Logo-24px-white.svg)
+[PNG](/images/Logo-384px-white.png)
+
+### Symbol only
+
+Use the symbol without the wordmark only at small sizes (favicons, app icons, UI contexts where the full lockup is too wide).
+
+**On light background**
+
+![vaults.fyi symbol — gradient on light background](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-symbol-gradient.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=8563b72f575d0a8728bc8c264c2cef2d)
+[SVG](/images/Logo-symbol-gradient.svg)
+[PNG](/images/Logo-symbol-gradient.png)
+
+**On dark background**
+
+![vaults.fyi symbol — gradient on dark background](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-symbol-gradient.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=8563b72f575d0a8728bc8c264c2cef2d)
+[SVG](/images/Logo-symbol-gradient.svg)
+[PNG](/images/Logo-symbol-gradient.png)
+
+**On brand blue**
+
+![vaults.fyi symbol — white on brand blue](https://mintcdn.com/vaultsfyi/e2nu_rHbR1M8lgfT/images/Logo-symbol-white.png?fit=max\&auto=format\&n=e2nu_rHbR1M8lgfT\&q=85\&s=41ff48317da19cd4b3d62d9059b89a6d)
+[SVG](/images/Logo-symbol-white.svg)
+[PNG](/images/Logo-symbol-white.png)
+
+### Logo usage
+
+> [!WARNING]
+>
+> Never crop, distort, recolor, rotate, or add effects to the logo. Do not change the relative proportions of the symbol and logotype.
+
+| Do | Don't |
+| - | - |
+| Use the gradient symbol on light or dark backgrounds | Place the color logo on busy or patterned backgrounds |
+| Use the white logo on brand blue surfaces | Recolor the symbol to a non-brand color |
+| Use black or white versions for single-color print contexts | Stretch, skew, or rotate the logo |
+| Keep clear space around the logo | Use the symbol alone where the full lockup fits |
+
+***
+
+## Colors
+
+### Primary
+
+\#1A8BFFprimary-500 — UI, links, interactive elements
+
+\#48A2FFprimary-400 — dark mode variant of primary-500
+
+**Full primary scale**
+
+| Token | Hex | Swatch |
+| - | - | - |
+| primary-50 | `#E8F3FF` | |
+| primary-100 | `#B8DBFF` | |
+| primary-200 | `#96CAFF` | |
+| primary-300 | `#66B1FF` | |
+| primary-400 | `#48A2FF` | |
+| primary-500 | `#1A8BFF` | |
+| primary-600 | `#187EE8` | |
+| primary-700 | `#1263B5` | |
+| primary-800 | `#0E4C8C` | |
+| primary-900 | `#0B3A6B` | |
+
+### Neutrals
+
+**Full neutral scale**
+
+| Token | Hex | Swatch |
+| - | - | - |
+| neutral-50 | `#FFFFFF` | |
+| neutral-100 | `#F8F9FC` | |
+| neutral-200 | `#F2F4F9` | |
+| neutral-250 | `#C2C9DB` | |
+| neutral-300 | `#9297B4` | |
+| neutral-400 | `#697098` | |
+| neutral-500 | `#555B7C` | |
+| neutral-600 | `#2C3251` | |
+| neutral-650 | `#232539` | |
+| neutral-700 | `#1B1D2C` | |
+| neutral-800 | `#141625` | |
+| neutral-900 | `#0F1121` | |
+
+**Text colors**
+
+Text colors are semantic and mode-aware — always reference by token name in code, not by hex. The three most commonly used are below; hex values are for reference only.
+
+Heading#141625 light / #F8F9FC dark — H1–H6, prominent body text
+
+Caption#697098 light / #C2C9DB dark — secondary/muted text
+
+Button#FFFFFF (both modes) — button label on primary backgrounds
+
+### State colors (reserved)
+
+Reserved for status indicators only — never for data series, decorative elements, or general UI.
+
+\#2BD4A1success-500 — positive / good
+
+\#D52A4Cerror-500 — negative / bad
+
+\#D55D2Awarning-500 — caution
+
+**Full state scales**
+
+| Token | Hex | | Token | Hex | | Token | Hex |
+| - | - | - | - | - | - | - | - |
+| success-50 | `#EAFBF6` | | warning-50 | `#FBEFEA` | | error-50 | `#FBEAED` |
+| success-100 | `#BDF2E2` | | warning-100 | `#F2CDBD` | | error-100 | `#F2BDC8` |
+| success-200 | `#9DEBD4` | | warning-200 | `#ECB49D` | | error-200 | `#EC9DAD` |
+| success-300 | `#71E2C0` | | warning-300 | `#E39270` | | error-300 | `#E37087` |
+| success-400 | `#55DDB4` | | warning-400 | `#DD7D55` | | error-400 | `#DD5570` |
+| success-500 | `#2BD4A1` | | warning-500 | `#D55D2A` | | error-500 | `#D52A4C` |
+| success-600 | `#27C193` | | warning-600 | `#C25526` | | error-600 | `#C22645` |
+| success-700 | `#1F9772` | | warning-700 | `#97421E` | | error-700 | `#971E36` |
+| success-800 | `#187559` | | warning-800 | `#753317` | | error-800 | `#75172A` |
+| success-900 | `#125944` | | warning-900 | `#592712` | | error-900 | `#591220` |
+
+### Chart colors
+
+Reserved for data visualization — charts, graphs, and sparklines only. Never for UI elements.
+
+`#1A8BFF`
+
+`#64B5F6`
+
+`#0D5EBF`
+
+`#8B5CF6`
+
+### Accent palettes
+
+Extended palettes for multi-series charts and data visualizations. Each palette has stops at 50, 400, 500, 600, and 950.
+
+**All accent palettes**
+
+| Palette | 50 | 400 | 500 | 600 | 950 |
+| - | - | - | - | - | - |
+| teal | `#F0FDFA` | `#2DD4BF` | `#14B8A6` | `#0D9488` | `#042F2E` |
+| violet | `#F5F3FF` | `#A78BFA` | `#8B5CF6` | `#7C3AED` | `#2E1065` |
+| fuchsia | `#FDF4FF` | `#E879F9` | `#D946EF` | `#C026D3` | `#4A044E` |
+| pink | `#FDF2F8` | `#F472B6` | `#EC4899` | `#DB2777` | `#500724` |
+| orange | `#FFF7ED` | `#FF8905` | `#FF6900` | `#F54900` | `#441306` |
+| emerald | `#ECFDF5` | `#00D492` | `#00BC7D` | `#009966` | `#002C21` |
+| cyan | `#ECFEFF` | `#00D3F2` | `#00B8DB` | `#0092B8` | `#073345` |
+| rose | `#FEF1F2` | `#FF637E` | `#FF1F57` | `#EC0040` | `#4D0218` |
+| blue | `#EFF9FF` | `#50A2FF` | `#2C7FFF` | `#145DFB` | `#162455` |
+| yellow | `#FEFCE8` | `#FEC700` | `#F0B000` | `#D18700` | `#431F05` |
+
+***
+
+## Name and usage
+
+The brand name is **vaults.fyi** — always lowercase, always with the dot. Lowercase is intentional, not a typo.
+
+| Context | Form |
+| - | - |
+| Prose, social, UI copy | `vaults.fyi` |
+| Document titles, app store listings, co-marketing tables | `Vaults.fyi` |
+| URLs | `vaults.fyi`, `app.vaults.fyi` |
+
+> [!WARNING]
+>
+> The dot is part of the name. Never write `vaultsfyi`, `VaultsFYI`, `vaults.FYI`, or `VAULTS.FYI`.
+
+**Sentence starts.** Restructure to avoid opening with the name — `"vaults.fyi launched..."` reads as a typo to most people. Lead with context instead: `"Today we launched..."` or `"The new vaults.fyi feature..."`.
+
+**Products.** `app.vaults.fyi` and the vaults.fyi API are distinct products under the vaults.fyi brand. Use the full product name when referring to a specific one, not just "vaults.fyi."
+
+***
+
+## Typography
+
+| Font | Use |
+| - | - |
+| **Geist** | Body text, headings, UI labels |
+| **Geist Mono** | Table headers, code, numeric data |
+
+Both fonts are available from [Vercel's Geist font page](https://vercel.com/font).
+
+***
+
+## Press and media
+
+For press inquiries or co-marketing requests, reach out at [gm@wallfacer.io](mailto:gm@wallfacer.io) or via [@vaultsfyi](https://twitter.com/vaultsfyi) on X.

@@ -1,0 +1,1112 @@
+# vaults.fyi docs: TypeScript and Python SDK quickstart, method reference and tutorials
+
+Part of https://docs.vaults.fyi/llms-full.txt (core). Same page format: each page starts with `# Title` and a `Source:` line.
+
+# SDK quickstart: TypeScript (@vaultsfyi/sdk) and Python (vaultsfyi)
+Source: https://docs.vaults.fyi/sdk/quickstart
+
+> Install @vaultsfyi/sdk 2.3.14 or vaultsfyi 1.3.0, set VAULTSFYI_API_KEY, and run a tested first script that fetches deposit options for a wallet and one vault's APY; includes response shape, defaults, credit cost and SDK-specific pitfalls.
+
+This page gets you from nothing to a working vaults.fyi SDK call in TypeScript or Python. It installs the published packages, sets the API key, runs one script that fetches personalized deposit options for a wallet and one vault's APY, and lists the SDK quirks that break code copied from older docs. Use it before the [SDK reference](/sdk/reference).
+
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** (Node.js 18+, ESM) and **`vaultsfyi` 1.3.0** (Python 3.8+; tested on 3.9), from a clean install in an empty directory. Both SDKs call the REST API at `https://api.vaults.fyi` and send your key in the `x-api-key` header. Outputs below are real.
+
+## 1. Install
+
+TypeScript (the script runs with `tsx`; any ESM TypeScript runner works):
+
+```bash
+npm install @vaultsfyi/sdk@2.3.14 tsx
+```
+
+Python:
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install vaultsfyi==1.3.0
+```
+
+## 2. Set your API key
+
+Get a key at [portal.vaults.fyi](https://portal.vaults.fyi/signup) (pay-as-you-go is $0.002 per credit). Keep it in the environment, never in code:
+
+```bash
+export VAULTSFYI_API_KEY="<your API key from portal.vaults.fyi>"
+```
+
+## 3. First script
+
+TypeScript, saved as `quickstart.ts` (the project's `package.json` needs `"type": "module"`):
+
+```typescript
+// SDK quickstart (TypeScript, @vaultsfyi/sdk 2.3.14). Node >= 18, ESM ("type": "module").
+import { VaultsSdk } from '@vaultsfyi/sdk';
+
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
+
+// First call: personalized deposit options for a wallet (GET /v2/portfolio/best-deposit-options/{userAddress}).
+const options = await sdk.getDepositOptions({
+  path: { userAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045' },
+  query: { allowedAssets: ['USDC'], onlyTransactional: true, maxVaultsPerAsset: 2 },
+});
+for (const b of options.userBalances) {
+  if (!b.asset) continue; // typed optional in the SDK; always present in practice
+  console.log(b.asset.symbol, 'balance (base units):', b.asset.balanceNative, 'decimals:', b.asset.decimals);
+  for (const v of b.depositOptions) {
+    console.log(`  ${v.network.name} ${v.name}: ${(v.apy.total * 100).toFixed(2)} %  vaultId ${v.vaultId}`);
+  }
+}
+
+// One vault (path key is vaultId, not vaultAddress).
+const vault = await sdk.getVault({ path: { network: 'base', vaultId: '0xbeeff2490FEffa212faC2f6553682C219E6a8845' } });
+console.log(vault.name, '7d APY', `${(vault.apy['7day'].total * 100).toFixed(2)} %`);
+```
+
+Python, saved as `quickstart.py`:
+
+```python
+"""SDK quickstart (Python, vaultsfyi 1.3.0). Python >= 3.8."""
+import os
+
+from vaultsfyi import VaultsSdk
+
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
+
+options = client.get_deposit_options(
+    "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    allowed_assets=["USDC"],
+    only_transactional=True,
+    max_vaults_per_asset=2,
+)
+for b in options["userBalances"]:
+    print(b["asset"]["symbol"], "balance (base units):", b["asset"]["balanceNative"], "decimals:", b["asset"]["decimals"])
+    for v in b["depositOptions"]:
+        print(f'  {v["network"]["name"]} {v["name"]}: {v["apy"]["total"] * 100:.2f} %  vaultId {v["vaultId"]}')
+
+# One vault. The Python SDK names this argument vault_address, but it is the REST vaultId.
+vault = client.get_vault("base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845")
+print(vault["name"], "7d APY", f'{vault["apy"]["7day"]["total"] * 100:.2f} %')
+```
+
+## 4. Run it
+
+```bash
+npx tsx quickstart.ts
+```
+
+```bash
+python quickstart.py
+```
+
+Output (2026-10-23, identical for both; trimmed to the first network and the last line):
+
+```text
+USDC balance (base units): 78995979 decimals: 6
+  base Midas mLIQUIDITY: 69.75 %  vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873
+  base Harvest 40 Acres USDC: 27.84 %  vaultId 0xC777031D50F632083Be7080e51E390709062263E
+...
+Steakhouse High Yield USDC Edition 7d APY 3.15 %
+```
+
+## What the first call returned
+
+`getDepositOptions` / `get_deposit_options` wraps `GET /v2/portfolio/best-deposit-options/{userAddress}` and costs **1 credit + 2 per vault returned** (this run: 9 vaults, 19 credits). `getVault` / `get_vault` wraps `GET /v2/detailed-vaults/{network}/{vaultId}` (3 credits). The response, trimmed to one balance and one option (real values):
+
+```json
+{
+  "requestedAddress": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "userBalances": [
+    {
+      "asset": {
+        "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "symbol": "USDC",
+        "decimals": 6,
+        "balanceNative": "78995979",
+        "balanceUsd": "78.98465729628973"
+      },
+      "depositOptions": [
+        {
+          "vaultId": "0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873",
+          "name": "Midas mLIQUIDITY",
+          "network": {
+            "name": "base",
+            "chainId": 8453
+          },
+          "isTransactional": true,
+          "tvl": {
+            "usd": "736693",
+            "native": "736798625343"
+          },
+          "apy": {
+            "base": 0.6975,
+            "reward": 0,
+            "total": 0.6975
+          },
+          "projectedUsdAnnualEarnings": "55.09179846416209"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`balanceNative` is base units (78995979 = 78.995979 USDC); `apy` is a decimal fraction (0.6975 = 69.75 %, a real but unusual value: check TVL and score before showing it). Defaults of this endpoint: networks base, mainnet, arbitrum and optimism; `minTvl=100000`; `onlyAppFeatured=true`; `allowVaultsWithWarnings=false`; `maxVaultsPerAsset=3`; APY window `7day`. The wallet holds USDC on several networks, so USDC appears once per network.
+
+## Things that differ from older SDK docs
+
+- **Import (TypeScript):** `import { VaultsSdk } from '@vaultsfyi/sdk'`. The package exports only `VaultsSdk` and `SUPPORTED_NETWORKS`; it has no default export.
+- **Vault path key (TypeScript):** `path: { network, vaultId }`. With `vaultAddress` the SDK requests `/undefined` and fails.
+- **Vault argument (Python):** positional or `vault_address=`, but pass the REST **`vaultId`** (usually the address; not always).
+- **Responses are envelopes, not arrays:** list methods return `{ itemsOnPage, nextPage?, data }`; `nextPage` is absent on the last page.
+- **Units are unchanged by the SDK:** APY is a decimal fraction (`0.0315` = 3.15 %), amounts are base-unit strings, timestamps are Unix seconds.
+- **Arrays** (`allowedNetworks: ['base', 'arbitrum']`) are sent as repeated query keys, which is what the API expects.
+- **Errors:** the TypeScript SDK throws an `Error` with only a `message` (no status code) and does not retry; the Python SDK raises typed exceptions and retries 429/5xx. See [SDK reference: errors](/sdk/reference#errors-and-retries).
+- **Keyless x402 mode (TypeScript):** `new VaultsSdk({ client: signer })` exists; 2.3.14 uses an x402 v1 client, while the API uses x402 v2. Use an API key, or an x402 v2 client as shown on [x402](/ai-agents/x402).
+
+## Next steps
+
+- [SDK reference](/sdk/reference): every method, its REST endpoint, parameters and credit cost.
+- [Wallet integration tutorial](/sdk/tutorials/wallet-integration): idle assets → deposit → position.
+- [Data analytics tutorial](/sdk/tutorials/data-analytics): lists, history, benchmarks.
+- [Recipes](/recipes/overview): the same tasks in curl, Python and TypeScript.
+- [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder (results: `recipes-tests/RESULTS.md`)._
+
+
+# SDK reference: every @vaultsfyi/sdk and vaultsfyi method with its REST endpoint
+Source: https://docs.vaults.fyi/sdk/reference
+
+> Every method of @vaultsfyi/sdk 2.3.14 (TypeScript) and vaultsfyi 1.3.0 (Python), mapped to its v2 REST endpoint, parameters, credit cost and live return shape, plus tested examples, error classes and retry behaviour.
+
+This page lists every public method of the two official vaults.fyi SDKs, the REST endpoint each one wraps, its parameters, its credit cost and the shape it returned when called live. Use it to pick a method, to translate between SDK and REST, and to handle SDK errors correctly. For a first working script, see the [SDK quickstart](/sdk/quickstart).
+
+Generated from the published packages **`@vaultsfyi/sdk` 2.3.14** and **`vaultsfyi` 1.3.0**. Every TypeScript method (35) and every Python method (29, including one deprecated alias) was called once against the live API on 2026-10-23, read-only. Both SDKs send the key in the `x-api-key` header to `https://api.vaults.fyi`, and return the API's JSON unchanged: APY values are decimal fractions, amounts are base-unit strings, timestamps are Unix seconds.
+
+## Constructors
+
+| | TypeScript | Python |
+| - | - | - |
+| With an API key | `new VaultsSdk({ apiKey })` | `VaultsSdk(api_key, api_base_url="https://api.vaults.fyi", timeout=30, max_retries=3)` |
+| Keyless (x402) | `new VaultsSdk({ client: signer })`: uses `x402-fetch` 0.7.0 (x402 v1); the API uses x402 v2. See [x402](/ai-agents/x402). | not supported |
+| Timeout / retries | none (plain `fetch`, no retries) | `timeout` seconds; `max_retries` retries on 429, 500, 502, 503, 504 for GET, backoff factor 1 |
+| Other exports | `SUPPORTED_NETWORKS` (22 network names) | exceptions in `vaultsfyi.exceptions` |
+
+TypeScript methods take one object `{ path?, query? }` whose keys are the REST names (`vaultId`, `userAddress`, `allowedNetworks`). Python methods take path parameters positionally and query parameters as snake_case keywords (`allowed_networks`), converted to the REST names; extra `**kwargs` are passed through as REST query parameters unchanged. Lists are sent as repeated keys in both SDKs.
+
+Setup used by every example below:
+
+```typescript
+import { VaultsSdk, SUPPORTED_NETWORKS } from '@vaultsfyi/sdk';
+
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! });
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'; // any 0x wallet address
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC (Base)
+const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const now = Math.floor(Date.now() / 1000 / 86400) * 86400; // Unix SECONDS, midnight UTC
+```
+
+```python
+import os
+import time
+
+from vaultsfyi import VaultsSdk
+from vaultsfyi.exceptions import HttpResponseError, AuthenticationError, ForbiddenError, RateLimitError, NetworkError
+
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # optional: timeout=30, max_retries=3
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+NETWORK = "base"
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # passed as vault_address= in this SDK
+USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+now = int(time.time()) // 86400 * 86400  # Unix SECONDS, midnight UTC
+week_ago = now - 7 * 86400
+```
+
+## Method map
+
+| REST endpoint | TypeScript method | Python method | Query parameters (REST names) | Credits | First top-level keys returned (live, 2026-10-23) |
+| - | - | - | - | - | - |
+| `GET /v2/health` | `getHealth` | `get_health` | — | 0 (public) | `{status, message}` |
+| `GET /v2/vaults` | `getVaults` | `get_vaults` | `page`, `perPage`, `network`, `assetSymbol`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted` | 1 | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/assets` | `getAssets` | `get_assets` | `page`, `perPage`, `network` | 1 | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/tags` | `getTags` | `get_tags` | — | 1 | array |
+| `GET /v2/networks` | `getNetworks` | `get_networks` | — | 1 | array |
+| `GET /v2/curators` | `getCurators` | `get_curators` | — | 1 | array |
+| `GET /v2/protocols` | `getProtocols` | — | — | 1 | array |
+| `GET /v2/historical/{network}/{vaultId}` | `getVaultHistoricalData` | `get_vault_historical_data` | `page`, `perPage`, `apyInterval`, `granularity`, `fromTimestamp`, `toTimestamp` | 3 + 3 per data point | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/historical/{network}/{vaultId}/apy` | `getVaultHistoricalApy` | `get_vault_historical_apy` | `page`, `perPage`, `apyInterval`, `granularity`, `fromTimestamp`, `toTimestamp` | 1 + 1 per data point | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/historical/{network}/{vaultId}/tvl` | `getVaultHistoricalTvl` | `get_vault_historical_tvl` | `page`, `perPage`, `apyInterval`, `granularity`, `fromTimestamp`, `toTimestamp` | 1 + 1 per data point | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/historical/{network}/{vaultId}/sharePrice` | `getVaultHistoricalSharePrice` | `get_vault_historical_share_price` | `page`, `perPage`, `apyInterval`, `granularity`, `fromTimestamp`, `toTimestamp` | 1 + 1 per data point | `{itemsOnPage, nextPage, data}` |
+| `GET /v2/historical/asset-prices/{network}/{assetAddress}` | `getAssetPriceHistory` | `get_historical_asset_prices` | `page`, `perPage`, `granularity`, `fromTimestamp`, `toTimestamp` | 1 + 1 per data point | `{itemsOnPage, data}` |
+| `GET /v2/detailed-vaults` | `getAllVaults` | `get_detailed_vaults` | `page`, `perPage`, `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `allowedNetworks`, `disallowedNetworks`, `maxTvl`, `maxApy`, `minApy`, `tags`, `curators`, `sortOrder`, `sortBy` | 1 + 3 per vault returned | `{itemsOnPage, nextPage, data, errors}` |
+| `GET /v2/detailed-vaults/{network}/{vaultId}` | `getVault` | `get_vault` | — | 3 | `{vaultId, address, name, network, asset, isTransactional}` |
+| `GET /v2/detailed-vaults/{network}/{vaultId}/apy` | `getVaultApyBreakdown` | `get_vault_apy_breakdown` | — | 1 | `{1day, 7day, 30day, 90day}` |
+| `GET /v2/detailed-vaults/{network}/{vaultId}/tvl` | `getVaultTvl` | `get_vault_tvl_breakdown` | — | 1 | `{usd, native}` |
+| `GET /v2/portfolio/best-vault/{userAddress}` | `getBestVault` | `get_best_vault` | `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `allowedNetworks`, `disallowedNetworks`, `apyInterval`, `minApy`, `maxApy`, `maxTvl`, `tags`, `curators`, `minUsdAssetValueThreshold` | 2 | `{requestedAddress, asset, vault}` |
+| `GET /v2/portfolio/positions/{userAddress}` | `getPositions` | `get_positions` | `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `allowedNetworks`, `disallowedNetworks`, `maxTvl`, `maxApy`, `minApy`, `tags`, `curators`, `sortOrder`, `sortBy`, `apyInterval`, `minUsdAssetValueThreshold` | 5 | `{data, errors}` |
+| `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}` | `getPosition` | `get_position` | `apyInterval` | 1 | `{vaultId, address, network, asset, name, protocol}` |
+| `GET /v2/portfolio/best-deposit-options/{userAddress}` | `getDepositOptions` | `get_deposit_options` | `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `minVaultScore`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `allowedNetworks`, `disallowedNetworks`, `apyInterval`, `minApy`, `maxApy`, `maxTvl`, `tags`, `curators`, `minUsdAssetValueThreshold`, `alwaysReturnAssets`, `maxVaultsPerAsset` | 1 + 2 per vault returned | `{requestedAddress, userBalances}` |
+| `GET /v2/portfolio/idle-assets/{userAddress}` | `getIdleAssets` | `get_idle_assets` | `allowedAssets`, `disallowedAssets`, `minUsdAssetValueThreshold`, `sortBy`, `sortDirection`, `allowedNetworks`, `disallowedNetworks` | 5 | `{data, errors}` |
+| `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}` | `getUserVaultTotalReturns` | `get_vault_total_returns` | — | 1 | `{address, assetCaip, name, symbol, decimals, assetLogo}` |
+| `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}` | `getUserVaultEvents` | `get_vault_holder_events` | — | 3 | `{asset, lpToken, data, items}` |
+| `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | `getTransactionsContext` | `get_transactions_context` | — | 3 | `{currentDepositStep, depositSteps, currentRedeemStep, redeemSteps, lpToken, asset}` |
+| `GET /v2/transactions/suffix/{userAddress}/{vaultId}` | `getTransactionSuffix` | — | — | 1 | `{suffix}` |
+| `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | `getActions` | `get_actions` | `simulate`, `assetAddress`, `amount`, `all` | 5 | `{currentActionIndex, actions}` |
+| `GET /v2/transactions/rewards/context/{userAddress}` | `getRewardsTransactionsContext` | `get_rewards_context` | — | 3 | `{claimable, actionUrl}` |
+| `GET /v2/transactions/rewards/claim/{userAddress}` | `getRewardsClaimActions` | `get_rewards_claim` | `simulate`, `claimIds` | 5 | object keyed by network, e.g. `{mainnet}` |
+| `GET /v2/benchmarks/{network}` | `getBenchmarks` | `get_benchmarks` | `code` | 3 | `{apy, timestamp}` |
+| `GET /v2/historical-benchmarks/{network}` | `getHistoricalBenchmarks` | `get_historical_benchmarks` | `page`, `perPage`, `code`, `fromTimestamp`, `toTimestamp` | 3 + 3 per data point | `{itemsOnPage, data}` |
+| `GET /v2/nrt/vault/{network}/{vaultId}` | `getVaultNrt` | — | — | 1 | `{totalSupply, totalAssets, sharePrice, underlyingAssetPrice}` |
+| `GET /v2/nrt/vault/{network}/{vaultId}/sharePrice` | `getVaultNrtSharePrice` | — | — | 1 | `{sharePrice}` |
+| `GET /v2/nrt/vault/{network}/{vaultId}/totalSupply` | `getVaultNrtTotalSupply` | — | — | 1 | `{totalSupply}` |
+| `GET /v2/nrt/vault/{network}/{vaultId}/totalAssets` | `getVaultNrtTotalAssets` | — | — | 1 | `{totalAssets}` |
+| `GET /v2/nrt/vault/{network}/{vaultId}/underlyingAssetPrice` | `getVaultNrtUnderlyingAssetPrice` | — | — | 1 | `{underlyingAssetPrice}` |
+
+Python deprecated aliases: `get_all_vaults` (calls `get_detailed_vaults`). TypeScript methods: 35; Python methods with a REST path: 28; v2 operations: 35.
+
+Python has no method for `GET /v2/protocols`, the suffix endpoint or the five NRT endpoints; call them over REST (see [TVL attribution suffix](/recipes/tvl-attribution-suffix) and [near-real-time share price](/recipes/near-real-time-share-price)). Neither SDK covers the Beta or Alpha APIs. Credits are from [credits](/plans/credits); "not listed" means the credits table gives no cost.
+
+## Python signatures
+
+From `vaultsfyi/client.py` 1.3.0. `vault_address` is the REST **`vaultId`** (usually, but not always, the contract address). Keyword arguments map to the camelCase query parameter of the same name.
+
+| Python method | Positional arguments | Keyword arguments |
+| - | - | - |
+| `get_health` | — | — |
+| `get_vaults` | — | `page`, `per_page`, `network`, `asset_symbol`, `only_transactional`, `only_app_featured`, `allow_corrupted` (plus `**kwargs`) |
+| `get_assets` | — | `page`, `per_page`, `network` (plus `**kwargs`) |
+| `get_networks` | — | — (plus `**kwargs`) |
+| `get_tags` | — | — (plus `**kwargs`) |
+| `get_benchmarks` | `network`, `code` | — |
+| `get_historical_benchmarks` | `network`, `code` | `page`, `per_page`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+| `get_vault_historical_data` | `network`, `vault_address` | `page`, `per_page`, `apy_interval`, `granularity`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+| `get_vault_historical_apy` | `network`, `vault_address` | `page`, `per_page`, `apy_interval`, `granularity`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+| `get_vault_historical_tvl` | `network`, `vault_address` | `page`, `per_page`, `apy_interval`, `granularity`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+| `get_vault_historical_share_price` | `network`, `vault_address` | `page`, `per_page`, `apy_interval`, `granularity`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+| `get_vault_total_returns` | `user_address`, `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_positions` | `user_address` | `allowed_assets`, `disallowed_assets`, `allowed_protocols`, `disallowed_protocols`, `allowed_networks`, `disallowed_networks`, `min_tvl`, `max_tvl`, `min_apy`, `max_apy`, `tags`, `curators`, `only_transactional`, `only_app_featured`, `allow_corrupted`, `allow_vaults_with_warnings`, `sort_by`, `sort_order`, `apy_interval`, `min_usd_asset_value_threshold` (plus `**kwargs`) |
+| `get_position` | `user_address`, `network`, `vault_address` | `apy_interval` (plus `**kwargs`) |
+| `get_best_vault` | `user_address` | `allowed_assets`, `disallowed_assets`, `allowed_protocols`, `disallowed_protocols`, `allowed_networks`, `disallowed_networks`, `min_tvl`, `min_apy`, `only_transactional`, `only_app_featured`, `allow_corrupted`, `allow_vaults_with_warnings`, `apy_interval`, `min_usd_asset_value_threshold` (plus `**kwargs`) |
+| `get_deposit_options` | `user_address` | `allowed_assets`, `disallowed_assets`, `allowed_protocols`, `disallowed_protocols`, `allowed_networks`, `disallowed_networks`, `min_tvl`, `min_apy`, `only_transactional`, `only_app_featured`, `allow_corrupted`, `allow_vaults_with_warnings`, `apy_interval`, `min_usd_asset_value_threshold`, `always_return_assets`, `max_vaults_per_asset` (plus `**kwargs`) |
+| `get_vault_holder_events` | `user_address`, `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_detailed_vaults` | — | `page`, `per_page`, `allowed_assets`, `disallowed_assets`, `allowed_protocols`, `disallowed_protocols`, `allowed_networks`, `disallowed_networks`, `min_tvl`, `max_tvl`, `min_apy`, `max_apy`, `tags`, `curators`, `only_transactional`, `only_app_featured`, `allow_corrupted`, `allow_vaults_with_warnings`, `sort_by`, `sort_order` (plus `**kwargs`) |
+| `get_all_vaults` | — | — (plus `**kwargs`) |
+| `get_vault` | `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_vault_apy_breakdown` | `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_vault_tvl_breakdown` | `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_idle_assets` | `user_address` | `allowed_assets`, `disallowed_assets`, `allowed_networks`, `disallowed_networks`, `min_usd_asset_value_threshold`, `sort_by`, `sort_direction` (plus `**kwargs`) |
+| `get_transactions_context` | `user_address`, `network`, `vault_address` | — (plus `**kwargs`) |
+| `get_actions` | `action`, `user_address`, `network`, `vault_address` | `amount`, `asset_address`, `simulate=False`, `all` (plus `**kwargs`) |
+| `get_rewards_context` | `user_address` | — (plus `**kwargs`) |
+| `get_rewards_claim` | `user_address` | `simulate`, `claim_ids` (plus `**kwargs`) |
+| `get_curators` | — | — (plus `**kwargs`) |
+| `get_historical_asset_prices` | `network`, `asset_address` | `page`, `per_page`, `granularity`, `from_timestamp`, `to_timestamp` (plus `**kwargs`) |
+
+## TypeScript path keys
+
+From `@vaultsfyi/sdk` 2.3.14 `dist/client.mjs`. Path values are read from these exact keys; a wrong key (for example `vaultAddress`) puts `undefined` in the URL.
+
+| TypeScript method | `path` keys | Pass `query` |
+| - | - | - |
+| `getHealth` | — | no |
+| `getVaults` | — | yes |
+| `getAssets` | — | yes |
+| `getBenchmarks` | `network` | yes |
+| `getHistoricalBenchmarks` | `network` | yes |
+| `getVaultHistoricalData` | `network`, `vaultId` | yes |
+| `getVaultHistoricalApy` | `network`, `vaultId` | yes |
+| `getVaultHistoricalTvl` | `network`, `vaultId` | yes |
+| `getVaultHistoricalSharePrice` | `network`, `vaultId` | yes |
+| `getPositions` | `userAddress` | yes |
+| `getPosition` | `userAddress`, `network`, `vaultId` | yes |
+| `getDepositOptions` | `userAddress` | yes |
+| `getAllVaults` | — | yes |
+| `getVault` | `network`, `vaultId` | no |
+| `getIdleAssets` | `userAddress` | yes |
+| `getTransactionsContext` | `userAddress`, `network`, `vaultId` | no |
+| `getTransactionSuffix` | `userAddress`, `vaultId` | no |
+| `getActions` | `action`, `userAddress`, `network`, `vaultId` | yes |
+| `getRewardsTransactionsContext` | `userAddress` | no |
+| `getRewardsClaimActions` | `userAddress` | yes |
+| `getUserVaultEvents` | `userAddress`, `network`, `vaultId` | no |
+| `getUserVaultTotalReturns` | `userAddress`, `network`, `vaultId` | no |
+| `getNetworks` | — | no |
+| `getProtocols` | — | no |
+| `getCurators` | — | no |
+| `getTags` | — | no |
+| `getVaultApyBreakdown` | `network`, `vaultId` | no |
+| `getVaultTvl` | `network`, `vaultId` | no |
+| `getBestVault` | `userAddress` | yes |
+| `getAssetPriceHistory` | `network`, `assetAddress` | yes |
+| `getVaultNrt` | `network`, `vaultId` | no |
+| `getVaultNrtSharePrice` | `network`, `vaultId` | no |
+| `getVaultNrtTotalSupply` | `network`, `vaultId` | no |
+| `getVaultNrtTotalAssets` | `network`, `vaultId` | no |
+| `getVaultNrtUnderlyingAssetPrice` | `network`, `vaultId` | no |
+
+## Discovery: `getAllVaults` / `get_detailed_vaults`
+
+Wraps `GET /v2/detailed-vaults` (1 credit + 3 per vault). Defaults: networks base, mainnet, arbitrum and optimism; `minTvl=100000`; `sortOrder=asc`; `allowVaultsWithWarnings=true`. Returns `{ itemsOnPage, nextPage?, data, errors }`, not an array. In Python, `get_all_vaults` is a deprecated alias.
+
+```typescript
+// GET /v2/detailed-vaults. Defaults: networks base/mainnet/arbitrum/optimism, minTvl 100000,
+// sortOrder asc, allowVaultsWithWarnings true. Cost: 1 + 3 credits per vault returned.
+const page = await sdk.getAllVaults({
+  query: { allowedNetworks: ['base'], allowedAssets: ['USDC'], sortBy: 'apy7day', sortOrder: 'desc', perPage: 3 },
+});
+for (const v of page.data) console.log(v.name, `${(v.apy['7day'].total * 100).toFixed(2)} %`); // decimal -> %
+```
+
+```python
+page = client.get_detailed_vaults(  # GET /v2/detailed-vaults; get_all_vaults is a deprecated alias
+    allowed_networks=["base"], allowed_assets=["USDC"],  # lists are sent as repeated keys
+    sort_by="apy7day", sort_order="desc", per_page=3,    # sort_order defaults to asc
+)
+for v in page["data"]:
+    print(v["name"], f'{v["apy"]["7day"]["total"] * 100:.2f} %')  # decimal fraction -> %
+```
+
+Output (2026-10-23, both SDKs):
+
+```text
+OK getVaults                        {itemsOnPage, nextPage, data}
+Apostro Resolv USDC 152563.52 %
+Midas mLIQUIDITY 69.75 %
+```
+
+The first result's 152,563 % APY is a real, unclamped value for a tiny vault; filter by `minTvl` and score before display. Trimmed response (second vault; real values):
+
+```json
+{
+  "itemsOnPage": 3,
+  "nextPage": 1,
+  "data": [
+    {
+      "vaultId": "0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873",
+      "name": "Midas mLIQUIDITY",
+      "network": {
+        "name": "base"
+      },
+      "asset": {
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      "apy": {
+        "7day": {
+          "base": 0.6975,
+          "reward": 0,
+          "total": 0.6975
+        }
+      },
+      "tvl": {
+        "usd": "736693",
+        "native": "736798625343"
+      },
+      "score": {
+        "vaultScore": 58.01353342584076
+      },
+      "isTransactional": true,
+      "warnings": []
+    }
+  ],
+  "errors": {
+    "unsupportedNetworks": [],
+    "unsupportedAssets": [],
+    "unsupportedProtocols": []
+  }
+}
+```
+
+`getVaults` / `get_vaults` wraps `GET /v2/vaults`: identity fields only (no APY or TVL), **all** networks by default, 1 credit per call at any `perPage`:
+
+```typescript
+// GET /v2/vaults: identity only (no APY/TVL), ALL networks by default, flat 1 credit per call.
+const list = await sdk.getVaults({ query: { network: NETWORK, assetSymbol: 'USDC', perPage: 3 } });
+// list = { itemsOnPage, nextPage?, data: [{ vaultId, address, name, network, asset, isTransactional, ... }] }
+```
+
+## One vault: `getVault`, `getVaultApyBreakdown`, `getVaultTvl`
+
+```typescript
+const vault = await sdk.getVault({ path: { network: NETWORK, vaultId: VAULT_ID } }); // path key: vaultId
+```
+
+```python
+vault = client.get_vault(NETWORK, VAULT_ID)  # GET /v2/detailed-vaults/{network}/{vaultId}
+```
+
+```typescript
+const apy = await sdk.getVaultApyBreakdown({ path: { network: NETWORK, vaultId: VAULT_ID } });
+// apy = { '1day': { base, reward, total }, '7day': ..., '30day': ..., '90day': ... }  (no 1hour here)
+```
+
+```typescript
+const tvl = await sdk.getVaultTvl({ path: { network: NETWORK, vaultId: VAULT_ID } }); // { usd, native }
+```
+
+## History: `getVaultHistoricalApy` and related
+
+`granularity` defaults to `1hour` and `perPage` to 50: set both. Points are oldest first. Costs: `/apy`, `/tvl`, `/sharePrice` 1 + 1 per point; the combined endpoint 3 + 3 per point.
+
+```typescript
+const apyHist = await sdk.getVaultHistoricalApy({
+  path: { network: NETWORK, vaultId: VAULT_ID },
+  query: { granularity: '1day', apyInterval: '7day', fromTimestamp: now - 7 * 86400, toTimestamp: now, perPage: 7 },
+});
+```
+
+```python
+apy_hist = client.get_vault_historical_apy(
+    NETWORK, VAULT_ID, granularity="1day", apy_interval="7day",  # granularity defaults to 1hour
+    from_timestamp=week_ago, to_timestamp=now, per_page=7,
+)  # {"itemsOnPage", "nextPage"?, "data": [{"timestamp", "blockNumber", "apy": {...}}]}, oldest first
+```
+
+```typescript
+const hist = await sdk.getVaultHistoricalData({
+  path: { network: NETWORK, vaultId: VAULT_ID },
+  query: { granularity: '1day', fromTimestamp: now - 7 * 86400, toTimestamp: now, perPage: 7 },
+}); // { itemsOnPage, nextPage?, data: [{ timestamp, apy, tvl, sharePrice }] }, oldest first
+```
+
+```typescript
+const prices = await sdk.getAssetPriceHistory({
+  path: { network: NETWORK, assetAddress: USDC_BASE },
+  query: { granularity: '1day', fromTimestamp: now - 7 * 86400, toTimestamp: now, perPage: 7 },
+});
+```
+
+## Benchmarks: `getBenchmarks`, `getHistoricalBenchmarks`
+
+`code` is required (`usd` or `eth`).
+
+```typescript
+const bench = await sdk.getBenchmarks({ path: { network: NETWORK }, query: { code: 'usd' } }); // code required
+```
+
+```typescript
+const benchHist = await sdk.getHistoricalBenchmarks({
+  path: { network: NETWORK },
+  query: { code: 'usd', fromTimestamp: now - 3 * 86400, toTimestamp: now, perPage: 10 },
+});
+```
+
+## Near real-time: `getVaultNrt` (TypeScript only)
+
+```typescript
+const nrt = await sdk.getVaultNrt({ path: { network: NETWORK, vaultId: VAULT_ID } });
+// { totalSupply (share base units), totalAssets (asset base units), sharePrice (number), underlyingAssetPrice (USD) }
+```
+
+## Portfolio: `getPositions`, `getPosition`, `getIdleAssets`, `getBestVault`
+
+Portfolio responses are not paginated. Position size is `asset.positionValueInAsset`; `asset.balanceNative` is the wallet's idle balance ([positions recipe](/recipes/positions-and-balances)).
+
+```typescript
+const positions = await sdk.getPositions({ path: { userAddress: USER }, query: { allowedNetworks: ['base'] } });
+// { data: [...], errors } -- not paginated. Position size: asset.positionValueInAsset (base units).
+```
+
+```typescript
+const position = await sdk.getPosition({ path: { userAddress: USER, network: NETWORK, vaultId: VAULT_ID } });
+```
+
+```typescript
+const idle = await sdk.getIdleAssets({ path: { userAddress: USER }, query: { allowedNetworks: ['base'] } });
+// { data: [{ symbol, decimals, balanceNative (base units), balanceUsd?, network }], errors }
+```
+
+```typescript
+const best = await sdk.getBestVault({ path: { userAddress: USER }, query: { allowedNetworks: ['base'] } });
+```
+
+## Transactions: `getTransactionsContext`, `getActions`
+
+Read the context first, then build the unsigned payload. `amount` is a base-unit string. Send `actions` in order, from `currentActionIndex`, after verifying each one ([transaction safety](/ai-agents/transaction-safety)). The SDKs never sign.
+
+```typescript
+const ctx = await sdk.getTransactionsContext({ path: { userAddress: USER, network: NETWORK, vaultId: VAULT_ID } });
+// ctx.currentDepositStep, ctx.depositSteps, ctx.asset.{address, decimals, balanceNative}
+```
+
+```typescript
+// GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}. amount: base-unit string (1 USDC = '1000000').
+const tx = await sdk.getActions({
+  path: { action: 'deposit', userAddress: USER, network: NETWORK, vaultId: VAULT_ID },
+  query: { assetAddress: USDC_BASE, amount: '1000000' },
+});
+// tx = { currentActionIndex, actions: [{ name, tx: { to, chainId, data, value? } }] } -- send in order
+```
+
+```python
+tx = client.get_actions(
+    "deposit", USER, NETWORK, VAULT_ID,          # action, user, network, vault (REST path order)
+    asset_address=USDC_BASE, amount="1000000",   # amount: base-unit string, 1 USDC = "1000000"
+)  # the SDK always adds simulate=false (deprecated, ignored by the API)
+for a in tx["actions"][tx["currentActionIndex"]:]:
+    print(a["name"], a["tx"]["to"], a["tx"]["chainId"])  # sign and send IN ORDER
+```
+
+Output of the Python call (2026-10-23):
+
+```text
+Approve USDC for Steakhouse High Yield USDC Edition vault 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 8453
+Deposit USDC to Steakhouse High Yield USDC Edition vault 0xbeeff2490FEffa212faC2f6553682C219E6a8845 8453
+```
+
+Trimmed response (calldata shortened; ERC-20 actions carry no `value` key):
+
+```json
+{
+  "currentActionIndex": 0,
+  "actions": [
+    {
+      "name": "Approve USDC for Steakhouse High Yield USDC Edition vault",
+      "tx": {
+        "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "chainId": 8453,
+        "data": "0x095ea7b3000000000000000000000000beeff2490feffa212fac2f6553682c219e6a8845…"
+      }
+    },
+    {
+      "name": "Deposit USDC to Steakhouse High Yield USDC Edition vault",
+      "tx": {
+        "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+        "chainId": 8453,
+        "data": "0x6e553f6500000000000000000000000000000000000000000000000000000000000f4240…"
+      }
+    }
+  ]
+}
+```
+
+Python's `get_actions` always sends `simulate=false`; the parameter is deprecated and ignored by the API. `all=True` redeems the full position (redeem action only).
+
+```typescript
+const { suffix } = await sdk.getTransactionSuffix({ path: { userAddress: USER, vaultId: VAULT_ID } }); // hex, no 0x
+```
+
+## Rewards: `getRewardsTransactionsContext`, `getRewardsClaimActions`
+
+`claimable` is an object keyed by network. Pass real `claimId`s only, taken from the rewards context. The claim response is keyed by network too.
+
+```typescript
+const rewards = await sdk.getRewardsTransactionsContext({ path: { userAddress: USER } });
+const claimIds = Object.values(rewards.claimable).flat().map((c) => c.claimId); // claimable is keyed by network
+```
+
+```typescript
+// Real ids only, from the rewards context. Response is keyed by network.
+const claims = await sdk.getRewardsClaimActions({ path: { userAddress: USER }, query: { claimIds } });
+```
+
+```python
+ctx = client.get_rewards_context(USER)
+claim_ids = [c["claimId"] for claims in ctx["claimable"].values() for c in claims]  # keyed by network
+claims = client.get_rewards_claim(USER, claim_ids=claim_ids) if claim_ids else {}
+```
+
+## Errors and retries
+
+The two SDKs behave differently. Verified with a local stub server returning each status (no API calls) and with a live 400:
+
+| HTTP status | Python `vaultsfyi` 1.3.0 (`max_retries=3`) | TypeScript `@vaultsfyi/sdk` 2.3.14 |
+| - | - | - |
+| 400 (validation) | `HttpResponseError`, `status_code=400`, 1 request | `Error` subclass (`HttpResponseError`, not exported), only `message`, 1 request |
+| 401 (invalid key) | `AuthenticationError`, 1 request | same plain error, no status |
+| 402 (no key) | `HttpResponseError`, `status_code=402`, 1 request | same plain error, no status |
+| 403 (credits exhausted) | `ForbiddenError`, 1 request | same plain error, no status |
+| 404 | `HttpResponseError`, `status_code=404` | same plain error, no status |
+| 429, 500, 503 | `NetworkError` after 4 requests (about 6 s) | plain error after 1 request: **no retries** |
+
+The live 400 for `sortBy: 'apy'`: the message is the API's JSON-encoded issue list.
+
+TypeScript (the error class is not exported, so catch `Error` and read `message`):
+
+```typescript
+try {
+  await sdk.getAllVaults({ query: { sortBy: 'apy' as never, perPage: 1 } });
+} catch (err) {
+  // HttpResponseError is NOT exported and has no status code: only `message` is available.
+  console.log('SDK error:', (err as Error).constructor.name, (err as Error).message.slice(0, 80).replace(/\s+/g, ' '));
+}
+```
+
+```text
+SDK error: HttpResponseError [ { "received": "apy", "code": "invalid_enum_value", "options": [ 
+```
+
+Python:
+
+```python
+try:
+    client.get_detailed_vaults(sort_by="apy", per_page=1)  # invalid enum -> HTTP 400
+except AuthenticationError as e:    # 401: key sent but invalid
+    print("auth", e)
+except ForbiddenError as e:         # 403: credits exhausted
+    print("forbidden", e)
+except RateLimitError as e:         # 429 per the code, but in 1.3.0 a 429 surfaces as NetworkError (see below)
+    print("rate limited", e)
+except HttpResponseError as e:      # any other non-2xx, incl. 400 and 402 (no key)
+    print("HTTP", e.status_code, str(e)[:60].replace("\n", " "))
+except NetworkError as e:           # connection errors AND 429/500/502/503/504 after the built-in retries
+    print("network", e)
+```
+
+```text
+HTTP 400 [   {     "received": "apy",     "code": "invalid_enum_value
+```
+
+What to do:
+
+- **TypeScript:** add your own retry with backoff for transient failures, and don't retry on messages that describe validation or auth problems. If you need the status code, call the REST API directly (see [handle errors and retries](/recipes/handle-errors-and-retries)).
+- **Python:** catch `NetworkError` to detect exhausted 429/5xx retries. Set `max_retries=0` if you run your own retry loop, to avoid multiplying requests.
+- **Both:** a 200 can still carry soft errors in `errors.unsupported*`; check them after list calls.
+
+Exception classes exported by `vaultsfyi` 1.3.0: `VaultsFyiError` (base), `HttpResponseError` (`status_code`, `response_data`), `AuthenticationError`, `ForbiddenError`, `RateLimitError`, `NetworkError`.
+
+## SDK coverage and error handling (2.3.14 / 1.3.0)
+
+- Python: no methods for `/v2/protocols`, `/v2/transactions/suffix/...` or `/v2/nrt/...`.
+- Python names the vault argument `vault_address`; REST and TypeScript use `vaultId`.
+- TypeScript errors carry no status code; no retries.
+- TypeScript x402 mode uses an x402 v1 client; the API uses x402 v2.
+- Neither SDK covers Beta (Solana, borrow, Pendle) or Alpha endpoints.
+
+Report SDK issues to the maintainers; see the package pages on npm and PyPI.
+
+## Related pages
+
+- [SDK quickstart](/sdk/quickstart)
+- [Wallet integration tutorial](/sdk/tutorials/wallet-integration) and [data analytics tutorial](/sdk/tutorials/data-analytics)
+- [API conventions](/api-reference/conventions) and [errors](/api-reference/errors)
+- [Transaction safety](/ai-agents/transaction-safety)
+- [Recipes](/recipes/overview) and [credits](/plans/credits)
+
+_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+
+
+# Tutorial: add yield to a wallet with the vaults.fyi SDK
+Source: https://docs.vaults.fyi/sdk/tutorials/wallet-integration
+
+> Tested SDK walkthrough for wallets: detect idle assets, show deposit options, read the transaction context, build and verify an unsigned deposit, sign it in order with viem (shown, not executed), then track the position; with credit cost per step.
+
+This tutorial builds the core yield flow of a wallet with the vaults.fyi SDK: find the user's idle tokens, suggest vaults for them, build a deposit the user signs, and show the resulting position. Use it when you integrate Earn into a wallet or consumer app. The REST equivalents of each step are in the [recipes](/recipes/overview).
+
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** and **`vaultsfyi` 1.3.0** against the live API, read-only, for the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`. The SDKs send the key as `x-api-key`. Balances are base-unit strings; APY values are decimal fractions. **The signing step was not executed** (it runs only with `SEND=1`).
+
+## Prerequisites
+
+- An API key in `VAULTSFYI_API_KEY` ([SDK quickstart](/sdk/quickstart) covers install and setup).
+- TypeScript: Node.js 18+, `@vaultsfyi/sdk@2.3.14`, `viem` 2.x, an ESM project. Python: Python 3.8+, `vaultsfyi==1.3.0`.
+
+## Credit cost of one full flow
+
+| Step | SDK method | REST endpoint | Credits |
+| - | - | - | - |
+| 1. Idle assets | `getIdleAssets` / `get_idle_assets` | `GET /v2/portfolio/idle-assets/{userAddress}` | 5 |
+| 2. Deposit options | `getDepositOptions` / `get_deposit_options` | `GET /v2/portfolio/best-deposit-options/{userAddress}` | 1 + 2 per vault (this run: 9 vaults = 19) |
+| 3. Context | `getTransactionsContext` / `get_transactions_context` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | 3 |
+| 4. Payload | `getActions` / `get_actions` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | 5 |
+| 5. Position | `getPositions` / `get_positions` | `GET /v2/portfolio/positions/{userAddress}` | 5 |
+| **Total** | | | **37** |
+
+([credits](/plans/credits)). Cache steps 1, 2 and 5 per session; always run 3 and 4 fresh right before signing.
+
+## The full script (TypeScript)
+
+```typescript
+// Wallet integration with @vaultsfyi/sdk 2.3.14: idle assets -> deposit options -> context ->
+// payload -> verify -> sign (only when SEND=1) -> position. Node >= 18, ESM.
+import { VaultsSdk } from '@vaultsfyi/sdk';
+import { createPublicClient, createWalletClient, getAddress, http, type Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base } from 'viem/chains';
+
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'; // the connected wallet
+const NETWORK = 'base';
+
+// Base-unit string -> human string, exact (no float rounding).
+const human = (raw: string, decimals: number, dp = 4) => {
+  const s = BigInt(raw).toString().padStart(decimals + 1, '0');
+  return decimals ? `${s.slice(0, -decimals)}.${s.slice(-decimals).slice(0, dp)}` : s;
+};
+
+// 1) Idle assets: tokens in the wallet that are not deposited anywhere (5 credits).
+const idle = await sdk.getIdleAssets({ path: { userAddress: USER }, query: { allowedNetworks: [NETWORK] } });
+for (const a of idle.data.slice(0, 3)) {
+  console.log(`idle ${a.symbol}: ${human(a.balanceNative, a.decimals)} (~$${Number(a.balanceUsd ?? 0).toFixed(2)})`);
+}
+
+// 2) Deposit options for what the wallet holds (1 credit + 2 per vault returned).
+const options = await sdk.getDepositOptions({
+  path: { userAddress: USER },
+  query: { allowedNetworks: [NETWORK], onlyTransactional: true, maxVaultsPerAsset: 2 },
+});
+for (const b of options.userBalances.slice(0, 2)) {
+  for (const v of b.depositOptions) {
+    console.log(`option ${b.asset?.symbol} -> ${v.name}: ${(v.apy.total * 100).toFixed(2)} % (vaultId ${v.vaultId})`);
+  }
+}
+
+// 3) The user picks a vault in your UI. Read its transaction context first (3 credits).
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+const ctx = await sdk.getTransactionsContext({ path: { userAddress: USER, network: NETWORK, vaultId: VAULT_ID } });
+if (ctx.currentDepositStep !== 'deposit') throw new Error(`next step is ${ctx.currentDepositStep}`);
+const amount = 10n ** BigInt(ctx.asset.decimals); // 1 USDC in base units = 1000000
+if (amount > BigInt(ctx.asset.balanceNative)) throw new Error('insufficient balance'); // the API does not check
+
+// 4) Build the unsigned payload (5 credits). amount is a base-unit integer string.
+const tx = await sdk.getActions({
+  path: { action: 'deposit', userAddress: USER, network: NETWORK, vaultId: VAULT_ID },
+  query: { assetAddress: ctx.asset.address, amount: amount.toString() },
+});
+
+// 5) Verify every action before showing it to the user.
+const allowedTargets = [getAddress(ctx.asset.address), getAddress(VAULT_ID)];
+for (const a of tx.actions) {
+  if (a.tx.chainId !== base.id) throw new Error(`wrong chain ${a.tx.chainId}`);
+  if (!allowedTargets.includes(getAddress(a.tx.to))) throw new Error(`unexpected target ${a.tx.to}`);
+  console.log(`action: ${a.name} -> ${a.tx.to}`);
+}
+
+// 6) Sign and send IN ORDER, waiting for each receipt. Never runs unless SEND=1.
+if (process.env.SEND === '1') {
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex); // the user's key, held by the wallet
+  const wallet = createWalletClient({ account, chain: base, transport: http() });
+  const pub = createPublicClient({ chain: base, transport: http() });
+  for (const a of tx.actions.slice(tx.currentActionIndex)) {
+    const hash = await wallet.sendTransaction({ to: a.tx.to as Hex, ...(a.tx.data !== undefined ? { data: a.tx.data as Hex } : {}), value: BigInt(a.tx.value ?? 0) });
+    const receipt = await pub.waitForTransactionReceipt({ hash });
+    if (receipt.status !== 'success') throw new Error(`${a.name} reverted: ${hash}`);
+  }
+} else {
+  console.log('dry run: not signing (set SEND=1 in a real wallet)');
+}
+
+// 7) Track the position (5 credits). Position size = asset.positionValueInAsset, NOT asset.balanceNative.
+const positions = await sdk.getPositions({ path: { userAddress: USER }, query: { allowedNetworks: [NETWORK] } });
+for (const p of positions.data) {
+  console.log(`position ${p.name}: ${human(p.asset.positionValueInAsset ?? '0', p.asset.decimals)} ${p.asset.symbol}`);
+}
+```
+
+Output (2026-10-23, dry run):
+
+```text
+idle WETH: 0.2225 (~$533.16)
+idle USDbC: 4.3907 (~$4.39)
+idle USDC: 78.9959 (~$78.98)
+option ETH -> Base cbETH Loooper: 5.96 % (vaultId 0x5900C3b72458F12967DC1bef35b92d271F5cDBc1)
+option ETH -> DeTrade Core ETH: 5.13 % (vaultId 0x9b97BFDfE44D1B113ECD4BF2f243ed36acA34523)
+option USDC -> Midas mLIQUIDITY: 69.75 % (vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873)
+option USDC -> Harvest 40 Acres USDC: 27.84 % (vaultId 0xC777031D50F632083Be7080e51E390709062263E)
+action: Approve USDC for Steakhouse High Yield USDC Edition vault -> 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+action: Deposit USDC to Steakhouse High Yield USDC Edition vault -> 0xbeeff2490FEffa212faC2f6553682C219E6a8845
+dry run: not signing (set SEND=1 in a real wallet)
+position True Yield Dollar: 920.9162 USDC
+```
+
+## The same flow in Python (build and verify only)
+
+The Python SDK has no signer; hand `actions[currentActionIndex:]` to your wallet library and send them in order.
+
+```python
+"""Wallet integration with the vaultsfyi Python SDK 1.3.0: idle assets -> deposit options -> context ->
+payload -> verify. Signing is left to your wallet library; this script never signs."""
+import os
+from decimal import Decimal
+
+from vaultsfyi import VaultsSdk
+
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"  # the connected wallet
+NETWORK, CHAIN_ID = "base", 8453
+
+
+def human(raw, decimals):
+    """Base-unit integer string -> Decimal tokens."""
+    return Decimal(raw) / (Decimal(10) ** decimals)
+
+
+# 1) Idle assets (5 credits). balanceNative is a base-unit string.
+idle = client.get_idle_assets(USER, allowed_networks=[NETWORK])
+for a in idle["data"][:3]:
+    print(f'idle {a["symbol"]}: {human(a["balanceNative"], a["decimals"]):.4f} (~${float(a.get("balanceUsd") or 0):.2f})')
+
+# 2) Deposit options (1 credit + 2 per vault returned).
+options = client.get_deposit_options(USER, allowed_networks=[NETWORK], only_transactional=True, max_vaults_per_asset=2)
+for b in options["userBalances"][:2]:
+    for v in b["depositOptions"]:
+        print(f'option {b["asset"]["symbol"]} -> {v["name"]}: {v["apy"]["total"] * 100:.2f} % (vaultId {v["vaultId"]})')
+
+# 3) Context for the vault the user picked (3 credits). The SDK calls the vaultId argument vault_address.
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC
+ctx = client.get_transactions_context(USER, NETWORK, VAULT_ID)
+assert ctx["currentDepositStep"] == "deposit", ctx["currentDepositStep"]
+amount = 10 ** ctx["asset"]["decimals"]  # 1 USDC = 1000000 base units
+assert amount <= int(ctx["asset"]["balanceNative"]), "insufficient balance"  # the API does not check
+
+# 4) Unsigned payload (5 credits).
+tx = client.get_actions("deposit", USER, NETWORK, VAULT_ID, asset_address=ctx["asset"]["address"], amount=str(amount))
+
+# 5) Verify chain and targets, then hand actions[currentActionIndex:] to the wallet IN ORDER.
+allowed = {ctx["asset"]["address"].lower(), VAULT_ID.lower()}
+for a in tx["actions"][tx["currentActionIndex"]:]:
+    assert a["tx"]["chainId"] == CHAIN_ID and a["tx"]["to"].lower() in allowed, a
+    print(f'action: {a["name"]} -> {a["tx"]["to"]}')
+
+# 6) Position (5 credits): size is asset.positionValueInAsset; asset.balanceNative is the idle wallet balance.
+for p in client.get_positions(USER, allowed_networks=[NETWORK])["data"]:
+    print(f'position {p["name"]}: {human(p["asset"]["positionValueInAsset"], p["asset"]["decimals"]):.4f} {p["asset"]["symbol"]}')
+```
+
+Output (2026-10-23):
+
+```text
+idle WETH: 0.2225 (~$533.16)
+idle USDbC: 4.3908 (~$4.39)
+idle USDC: 78.9960 (~$78.98)
+option ETH -> Base cbETH Loooper: 5.96 % (vaultId 0x5900C3b72458F12967DC1bef35b92d271F5cDBc1)
+option ETH -> DeTrade Core ETH: 5.13 % (vaultId 0x9b97BFDfE44D1B113ECD4BF2f243ed36acA34523)
+option USDC -> Midas mLIQUIDITY: 69.75 % (vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873)
+option USDC -> Harvest 40 Acres USDC: 27.84 % (vaultId 0xC777031D50F632083Be7080e51E390709062263E)
+action: Approve USDC for Steakhouse High Yield USDC Edition vault -> 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+action: Deposit USDC to Steakhouse High Yield USDC Edition vault -> 0xbeeff2490FEffa212faC2f6553682C219E6a8845
+position True Yield Dollar: 920.9162 USDC
+```
+
+## Step notes
+
+### 1. Idle assets
+
+Returns `{ data: [{ symbol, decimals, balanceNative, balanceUsd?, network, … }], errors }`. Defaults to the four networks base, mainnet, arbitrum and optimism; pass `allowedNetworks` for others. Hide dust balances before suggesting deposits: gas can exceed the yield.
+
+### 2. Deposit options
+
+Returns `{ requestedAddress, userBalances: [{ asset, depositOptions: [{ vaultId, name, network, apy: { base, reward, total }, tvl, projectedUsdAnnualEarnings }] }] }`. Defaults: `minTvl=100000`, `onlyAppFeatured=true`, `allowVaultsWithWarnings=false`, `maxVaultsPerAsset=3`, 7-day APY. Pass `onlyTransactional: true` so every option can be deposited through the Transactions API. Very high APYs (69.75 % above) are real values; apply your own TVL and score policy.
+
+### 3. Context
+
+`currentDepositStep` tells you what to build next (`deposit` here). `asset.address` and `asset.decimals` give you the `assetAddress` and the base-unit scale. The API does **not** check the balance or limits for you; compare `amount` with `asset.balanceNative` yourself.
+
+### 4. Payload and verification
+
+`getActions` returns `{ currentActionIndex, actions: [{ name, tx: { to, chainId, data, value? } }] }`, here an `approve` on USDC and a `deposit` on the vault. Verify `chainId`, `to`, `value` and, ideally, the decoded arguments ([build a deposit](/recipes/deposit-transaction) decodes them with viem). Show `actions[].name` and the amount to the user before signing.
+
+### 5. Sign and send in order
+
+Send `actions[currentActionIndex:]` one at a time and wait for each receipt; the deposit fails if the approval is not mined. Never let an API, SDK or agent hold the user's private key. For smart-contract wallets you can batch the calls yourself; see [transaction flows](/concepts/transaction-flows#eoa-and-smart-contract-wallets).
+
+### 6. Position
+
+The position size is `asset.positionValueInAsset` (asset base units). `asset.balanceNative` on a position is the wallet's **idle** balance of that asset; don't add it. Returns and events (`getUserVaultTotalReturns`, `getUserVaultEvents`) need `userEventsIndexed: true` on the vault.
+
+## Pitfalls fixed from earlier versions of this tutorial
+
+- `import pkg from '@vaultsfyi/sdk'` → `import { VaultsSdk } from '@vaultsfyi/sdk'`.
+- `path: { …, vaultAddress }` → `path: { …, vaultId }` (TypeScript).
+- `cd python_examples/` → the repository directory is `python-examples`.
+- "Context reports deposit limits and the API rejects deposits over them" → the API does no balance or limit check; check yourself.
+- The flow stopped before signing → step 5 shows ordered signing with receipts.
+
+## Related pages
+
+- [Transaction safety](/ai-agents/transaction-safety): the pre-sign checklist.
+- [Build a deposit](/recipes/deposit-transaction), [positions and balances](/recipes/positions-and-balances).
+- [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors).
+- [For wallets and apps](/use-cases/for-wallets-and-apps).
+
+_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+
+
+# Tutorial: yield analytics with the vaults.fyi SDK
+Source: https://docs.vaults.fyi/sdk/tutorials/data-analytics
+
+> Tested SDK walkthrough for analysts: page through /v2/detailed-vaults with the 4-network and minTvl defaults overridden, pull 90 days of daily APY, compare a vault with the USD benchmark, and budget credits, in TypeScript and Python.
+
+This tutorial builds a small analytics pipeline with the vaults.fyi SDK: a complete vault list across chosen networks, a 90-day daily APY series for one vault, and a one-vault report against the network's USD benchmark. Use it for dashboards, research notes and allocator reports. REST versions are in the recipes [paginate all vaults](/recipes/paginate-all-vaults) and [vault history vs benchmark](/recipes/vault-history-vs-benchmark).
+
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** and **`vaultsfyi` 1.3.0** against the live API. The SDKs send the key as `x-api-key`. APY values are decimal fractions (`0.0315` = 3.15 %); timestamps are Unix seconds.
+
+## Prerequisites
+
+- An API key in `VAULTSFYI_API_KEY` ([SDK quickstart](/sdk/quickstart)).
+- TypeScript: Node.js 18+, `@vaultsfyi/sdk@2.3.14`, ESM. Python: Python 3.8+, `vaultsfyi==1.3.0`.
+
+## Credit cost of this run
+
+| Step | Method | Credits |
+| - | - | - |
+| Vault list, 51 vaults in 6 pages | `getAllVaults` / `get_detailed_vaults` | 6 + 3 × 51 = 159 |
+| 90 daily APY points | `getVaultHistoricalApy` / `get_vault_historical_apy` | 1 + 90 = 91 |
+| Vault detail | `getVault` / `get_vault` | 3 |
+| Current benchmark | `getBenchmarks` / `get_benchmarks` | 3 |
+| Benchmark history, 3 points (TypeScript only) | `getHistoricalBenchmarks` | 3 + 9 = 12 |
+
+([credits](/plans/credits)). For a full-market pull, every vault costs 3 credits on `/v2/detailed-vaults`; list identities with `getVaults` (1 credit per call) and fetch detail only where needed. Respect `x-ratelimit-remaining` (the SDKs don't expose headers; space out calls).
+
+## TypeScript
+
+```typescript
+// Data analytics with @vaultsfyi/sdk 2.3.14: page through a vault list, pull 90 days of daily APY,
+// compare with the USD benchmark, and print a one-vault report. Node >= 18, ESM.
+import { VaultsSdk } from '@vaultsfyi/sdk';
+
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+const pct = (x: number) => `${(x * 100).toFixed(2)} %`; // APY fields are decimal fractions
+
+// 1) Every USDT0 vault on Plasma and Ethereum, page by page. getAllVaults wraps GET /v2/detailed-vaults
+//    and returns { itemsOnPage, nextPage?, data }, NOT an array. nextPage is absent on the last page.
+//    Override the defaults: 4 networks (base, mainnet, arbitrum, optimism) and minTvl 100000.
+const vaults = [];
+let page = 0;
+let calls = 0;
+while (true) {
+  const res = await sdk.getAllVaults({
+    query: { allowedNetworks: ['plasma', 'mainnet'], allowedAssets: ['USDT0'], minTvl: 0, perPage: 10, page },
+  });
+  calls += 1;
+  vaults.push(...res.data);
+  if (res.nextPage === undefined) break;
+  page = res.nextPage;
+}
+console.log(`${vaults.length} vaults in ${calls} pages, ~${calls + 3 * vaults.length} credits (1 per call + 3 per vault)`);
+
+// 2) 90 days of daily 7-day APY. granularity defaults to 1hour and perPage to 50: set both.
+const toTimestamp = Math.floor(Date.now() / 1000 / 86400) * 86400; // Unix SECONDS, midnight UTC
+const fromTimestamp = toTimestamp - 90 * 86400;
+const history = await sdk.getVaultHistoricalApy({
+  path: { network: NETWORK, vaultId: VAULT_ID },
+  query: { granularity: '1day', apyInterval: '7day', fromTimestamp, toTimestamp, perPage: 100 },
+}); // oldest first; ~91 credits (1 + 1 per point)
+const series = history.data.map((p) => p.apy.total);
+const mean = series.reduce((a, b) => a + b, 0) / series.length;
+console.log(`${series.length} daily points, mean 7d APY ${pct(mean)}, min ${pct(Math.min(...series))}, max ${pct(Math.max(...series))}`);
+
+// 3) Report: current vault data and the network's USD benchmark, same 7-day window.
+const [vault, bench, benchHist] = await Promise.all([
+  sdk.getVault({ path: { network: NETWORK, vaultId: VAULT_ID } }),                  // 3 credits
+  sdk.getBenchmarks({ path: { network: NETWORK }, query: { code: 'usd' } }),         // 3 credits; code required
+  sdk.getHistoricalBenchmarks({                                                      // 3 + 3 per point
+    path: { network: NETWORK },
+    query: { code: 'usd', fromTimestamp: toTimestamp - 3 * 86400, toTimestamp, perPage: 10 },
+  }),
+]);
+if (!bench.apy) throw new Error('no benchmark for this network'); // typed nullable
+const report = {
+  name: vault.name,
+  apy7d: pct(vault.apy['7day'].total),
+  tvlUsd: Number(vault.tvl.usd),
+  vaultScore: Math.round((vault.score?.vaultScore ?? 0) * 10) / 10,
+  benchmark7d: pct(bench.apy['7day'].total),
+  spreadBp: Math.round((vault.apy['7day'].total - bench.apy['7day'].total) * 10_000),
+  benchmarkHistoryPoints: benchHist.itemsOnPage, // historical benchmarks are short; check before charting
+};
+console.log(JSON.stringify(report));
+```
+
+Output (2026-10-23):
+
+```text
+51 vaults in 6 pages, ~159 credits (1 per call + 3 per vault)
+90 daily points, mean 7d APY 2.88 %, min 2.54 %, max 3.17 %
+{"name":"Steakhouse High Yield USDC Edition","apy7d":"3.15 %","tvlUsd":468440351,"vaultScore":81.7,"benchmark7d":"4.07 %","spreadBp":-92,"benchmarkHistoryPoints":3}
+```
+
+## Python
+
+```python
+"""Data analytics with the vaultsfyi Python SDK 1.3.0: page through a vault list, pull 90 days of daily
+APY, compare with the USD benchmark, and print a one-vault report."""
+import os
+import statistics
+import time
+
+from vaultsfyi import VaultsSdk
+
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
+NETWORK = "base"
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC (passed as vault_address)
+
+
+def pct(x):
+    return f"{x * 100:.2f} %"  # APY fields are decimal fractions
+
+
+# 1) Every USDT0 vault on Plasma and Ethereum. Returns a dict {itemsOnPage, nextPage?, data}; nextPage is
+#    absent on the last page. Override the 4-network default and minTvl=100000.
+vaults, page, calls = [], 0, 0
+while True:
+    res = client.get_detailed_vaults(allowed_networks=["plasma", "mainnet"], allowed_assets=["USDT0"],
+                                     min_tvl=0, per_page=10, page=page)
+    calls += 1
+    vaults += res["data"]
+    if "nextPage" not in res:
+        break
+    page = res["nextPage"]
+print(f"{len(vaults)} vaults in {calls} pages, ~{calls + 3 * len(vaults)} credits (1 per call + 3 per vault)")
+
+# 2) 90 days of daily 7-day APY (granularity defaults to 1hour, perPage to 50: set both).
+to_ts = int(time.time()) // 86400 * 86400  # Unix SECONDS, midnight UTC
+history = client.get_vault_historical_apy(NETWORK, VAULT_ID, granularity="1day", apy_interval="7day",
+                                          from_timestamp=to_ts - 90 * 86400, to_timestamp=to_ts, per_page=100)
+series = [p["apy"]["total"] for p in history["data"]]  # oldest first
+print(f"{len(series)} daily points, mean 7d APY {pct(statistics.mean(series))}, "
+      f"min {pct(min(series))}, max {pct(max(series))}")
+
+# 3) Report: vault vs the network's USD benchmark, same 7-day window.
+vault = client.get_vault(NETWORK, VAULT_ID)
+bench = client.get_benchmarks(NETWORK, "usd")  # code is required: "usd" or "eth"
+v7, b7 = vault["apy"]["7day"]["total"], bench["apy"]["7day"]["total"]
+print({"name": vault["name"], "apy7d": pct(v7), "tvlUsd": int(vault["tvl"]["usd"]),
+       "vaultScore": round(vault["score"]["vaultScore"], 1), "benchmark7d": pct(b7),
+       "spreadBp": round((v7 - b7) * 10_000)})
+```
+
+Output (2026-10-23):
+
+```text
+51 vaults in 6 pages, ~159 credits (1 per call + 3 per vault)
+90 daily points, mean 7d APY 2.88 %, min 2.54 %, max 3.17 %
+{'name': 'Steakhouse High Yield USDC Edition', 'apy7d': '3.15 %', 'tvlUsd': 468440351, 'vaultScore': 81.7, 'benchmark7d': '4.07 %', 'spreadBp': -92}
+```
+
+## Step notes
+
+### Vault lists are envelopes
+
+`getAllVaults` returns `{ itemsOnPage, nextPage?, data, errors }`. Loop on `nextPage` and stop when it is absent (never `null`). There is no total count. Defaults hide data: only base, mainnet, arbitrum and optimism, only TVL ≥ $100,000, ascending sort. For a full-market dataset, pass every network as repeated `allowedNetworks` values and `minTvl: 0`.
+
+### History parameters
+
+`granularity` (spacing: `1hour`, `1day`, `1week`; default `1hour`) and `apyInterval` (smoothing window: `1day`, `7day`, `30day`, `90day`; default `7day`) are different things. With the defaults and `perPage` 50 you get about two days of hourly points. 90 days at `1day` is 90 points, one call with `perPage: 100`.
+
+### Benchmarks
+
+`code` is required (`usd` or `eth`). The benchmark is the TVL-weighted APY of the five largest vaults of that denomination on the network ([benchmark rates](/methodology/benchmark-rates)). Compare windows like for like (`apy['7day'].total` on both sides).
+
+### Parallel requests
+
+`Promise.all` over three requests is fine. For large backfills, run sequentially or with a small concurrency limit and back off on errors: the TypeScript SDK does not retry, the Python SDK retries 429/5xx three times.
+
+## Pitfalls fixed from earlier versions of this tutorial
+
+- The pagination loop treated `getAllVaults()` as an array (`push(...result)`, `result.length`) → use `res.data` and stop when `res.nextPage` is absent.
+- `path: { network, vaultAddress }` → `path: { network, vaultId }` in every TypeScript call.
+- `import { HttpResponseError }` → not exported; catch `Error` and read `message` ([SDK errors](/sdk/reference#errors-and-retries)).
+- 90-day history at the default hourly granularity returned only the oldest points → `granularity: '1day'`.
+- `currentApy: vault.apy` (an object of windows) → `vault.apy['7day'].total` (decimal).
+- TypeScript-only → every step also in Python.
+
+## Related pages
+
+- [For analysts](/use-cases/for-analysts).
+- [Paginate all vaults](/recipes/paginate-all-vaults), [vault history vs benchmark](/recipes/vault-history-vs-benchmark), [display APY correctly](/recipes/display-apy-correctly), [estimate credit cost](/recipes/estimate-credit-cost).
+- [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._

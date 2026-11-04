@@ -1,143 +1,131 @@
 ---
-title: "Supported DeFi Protocols and Networks on Vaults.fyi"
-description: "Vaults.fyi covers 80+ DeFi protocols on 20+ EVM networks plus Solana/SVM Beta coverage, including Aave, Morpho, Kamino, Drift, Jupiter, Jito, Lido, and Yearn."
+title: "Supported protocols and networks"
 sidebarTitle: "Supported Protocols"
+description: "Which protocols and EVM networks vaults.fyi covers, the exact network slugs and CAIP-2 ids the API accepts, how protocol filters match names vs protocolIds, and how to tell analytics-only from transactional vaults."
 ---
 
-Vaults.fyi covers over 80 DeFi protocols across more than 20 EVM networks, plus Solana/SVM vault coverage in Beta. For each supported protocol, you get standardized market data — APY, TVL, fees, and the Reputation Score — through one API surface, regardless of how each protocol is implemented under the hood.
+This page lists the networks and protocols vaults.fyi covers and the exact identifiers the API accepts for them. Use it to build filters, validate user input, or check whether a vault supports transactions. As of 2026-10-23 vaults.fyi covers 80+ protocols (126 protocol IDs from `GET /v2/protocols`) on 22 EVM networks (`GET /v2/networks`), plus Solana vaults on the Beta SVM endpoints. These counts change; the reference endpoints below always return the live lists (REST, `x-api-key` header on `https://api.vaults.fyi`).
 
-## Analytics vs. transactional support
+## Live reference endpoints
 
-Not all protocols have the same level of integration. Coverage falls into two tiers:
+| Endpoint | Returns | Use the value in |
+| - | - | - |
+| `GET /v2/networks` | `[{name, chainId, networkCaip}]` | `network` path params; `allowedNetworks` / `disallowedNetworks` (send `name` or `networkCaip`) |
+| `GET /v2/protocols` | `[{protocolId, name, displayName, product?, version?}]` | `allowedProtocols` / `disallowedProtocols` (send `name` or `protocolId`) |
+| `GET /v2/assets` | Assets with `symbol`, `address`, `network` | `allowedAssets` / `disallowedAssets` (send the **symbol**; token addresses are not accepted and are echoed in `errors.unsupportedAssets`) |
+| `GET /v2/curators` | `[{name, displayName, websiteUrl?}]` (155 on 2026-10-23) | `curators` (send `name`) |
+| `GET /v2/tags` | 18 tag strings, for example `Liquid Staking`, `RWA` | `tags` |
+| `GET /beta/svm/detailed-vaults` | Solana vaults (Beta) | — |
 
-<CardGroup cols={2}>
-  <Card title="Analytics support" icon="chart-bar" href="/concepts/yield-and-market-data">
-    Market data is available: APY, TVL, fees, historical rates, and the Reputation Score. You can query and display vault data but cannot prepare transaction payloads.
-  </Card>
+Unknown filter values never return an error: the response is HTTP 200 with fewer or no results and the rejected value in `errors.unsupportedNetworks`, `errors.unsupportedAssets` or `errors.unsupportedProtocols`. Unknown `curators` values are not echoed at all. Check `errors` and validate input against these endpoints. See [API conventions](/api-reference/conventions).
 
-  <Card title="Transactional support" icon="arrow-right-arrow-left" href="/concepts/transaction-flows">
-    Full integration: market data plus ready-to-sign deposit, redeem, and claim transaction payloads. Users can interact with the vault directly through your app.
-  </Card>
-</CardGroup>
+## Networks
 
-<Info>
-  To check whether a specific vault supports transactions, call `GET /v2/transactions/context/` for that vault. If transactional actions are unavailable, the response will indicate which steps are supported.
-</Info>
+The `network` path parameter and the `allowedNetworks` / `disallowedNetworks` filters accept the slug or the CAIP-2 id. In a path, a bare chain id (`8453`) or an unknown name such as `ethereum` returns HTTP 400. In a filter, an unknown value returns HTTP 200 with the value echoed in `errors.unsupportedNetworks`. See [Errors](/api-reference/errors).
 
-## Key protocols
+| Network | Slug | CAIP-2 | Chain id |
+| - | - | - | -: |
+| Ethereum Mainnet | `mainnet` | `eip155:1` | 1 |
+| Arbitrum | `arbitrum` | `eip155:42161` | 42161 |
+| Avalanche | `avalanche` | `eip155:43114` | 43114 |
+| Base | `base` | `eip155:8453` | 8453 |
+| Berachain | `berachain` | `eip155:80094` | 80094 |
+| Binance Smart Chain (BSC) | `bsc` | `eip155:56` | 56 |
+| Celo | `celo` | `eip155:42220` | 42220 |
+| Etherlink | `etherlink` | `eip155:42793` | 42793 |
+| Gnosis | `gnosis` | `eip155:100` | 100 |
+| Hyperliquid | `hyperliquid` | `eip155:999` | 999 |
+| Ink | `ink` | `eip155:57073` | 57073 |
+| Katana | `katana` | `eip155:747474` | 747474 |
+| Linea | `linea` | `eip155:59144` | 59144 |
+| Mega-ETH | `mega-eth` | `eip155:4326` | 4326 |
+| Monad | `monad` | `eip155:143` | 143 |
+| Optimism | `optimism` | `eip155:10` | 10 |
+| Plasma | `plasma` | `eip155:9745` | 9745 |
+| Polygon | `polygon` | `eip155:137` | 137 |
+| Robinhood | `robinhood` | `eip155:4663` | 4663 |
+| Swellchain | `swellchain` | `eip155:1923` | 1923 |
+| Unichain | `unichain` | `eip155:130` | 130 |
+| Worldchain | `worldchain` | `eip155:480` | 480 |
+| Solana (Beta) | — use `/beta/svm/*` | — | — |
 
-The following protocols are among the most widely used on Vaults.fyi:
+Solana is not a v2 network. Solana vaults, positions and transactions live under `/beta/svm/...` and use base58 addresses (`{vaultAddress}` path parameter).
 
-- **Aave** — the largest decentralized lending protocol, available across multiple networks
-- **Morpho** — modular lending built on top of Aave and Compound
-- **Euler** — permissionless lending vaults with flexible risk parameters
-- **Spark** — MakerDAO's lending and savings layer
-- **Lido** — liquid staking for ETH with broad DeFi integrations
-- **Compound** — one of the original onchain money markets
-- **Yearn** — automated yield aggregation with multi-strategy vaults
-- **Kamino, Drift, Jupiter, and Jito** — Solana/SVM vault coverage available through the Beta API
+**Default scope:** `GET /v2/detailed-vaults` and the `/v2/portfolio/*` list endpoints return only `base`, `mainnet`, `arbitrum` and `optimism` unless you pass `allowedNetworks`. To cover more, repeat the key: `allowedNetworks=base&allowedNetworks=plasma&allowedNetworks=bsc`. A comma-separated list returns 0 results. `GET /v2/vaults` and `GET /v2/assets` have no default scope.
 
-These protocols represent a cross-section of the 80\+ covered. For the authoritative V2 EVM protocol list, query `GET /v2/protocols` directly. For Solana/SVM coverage, use the Beta SVM endpoints.
+<a id="protocol-names-and-ids"></a>
+## Protocols
 
-## Protocol names and IDs
+Each protocol entry has a lowercase `protocolId` built from its name and, where applicable, product and version. Real entries (2026-10-23, `GET /v2/protocols`, trimmed):
 
-Each protocol object includes a lowercase `protocolId` built from its name and, when available, its product and version. Use `GET /v2/protocols` to retrieve the current values rather than constructing them in your integration.
-
-Protocol filters such as `allowedProtocols` and `disallowedProtocols` accept either:
-
-- A protocol `name`, such as `aave`, to match every supported Aave product and version
-- A full `protocolId`, such as `aave-standard spoke-v4`, to match only Aave V4 Standard Spoke opportunities
-
-```bash
-# Match all Aave opportunities
-curl --get 'https://api.vaults.fyi/v2/detailed-vaults' \
-  --header 'x-api-key: YOUR_API_KEY' \
-  --data-urlencode 'allowedProtocols=aave'
-
-# Match only the Aave V4 Standard Spoke product
-curl --get 'https://api.vaults.fyi/v2/detailed-vaults' \
-  --header 'x-api-key: YOUR_API_KEY' \
-  --data-urlencode 'allowedProtocols=aave-standard spoke-v4'
+```json
+[
+  { "protocolId": "40acres", "name": "40acres", "displayName": "40Acres" },
+  { "protocolId": "aave-collateral vault-v3", "name": "aave", "displayName": "Aave", "product": "collateral vault", "version": "v3" },
+  { "protocolId": "aave-staked aave", "name": "aave", "displayName": "Aave", "product": "staked aave" }
+]
 ```
 
-The same name-or-ID behavior applies anywhere these filters are exposed across V2, Alpha, and Beta. If both allow and deny filters are supplied, `allowedProtocols` takes precedence.
+`allowedProtocols` and `disallowedProtocols` accept either:
 
-## Full protocol list
+- a protocol `name` (`aave`) to match every product and version of that protocol, or
+- a full `protocolId` (`aave-standard spoke-v4`) to match one product.
 
-The following protocols are supported as of July 2026:
+**A name matches every protocolId that shares it.** This is a silent trap: the request returns 200 and mixes products.
 
-<AccordionGroup>
-  <Accordion title="View all 80+ supported protocols">
-    40acres, Aave, Aera, Ajna, Angle, Ankr, APYx, Arcadia, Avantis, Avon, Backed, Beefy, Cap, Centrifuge, Coinbase cbETH, Compound, Concrete, Convex, Dolomite, Drift, Ember, Ethena, Ether.Fi, Ethx, Euler, Extrafi, Fluid, Frax, Gearbox, Harvest Finance, Hop, Hyperbeat, Hyperlend, Infinifi, Inverse Finance, IPOR, Jito, Jupiter, Kamino, Kelp, Lagoon, Level, Lido, ListaDAO, Maker, Matrixdock, Mellow, Midas, Moonwell, Morpho, Mountain, Nashpoint, Notional, Ondo, Open Eden, OpenCover, Origin, Overnight Finance, Reservoir, Resolv, Revert.Finance, Rocket Pool, Seamless, Silo, Sky, Spark, Stader Ethx, Stakewise, Stargate, Summer.Fi, Superform, Swell, Syrup, Term, Tokemak, Tydro, Ultrayield, Upshift Finance, Veda, Venus, Wildcat, Yearn, Yearn yEth, Yo
-  </Accordion>
-</AccordionGroup>
+| You want | Send | Not |
+|---|---|---|
+| Morpho V1 (MetaMorpho) vaults only | `allowedProtocols=morpho-metamorpho` | `morpho` (also returns `morpho-v2` and `morpho-market`) |
+| Morpho V2 vaults only | `allowedProtocols=morpho-v2` | `morpho` |
+| Aave v3 vaults | `allowedProtocols=aave-collateral%20vault-v3` (the ID contains a space) | `aave-v3` (unknown ID: 200, empty `data`, echoed in `errors.unsupportedProtocols`), `aave` (matches 8 Aave protocolIds) |
 
-## Supported networks
+Observed 2026-10-23 on Base: `allowedProtocols=morpho` returned 62 vaults (31 `morpho-metamorpho` + 31 `morpho-v2`); `allowedProtocols=morpho-metamorpho` returned exactly the 31 V1 vaults. Always take exact IDs from `GET /v2/protocols` and check `errors.unsupportedProtocols`.
 
-Vaults.fyi currently supports the following networks:
+protocolIds can contain spaces. URL-encode them (`allowedProtocols=aave-standard%20spoke-v4`) or let your HTTP client encode query values. If you pass `allowedProtocols`, `disallowedProtocols` is ignored (spec: "The parameter is ignored if allowedProtocols is specified").
 
-<AccordionGroup>
-  <Accordion title="View all 20+ supported networks">
-    Ethereum Mainnet
+```bash
+# All Aave products on Ethereum mainnet (vaults with TVL >= 100,000 USD by default)
+curl -s --get "https://api.vaults.fyi/v2/detailed-vaults" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "allowedProtocols=aave" \
+  --data-urlencode "allowedNetworks=mainnet"
 
-    Arbitrum
+# Only Aave V4 Standard Spoke
+curl -s --get "https://api.vaults.fyi/v2/detailed-vaults" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "allowedProtocols=aave-standard spoke-v4" \
+  --data-urlencode "allowedNetworks=mainnet"
+```
 
-    Base
+Protocol matching differs by endpoint. v2 detailed vaults, positions, `/v2/vaults` and beta advanced analytics match the protocol `name` or `protocolId`, case-insensitive. Beta borrow markets also match `name` or `protocolId`; beta SVM endpoints additionally accept the numeric protocol id. Beta fixed-term matches the protocol name only.
 
-    Optimism
+### Protocols by name
 
-    Polygon
+`GET /v2/protocols` returns one entry per protocol product and version (126 entries, 87 distinct `name` values on 2026-10-23). The list below groups by protocol name and was last curated in July 2026; protocols added since (for example Liquity, Flying Tulip, Accountable per the changelog) may be missing. Use the endpoint for the authoritative list.
 
-    Avalanche
+40acres, Aave, Aera, Ajna, Angle, Ankr, APYx, Arcadia, Avantis, Avon, Backed, Beefy, Cap, Centrifuge, Coinbase cbETH, Compound, Concrete, Convex, Dolomite, Drift, Ember, Ethena, Ether.Fi, Ethx, Euler, Extrafi, Fluid, Frax, Gearbox, Harvest Finance, Hop, Hyperbeat, Hyperlend, Infinifi, Inverse Finance, IPOR, Jito, Jupiter, Kamino, Kelp, Lagoon, Level, Lido, ListaDAO, Maker, Matrixdock, Mellow, Midas, Moonwell, Morpho, Mountain, Nashpoint, Notional, Ondo, Open Eden, OpenCover, Origin, Overnight Finance, Reservoir, Resolv, Revert.Finance, Rocket Pool, Seamless, Silo, Sky, Spark, Stader Ethx, Stakewise, Stargate, Summer.Fi, Superform, Swell, Syrup, Term, Tokemak, Tydro, Ultrayield, Upshift Finance, Veda, Venus, Wildcat, Yearn, Yearn yEth, Yo.
 
-    Berachain
+Kamino, Drift, Jupiter and Jito are Solana protocols, available through the Beta SVM endpoints.
 
-    Binance Smart Chain (BSC)
+## Analytics-only vs transactional vaults
 
-    Celo
+Every vault has market data (APY, TVL, fees, history, Reputation Score). Only some also support the Transactions API (ready-to-sign deposit, redeem and claim calls).
 
-    Etherlink
+To check a vault, read `isTransactional` on its `GET /v2/detailed-vaults` or `GET /v2/detailed-vaults/{network}/{vaultId}` response, or filter lists with `onlyTransactional=true`. `transactionalProperties` tells you more:
 
-    Gnosis
+| Field | Meaning |
+| - | - |
+| `isTransactional` | `true` if `/v2/transactions/*` can build calls for this vault |
+| `transactionalProperties.depositStepsType` | `instant` or `complex`, as returned by the API |
+| `transactionalProperties.redeemStepsType` | `instant` or `complex` |
+| `transactionalProperties.rewardsSupported` | `true` if reward claims can be built for this vault |
 
-    Hyperliquid
+An `instant` deposit can still involve two transactions (ERC-20 `approve`, then deposit). Always read the exact steps from `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` and execute every returned action in order; see [Transaction flows](/concepts/transaction-flows).
 
-    Ink
+`instant` means the deposit or redeem finishes in one step without waiting; it can still take two transactions (approve, then deposit). `complex` means the flow has a waiting period between steps, for example `request-redeem` → wait → `claim-redeem`, `start-redeem-cooldown` → wait → `redeem`, or `request-deposit` → wait → `claim-deposit`. In other words, `complex` is a queued or asynchronous flow. To know when a queued withdrawal can be claimed, poll the transaction context until `currentRedeemStep` is `claim-redeem`.
 
-    Katana
+## How coverage grows
 
-    Linea
+New protocols and networks go through review and integration before they appear in the API. Protocol teams can request a listing through the [protocol request form](https://listings.vaults.fyi/); see the [FAQ](/resources/faq) for listing requirements.
 
-    Mega-ETH
-
-    Monad
-
-    Plasma
-
-    Robinhood
-
-    Solana (SVM, Beta)
-
-    Swellchain
-
-    Unichain
-
-    Worldchain
-  </Accordion>
-</AccordionGroup>
-
-<Tip>
-  Query `GET /v2/networks` to get the live list of V2 EVM networks with their chain IDs. Solana/SVM endpoints are available in [Beta](/api-reference/beta#solana-vaults).
-</Tip>
-
-## How coverage expands
-
-Vaults.fyi continuously adds new protocols and networks. When a new protocol launches or reaches meaningful TVL, it goes through a review and integration process before appearing in the API.
-
-To check the current state of any protocol or network programmatically, use the reference endpoints:
-
-- `GET /v2/protocols` — returns protocol names, products, and versions for the V2 EVM API
-- `GET /v2/networks` — returns supported V2 EVM networks with chain IDs
-- `GET /beta/svm/detailed-vaults` — returns Solana/SVM vault coverage in Beta
-
-These endpoints always reflect the live state of the API, so they are more reliable than any static list.
+Related: [Vault discovery](/concepts/vault-discovery), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).

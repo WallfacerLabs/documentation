@@ -1,95 +1,121 @@
 ---
-title: "Vault Reputation Score: Risk Filtering Guide"
-description: "Learn how the Vaults.fyi Reputation Score works, what four weighted component scores it uses, how flag penalties apply, and how to use minVaultScore to filter vaults programmatically."
+title: "Reputation Score"
 sidebarTitle: "Reputation Score"
+description: "What score.vaultScore measures, its four weighted components and their response fields, flag penalties, and how to filter by score (check score.vaultScore client-side if you need a strict threshold)."
 ---
 
-The Vaults.fyi Reputation Score is a proprietary metric that gives you a single, objective number to assess how battle-tested a vault is. It is not a comprehensive risk rating — it is a signal about protocol and vault history securing capital, holder adoption, underlying asset reliability, and applicable risk-flag penalties.
+This page defines the vaults.fyi Reputation Score, maps each part of it to a response field, and shows how to filter vaults by it safely. Use it when you screen vaults for users or need to explain a score. The Reputation Score is one number per vault in the field `score.vaultScore`, returned by `GET /v2/detailed-vaults` and `GET /v2/detailed-vaults/{network}/{vaultId}` (REST, `x-api-key` header). Higher means a longer, larger track record. It is a track-record signal, not a full risk rating.
 
-In API responses, reputation data is returned as the `score` object. The composite Reputation Score is `score.vaultScore`; the active component scores and penalty details explain how the final value is calculated. The deprecated `score.networkScore` field remains available for backwards compatibility and diagnostics, but has zero weight in the composite score.
+## Definition
 
-## What the Reputation Score measures
-
-The Reputation Score favors protocols that are "Lindy" — the longer a protocol has secured large amounts of capital without incident, the higher the vault tends to score. A low Reputation Score does not mean a vault is unsafe; it means the vault has not yet accumulated the track record that the metric rewards.
-
-<Info>
-  The Reputation Score complements — but does not replace — detailed risk reviews from auditors and risk managers like LlamaRisk, Chaos Labs, and Gauntlet. Use it for programmatic filtering; use risk reports for deeper due diligence.
-</Info>
-
-## Component scores
-
-Vaults.fyi calculates the Reputation Score from four weighted component scores:
-
-<AccordionGroup>
-  <Accordion title="Protocol integrity (45%)">
-    Measures the scale of trust a protocol has earned over its operational history. This component captures how much TVL the protocol has secured and for how long, using logarithmic scaling to prevent a handful of massive protocols from dominating. A protocol with $500M TVL sustained for two years contributes more positively than one that briefly touched the same TVL for a week.
-  </Accordion>
-  <Accordion title="Pool diagnostics (25%)">
-    Accounts for liquidity characteristics at the individual pool level, not just the protocol level. A large protocol can host pools with very different liquidity profiles — for example, Aave v3 USDT on mainnet ($5B TVL) behaves differently from Aave v3 pyUSD on mainnet ($12M TVL). This component uses the same TVL-over-time approach as protocol integrity, applied to the specific pool.
-  </Accordion>
-  <Accordion title="Community adoption (15%)">
-    Measures holder distribution and diversity. More unique holders indicate broader trust and reduce concentration risk. Future improvements to this component will include filtering low-value addresses, distinguishing individual holders from protocol-owned positions, and analyzing the ability of large holders to exit and affect liquidity.
-  </Accordion>
-  <Accordion title="Underlying asset reliability (15%)">
-    Evaluates the stability and creditworthiness of the vault's deposit asset. For stablecoins and pegged assets (ETH/BTC derivatives), this component measures historical price stability relative to the peg, plus/minus 2% liquidity depth in onchain markets, and CEX and DEX trading volume. Assets with a consistent peg and deep liquidity contribute more positively.
-  </Accordion>
-</AccordionGroup>
-
-The composite score uses the following formula, with a minimum result of zero:
+`score.vaultScore` is a weighted sum of four component scores minus the current flag penalty, floored at zero:
 
 ```text
-vaultScore = max(0,
-  0.45 * protocolTvlScore
-  + 0.25 * vaultTvlScore
-  + 0.15 * holderScore
-  + 0.15 * assetScore
-  - totalScorePenalty
+score.vaultScore = max(0,
+    0.45 * score.protocolTvlScore
+  + 0.25 * score.vaultTvlScore
+  + 0.15 * score.holderScore
+  + 0.15 * score.assetScore
+  - score.totalScorePenalty
 )
 ```
 
-Blockchain security is not a weighted component of the current Reputation Score.
+This formula reproduces `score.vaultScore` exactly (to floating-point precision) for every one of the 62 distinct vaults with a `score` object in the 2026-10-23 live captures.
+
+| Component | Weight | Response field | What it measures |
+| - | -: | - | - |
+| Protocol integrity | 45% | `score.protocolTvlScore` | How much TVL the protocol has secured and for how long (log-scaled, so a few huge protocols do not dominate). $500M held for two years scores higher than $500M held for a week. |
+| Pool diagnostics | 25% | `score.vaultTvlScore` | The same TVL-over-time measure applied to this specific vault or pool. Aave v3 USDT ($5B) and Aave v3 pyUSD ($12M) on mainnet score differently. |
+| Community adoption | 15% | `score.holderScore` | Number and distribution of holders; more unique holders means less concentration. |
+| Underlying asset reliability | 15% | `score.assetScore` | Peg stability, ±2% onchain liquidity depth and CEX/DEX volume of the deposit asset. |
+| Flag penalty | subtracted | `score.totalScorePenalty` | Point deduction from active or decaying flags (see below). |
+| Network (deprecated) | 0% | `score.networkScore` | Returned for backwards compatibility only. It is not part of the score. |
+
+### Range
+
+`score.vaultScore` and each component range from 0 to 100. The API does not round them (for example `81.72160425089307`). Observed values on 2026-10-23: `score.vaultScore` from 27.5 to 99.1. Because the weights sum to 1 and the result is floored at 0, `score.vaultScore` is at most the maximum component value.
+
+The API always returns a score, including for young vaults. app.vaults.fyi shows "Not Rated" for vaults younger than 90 days or with no holder score; apply the same check if you filter on score.
+
+Real response from `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845` (2026-10-23, trimmed to `score`):
+
+```json
+{
+  "score": {
+    "vaultScore": 81.72160425089307,
+    "vaultTvlScore": 69.75545503433813,
+    "protocolTvlScore": 79.89831763512478,
+    "holderScore": 93.08665037668256,
+    "networkScore": 60,
+    "assetScore": 95.77,
+    "totalScorePenalty": 0,
+    "penaltyComponents": []
+  }
+}
+```
 
 ## Flag penalties
 
-Active vault flags — security incidents, protocol risk warnings, and similar indicators — directly reduce the Reputation Score. Higher-severity flags carry larger deductions. Only the single largest active penalty applies; multiple flags do not stack.
+vaults.fyi attaches flags to vaults for incidents and risks (for example compromised keys or bad debt). Flags appear in `flags[]` (`content`, `severity`, `endDate`, optional `resolution`), and `warnings` repeats the text of active non-`info` flags.
 
-When a flag is resolved, the penalty does not necessarily disappear immediately. Vaults.fyi can mark a flag with resolution details and reduce the effective penalty to reflect how much of the issue has been addressed. This lets a vault recover trust incrementally rather than resetting overnight.
+- Flags reduce the score through `score.totalScorePenalty`: 25 points for a `warning` flag, 50 for a `critical` flag, 0 for `info`. Only the single largest penalty applies; penalties do not stack.
+- `score.penaltyComponents[]` lists the penalty that applies (the largest one): `type` (`flag`), `value` (points deducted now), `content`, `severity`, `endDate` (Unix seconds) and optional `resolution`.
+- While a flag is active the full penalty applies. After its `endDate` the penalty fades to zero over one year, so the score recovers gradually. A resolved flag carries no penalty.
+- `endDate` `4946619450` (year 2126) means the flag has no scheduled expiry.
 
-The `score.penaltyComponents` field in [detailed-vaults](/api-reference/detailed-vaults) responses shows each active or decaying flag penalty, its severity, current penalty value, expiry, and optional `resolution` note. The `score.totalScorePenalty` field shows the total penalty currently applied to the composite Reputation Score. The same optional `resolution` note is also returned on `flags[]` entries.
+Observed on 2026-10-23: a `critical` flag (Swell, compromised hot keys) carried `score.totalScorePenalty` = 50.
 
-## Interpreting the Reputation Score
 
-A higher Reputation Score reflects the combined contribution of protocol and vault history, holder adoption, and underlying asset reliability, after flag penalties. It does not assess the security of the blockchain the vault runs on. A high score does not guarantee safety — it means the vault has passed more of the tests that time imposes.
+## What the score does not cover
 
-<Warning>
-  The Reputation Score does not incorporate smart contract audit results, governance risk, or nuanced risk assessments of protocol architecture. Do not use it as a substitute for security research.
-</Warning>
+- Smart-contract audits, governance risk, upgradeability and admin-key exposure.
+- Security of the blockchain the vault runs on (network score has 0 weight).
+- Risks vaults.fyi has not flagged.
 
-## Using the Reputation Score to filter vaults
+A long-lived risky protocol can score well; a well-audited new protocol scores low until it builds a track record. Use the score for programmatic screening and use risk reports (for example LlamaRisk, Chaos Labs, Gauntlet) for due diligence.
 
-You can filter the detailed-vaults API response to only return vaults above a minimum Reputation Score threshold using the `minVaultScore` query parameter:
+## Filtering by score
 
+The list endpoints accept `minVaultScore` (number). Use it to narrow the result set. Check `score.vaultScore` client-side if you need a strict threshold. Also exclude flagged vaults: `allowVaultsWithWarnings` defaults to `true` on `GET /v2/detailed-vaults`.
+
+```bash
+curl -s "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&minVaultScore=70&allowVaultsWithWarnings=false&sortBy=apy7day&sortOrder=desc&perPage=50" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
 ```
-GET /v2/detailed-vaults?minVaultScore=60
+
+```python
+import os, requests
+
+MIN_SCORE = 70
+r = requests.get(
+    "https://api.vaults.fyi/v2/detailed-vaults",
+    headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+    params={"allowedNetworks": "base", "allowedAssets": "USDC", "minVaultScore": MIN_SCORE,
+            "allowVaultsWithWarnings": "false", "sortBy": "apy7day", "sortOrder": "desc", "perPage": 50},
+)
+r.raise_for_status()
+safe = [v for v in r.json()["data"]
+        if v["score"]["vaultScore"] >= MIN_SCORE   # client-side check for a strict threshold
+        and not v.get("flags") and not v.get("isCorrupted")]
 ```
 
-This is useful when building integrations where you want to surface only established vaults to end users, without needing to maintain your own allowlist.
+```typescript
+const MIN_SCORE = 70;
+const url = new URL("https://api.vaults.fyi/v2/detailed-vaults");
+url.search = new URLSearchParams({
+  allowedNetworks: "base", allowedAssets: "USDC", minVaultScore: String(MIN_SCORE),
+  allowVaultsWithWarnings: "false", sortBy: "apy7day", sortOrder: "desc", perPage: "50",
+}).toString();
+const body = await (await fetch(url, { headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! } })).json();
+const safe = body.data.filter((v: any) =>
+  v.score.vaultScore >= MIN_SCORE && !(v.flags?.length) && !v.isCorrupted);
+```
 
-<Tip>
-  Set `minVaultScore` to match your product's risk tolerance. Consumer wallets typically want higher thresholds (70+). Yield aggregators serving sophisticated users may set lower thresholds to capture emerging opportunities.
-</Tip>
+Choose the threshold for your users: consumer wallets typically use 70 or higher; tools for sophisticated users may go lower to include newer vaults.
 
-The Reputation Score is also visible in the Vaults.fyi app at [app.vaults.fyi](https://app.vaults.fyi/) and returned by the [detailed vaults endpoint](/api-reference/detailed-vaults) as `score.vaultScore`.
+Note that `GET /v2/detailed-vaults` covers only `base`, `mainnet`, `arbitrum` and `optimism` and vaults with TVL ≥ 100,000 USD by default; pass `allowedNetworks` (repeat the key per network) and `minTvl` to change that. See [API conventions](/api-reference/conventions).
 
-## Known limitations
 
-<Note>
-  The Reputation Score is objective and formula-driven, which means it has edges. A genuinely risky protocol with a long history can score well. A well-audited new protocol will score low until it builds a track record. Keep these limitations in mind when making risk decisions.
-</Note>
+The score is also shown on [app.vaults.fyi](https://app.vaults.fyi/). Background on the approach: [vaults.fyi reputation score blog post](https://blog.vaults.fyi/beyond-apy-the-vaultsfyi-reputation/).
 
-- The Reputation Score does not account for governance risk, upgrade mechanisms, or admin key exposure.
-- Blockchain security does not contribute to the current score. Assess network risk separately.
-- Smart contract audit status is not currently a direct input to the Reputation Score.
-- Flag penalties reflect known incidents surfaced by vaults.fyi — they do not capture all possible risk vectors.
-
-For a deeper explanation of the methodology and the thinking behind the Lindy-based approach, read the [Vaults.fyi reputation score blog post](https://blog.vaults.fyi/beyond-apy-the-vaultsfyi-reputation/).
+Related: [Vault discovery](/concepts/vault-discovery), [Glossary](/resources/glossary), [Rules for agents](/ai-agents/rules-for-agents).

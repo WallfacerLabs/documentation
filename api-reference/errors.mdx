@@ -1,0 +1,363 @@
+---
+title: "Errors, rate limits and retries"
+sidebarTitle: "Errors"
+description: "Every HTTP status the vaults.fyi API returns, with real error bodies, rate-limit headers, which errors to retry, copy-paste backoff code, and how to debug 200 responses with empty data."
+---
+
+This page lists every HTTP status the vaults.fyi REST API returns, the exact body shape of each, the rate-limit headers, which errors are safe to retry, and how to debug a 200 response with empty `data`. Use it when you write error handling or when a request does not return what you expected.
+
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Statuses and bodies below were observed live on 2026-10-23 unless they are marked as documented in the spec but not observed.
+
+## How to handle any response
+
+1. Branch on the **HTTP status**, not on the body. Bodies come in several shapes, and some have no `statusCode` field.
+2. On **400**, check whether `message` starts with `[`. If it does, it is a JSON-encoded array of validation issues; parse it. Otherwise it is a sentence. A sentence ending in "not found" means the resource does not exist.
+3. On **401** or **402**, fix authentication. Don't retry the same request.
+4. On **408**, **429**, **503** or **504**, wait (use `Retry-After` or `x-ratelimit-reset` if present) and retry with exponential backoff.
+5. On **200** from a list endpoint, check `errors.unsupported*` before you trust an empty `data`.
+
+## Status codes
+
+| Status | When it happens | Body shape | Retry? |
+| - | - | - | - |
+| 200 + `errors` | Unknown filter value (network, asset or protocol) in a list query | [Soft error](#soft-errors-200-with-an-errors-object) | No, fix the filter |
+| 400 | Invalid path, query or body (validation) | [Validation](#400-validation-errors) | No |
+| 400 | v2 resource not found, asset not investable in the vault, network not supported for the operation | [Plain 400](#400-business-rule-and-not-found-errors) | No |
+| 401 | Key sent but invalid | [401](#401-invalid-api-key) | No |
+| 402 | No `x-api-key` on a v2 endpoint (except `/v2/health` and `/v2/nrt/*`) | [x402 challenge](#402-payment-required-no-api-key) | No, add the key or pay |
+| 403 | Credits exhausted: the key's credit balance has reached zero | [403](#403-credits-exhausted) | No, top up |
+| 404 | Unknown route or wrong HTTP method; beta resource not found | [404](#404-not-found) | No |
+| 408 | Server timeout on portfolio positions, events and returns (body `{message, errorId?}`; not observed live) | — | Yes, later, with backoff |
+| 422 | Listed in the spec, but request validation errors are returned as 400, not 422 | — | No |
+| 429 | Rate limit exceeded | [429](#429-rate-limit-exceeded) | Yes, after `Retry-After` |
+| 500 | Server error (see [500](#500-server-error)) | `{error, message}` | No, except once for transient faults |
+| 503 | Service or upstream unavailable | `{statusCode, error, message}` | Yes, with backoff |
+| 504 | Cloudflare gateway timeout after about 60 s | Cloudflare JSON + `retry-after: 120` | Yes, after `retry-after` |
+
+## 400: validation errors
+
+When a path, query or body parameter fails validation, the status is 400 and `message` is a **JSON-encoded array of Zod issues** in a string. Each issue has `path`, `code` and `message`, and enum errors also have `options`. Parse it with `json.loads(body["message"])` or `JSON.parse(body.message)`.
+
+`GET /v2/detailed-vaults?sortBy=apy&perPage=1` (complete):
+
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "[\n  {\n    \"received\": \"apy\",\n    \"code\": \"invalid_enum_value\",\n    \"options\": [\n      \"tvl\",\n      \"apy1day\",\n      \"apy7day\",\n      \"apy30day\",\n      \"apy90day\"\n    ],\n    \"path\": [\n      \"sortBy\"\n    ],\n    \"message\": \"Invalid enum value. Expected 'tvl' | 'apy1day' | 'apy7day' | 'apy30day' | 'apy90day', received 'apy'\"\n  }\n]"
+}
+```
+
+Common validation triggers (all observed):
+
+| Trigger | Issue `code` / message |
+| - | - |
+| Unknown network in a path (`/v2/detailed-vaults/8453/...`, `ethereum`) | `invalid_enum_value`, `options` lists all 44 names and CAIP-2 IDs |
+| `perPage=0`, `perPage=5001`, `page=-1`, `perPage=abc` | `too_small` / `too_big` / `invalid_type` |
+| Bad enum (`sortOrder=DESC`, `granularity=1month`, `code=btc`, `action=stake`) | `invalid_enum_value` with `options` (enums are case-sensitive) |
+| Missing required query (`code` on benchmarks, `assetAddress` on transactions, `claimIds` on rewards claim) | `invalid_type`, "Required" |
+| Boolean other than `true` / `false` (`onlyTransactional=yes`) | `invalid_enum_value`, options `["true","false"]` |
+| Non-integer `minTvl` (`1000.5`) | "Expected integer, received float" |
+| Millisecond timestamp (`fromTimestamp=1792540800000`) | `custom`, "Timestamp must be a number greater than 0 and less than 1e11" |
+| Decimal transaction `amount` (`amount=1.5`) | `invalid_type`, "Expected bigint, received string". Use base units. |
+| Invalid `userAddress` (`0x123`, `vitalik.eth`) | `invalid_string`, "Value is not a valid address" |
+| Invalid `vaultId` (`not-a-vault`) | `custom`, "Value is not a valid vault id" |
+| EVM address on a `/beta/svm/*` endpoint | "Invalid Solana address" |
+| Alpha daily flows with a bad date (`2026/10/01`) | "Date must be in YYYY-MM-DD format" |
+
+## 400: business-rule and not-found errors
+
+Other 400s carry a plain sentence in `message`.
+
+`GET /v2/detailed-vaults/base/0x000000000000000000000000000000000000dEaD` (complete):
+
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "Vault 0x000000000000000000000000000000000000dEaD on network base not found"
+}
+```
+
+- **v2 returns 400, not 404, for a vault that does not exist** or is on a different network. The spec documents 404. Treat "400 + message ending in `not found`" as not-found.
+- A deposit with an asset the vault doesn't accept returns 400 "Asset DAI is not investable in Steakhouse High Yield USDC Edition vault". Use the vault's `asset.address`.
+- Alpha CCTP with `dstNetwork=gnosis` returns 400 "Network gnosis is not supported for CCTP".
+- Alpha intent quote with a non-vault output returns 400 "Only deposits are supported currently. Output position must be a vault."
+
+## 401: invalid API key
+
+A key that is sent but not recognised returns 401. The message says a key is *required*, so branch on the status code, not the message. `GET /v2/networks` with an invalid key (complete):
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "An API key is required to access this service. Sign up at https://portal.vaults.fyi/signup to generate a key. We offer a Pay-As-You-Go plan so you only pay for what you use, with no commitments."
+}
+```
+
+401 has no `statusCode` field and no rate-limit headers. Check that the header name is exactly `x-api-key` and that the value has no whitespace or quotes. Don't retry.
+
+## 402: payment required (no API key)
+
+A v2 request without `x-api-key` returns **402** with an [x402](/ai-agents/x402) version 2 payment challenge. It is never a 401. The `x-402-auth: true` header is not needed to get it. The same JSON is also base64-encoded in the `payment-required` response header.
+
+`GET /v2/networks` with no key (trimmed: `resource` and `extensions` shortened, `error` text cut):
+
+```json
+{
+  "x402Version": 2,
+  "error": "Payment required to process this request. You can use the x402 protocol for instant per-request payments, or visit https://portal.vaults.fyi/signup to top-up your account credits via our Pay-As-You-Go plan. ...",
+  "resource": { "url": "https://api.vaults.fyi/v2/networks", "serviceName": "vaults.fyi", "mimeType": "application/json" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "2000",
+      "payTo": "0x108BCd8a07C3fdfca3Aa500784A8573123a1029F",
+      "maxTimeoutSeconds": 60,
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "extra": { "name": "USD Coin", "version": "2", "symbol": "USDC" }
+    },
+    {
+      "scheme": "batch-settlement",
+      "network": "eip155:8453",
+      "amount": "2000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "maxTimeoutSeconds": 300,
+      "extra": { "name": "USD Coin", "version": "2", "symbol": "USDC", "receiverAuthorizer": "0x3721824a31197dcDD2984cF43b92B6cc8A87c0Fb", "withdrawDelay": 900, "minDeposit": "20000" }
+    }
+  ],
+  "extensions": { "bazaar": { "...": "..." } }
+}
+```
+
+- The price is `accepts[].amount`, in USDC base units (6 decimals): `"2000"` = $0.002. There is no `maxAmountRequired` field.
+- Schemes seen: `exact`, `upto` (historical endpoints, where `amount` is a maximum) and `batch-settlement`.
+- Payment is USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) on Base (`eip155:8453`).
+- If you meant to use a key, a 402 means the header was not sent. A common cause is a proxy or HTTP client that drops custom headers on redirect.
+
+## 403: credits exhausted
+
+Before each priced request the API checks the key's credit balance. When it has reached zero, the request returns 403 with this body (no `statusCode`):
+
+```json
+{
+  "error": "Forbidden",
+  "message": "This API key has exhausted its available credits. To resume service, please visit https://portal.vaults.fyi/signup to top-up your credits"
+}
+```
+
+The same check applies to every key, whatever the plan. Free endpoints (`/v2/health`, alpha) are not affected. Don't retry until credits are added: top up or upgrade at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup). See [Credits](/plans/credits).
+
+Pay-as-you-go keys have no spending cap: usage is billed per credit with no upper limit, so set your own budget alerts or call limits if you need one.
+
+## 404: not found
+
+An unknown path or a wrong HTTP method returns a route 404 (there is no 405). `GET /v2/positions/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (complete):
+
+```json
+{
+  "message": "Route GET:/v2/positions/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 not found",
+  "error": "Not Found",
+  "statusCode": 404
+}
+```
+
+The correct path is `/v2/portfolio/positions/{userAddress}`. A route 404 almost always means a typo, a missing `/portfolio/` or `/v2` segment, or a doubled `/v2/v2`. Copy paths from the endpoint pages or the OpenAPI spec.
+
+Beta resources that don't exist return 404 **without** `statusCode`. `GET /beta/borrow/markets/base/0xdeadbeef-0x00` (complete):
+
+```json
+{ "error": "Not Found", "message": "Borrow market 0xdeadbeef-0x00 on network base not found" }
+```
+
+v2 and beta disagree here: the same "not found" case is 400 in v2 and 404 in beta.
+
+## 429: rate limit exceeded
+
+Not observed in the captures for these docs, which stayed far below the limit. Rate limits are set per API key in requests per minute and enforced over a 60-second window, with bursts smoothed in 10-second buckets. Requests without a key (including keyless x402 requests) are limited to 10 per minute per IP. Responses that are not successful (status 400 or above) don't count toward the limit.
+
+Every authenticated response (including 400, 404 and 500 responses) carries these headers:
+
+| Header | Meaning | Observed |
+| - | - | - |
+| `x-ratelimit-limit` | Requests allowed per window | `600` |
+| `x-ratelimit-remaining` | Requests left in the current window | `599`, `598`, … |
+| `x-ratelimit-reset` | Seconds until the window resets | `60` down to `1` |
+
+The key used for these docs reported **600 requests per 60-second window**. That matches the pay-as-you-go and Analyst limit; Growth allows 1,200 and Builder 3,000 per minute (see [Plans and pricing](/plans/overview#rate-limits)). The headers are absent on 401, 402, route-404 and `/v2/health` responses.
+
+A 429 response carries a `Retry-After` header in seconds. Its body has one of two shapes, depending on which limiter tripped. A short burst usually trips the 10-second limiter:
+
+```json
+{ "message": "Too Many Requests", "retryAfter": 4 }
+```
+
+Exceeding the per-minute limit returns:
+
+```json
+{
+  "statusCode": 429,
+  "error": "Too Many Requests",
+  "message": "You can only make 600 requests per 1 minute. Use the API key to increase your rate limit",
+  "date": 1792540800000,
+  "expiresIn": 37
+}
+```
+
+(Values are illustrative.) On a 429, wait `Retry-After` seconds (or `x-ratelimit-reset`) and retry. Branch on the status, not the body. To avoid 429s, watch `x-ratelimit-remaining` and slow down before it reaches 0.
+
+Limits per API key: 600 requests per minute for pay-as-you-go and Analyst, 1,200 for Growth, 3,000 for Builder, and custom for Enterprise. See [Plans](/plans/overview#rate-limits).
+
+## 500: server error
+
+500 responses have no `statusCode` and no `errorId`, though the spec declares an optional `errorId`:
+
+```json
+{ "error": "Internal Server Error", "message": "Internal Server Error" }
+```
+
+Retry a 500 at most once. If the same request fails again, report it with the request and the time.
+
+## 503 and 504: unavailable and timeouts
+
+- **503** means the service or an upstream provider is unavailable. On `/alpha/transactions/intent/status` the message can carry the upstream provider's error, so check the ID before retrying.
+- **504** is a Cloudflare gateway timeout after about 60 seconds. The body is Cloudflare's JSON (`"cloudflare_error": true`, `"retryable": true`, `"retry_after": 120`) and the response has the header `retry-after: 120`. Wait at least `retry-after` seconds, or narrow the request (for example, a smaller window or a per-vault endpoint).
+
+## Soft errors: 200 with an `errors` object
+
+List endpoints don't return 400 for unknown filter values. They return 200, an empty or partial `data`, and the rejected values in `errors`. `GET /v2/detailed-vaults?allowedNetworks=ethereum&perPage=1` (complete):
+
+```json
+{"itemsOnPage":0,"data":[],"errors":{"unsupportedNetworks":["ethereum"],"unsupportedAssets":[],"unsupportedProtocols":[]}}
+```
+
+Treat any non-empty `errors.unsupported*` array as a client error. Beta borrow lists use `unsupportedCollateralAssets` and `unsupportedBorrowAssets`.
+
+## Debugging empty results
+
+If a list endpoint returns 200 with fewer results than expected, check these in order:
+
+| # | Cause | How to tell | Fix |
+| - | - | - | - |
+| 1 | Comma-joined array (`allowedNetworks=base,arbitrum`) | `errors.unsupportedNetworks: ["base,arbitrum"]` | Repeat the key: `allowedNetworks=base&allowedNetworks=arbitrum` |
+| 2 | Bracketed array (`allowedNetworks[]=base`) | Results come only from base, mainnet, arbitrum, optimism | Repeat the plain key |
+| 3 | Default network scope | No `errors`; results only from base, mainnet, arbitrum, optimism | Pass `allowedNetworks` for each network you need |
+| 4 | Default `minTvl=100000` | Small vaults or positions missing | Pass `minTvl=0` |
+| 5 | Wrong value format (`ethereum`, a chain ID, an asset address in `allowedAssets`) | Value echoed in `errors.unsupported*` | Use `mainnet` or `eip155:1`, ticker symbols, protocol IDs from `/v2/protocols` |
+| 6 | Unknown parameter name (`network=` on `/v2/detailed-vaults`) | Results look unfiltered | Use the documented name (`allowedNetworks`) |
+| 7 | Unknown curator | Empty `data`, empty `errors` | Use `name` values from `/v2/curators` |
+| 8 | Historical window | `fromTimestamp` in ms (400), or `fromTimestamp > toTimestamp` (empty) | Unix seconds, from earlier than to |
+| 9 | Page past the end | `itemsOnPage: 0` | Stop when `nextPage` is absent |
+| 10 | Best-vault defaults (`onlyAppFeatured=true`, `allowVaultsWithWarnings=false`) | Fewer candidates than `/v2/detailed-vaults` | Override the defaults explicitly |
+
+Defaults for every endpoint are listed on [Conventions → Defaults per endpoint](/api-reference/conventions#defaults-per-endpoint).
+
+## Retry policy and backoff code
+
+| Status | Retry? | Wait |
+| - | - | - |
+| 400, 401, 402, 403, 404, 422 | No | — |
+| 408 | Yes, up to 3 times | Exponential backoff |
+| 429 | Yes | `retry-after` if present, else `x-ratelimit-reset`, else backoff |
+| 500 | At most one retry if you suspect a transient fault, then report | — |
+| 502, 503, 504 | Yes, up to 3–5 times | `retry-after` if present (504: 120 s), else exponential backoff with jitter |
+| Network error or timeout | Yes for GET | Exponential backoff |
+
+Transaction builders (`/v2/transactions/*`) are read-only GETs that return unsigned payloads, so retrying them is safe. Never retry the signing or broadcasting of a transaction automatically.
+
+Python (tested live on 2026-10-23 against a 400 validation error, a 400 not-found and a 200):
+
+```python
+import json, os, random, time, requests
+
+RETRYABLE = {429, 502, 503, 504}
+
+class VaultsFyiError(Exception):
+    def __init__(self, status, body):
+        self.status, self.body = status, body
+        msg = body.get("message", "") if isinstance(body, dict) else str(body)
+        # Validation 400s carry a JSON-encoded array of Zod issues inside `message`.
+        self.issues = json.loads(msg) if isinstance(msg, str) and msg.startswith("[") else None
+        super().__init__(f"HTTP {status}: {self.issues or msg}")
+
+def vfyi_get(path, params=None, max_attempts=5):
+    for attempt in range(max_attempts):
+        r = requests.get(
+            f"https://api.vaults.fyi{path}",
+            headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+            params=params,  # lists are sent as repeated keys
+            timeout=90,
+        )
+        if r.ok:
+            return r.json()
+        if r.status_code not in RETRYABLE or attempt == max_attempts - 1:
+            try:
+                body = r.json()
+            except ValueError:
+                body = {"message": r.text[:500]}
+            raise VaultsFyiError(r.status_code, body)
+        # Prefer the server's hint: Retry-After (Cloudflare 5xx) or x-ratelimit-reset (seconds).
+        hint = r.headers.get("retry-after") or (
+            r.headers.get("x-ratelimit-reset") if r.status_code == 429 else None)
+        delay = float(hint) if hint else min(60, 2 ** attempt)
+        time.sleep(delay + random.uniform(0, 1))
+
+try:
+    vfyi_get("/v2/detailed-vaults", {"sortBy": "apy", "perPage": 1})
+except VaultsFyiError as e:
+    print(e.status, [(i["path"], i["code"], i.get("options")) for i in e.issues])
+    # 400 [(['sortBy'], 'invalid_enum_value', ['tvl', 'apy1day', 'apy7day', 'apy30day', 'apy90day'])]
+```
+
+TypeScript (Node 18+, tested live the same way):
+
+```typescript
+const RETRYABLE = new Set([429, 502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export class VaultsFyiError extends Error {
+  status: number;
+  body: any;
+  issues: any[] | null;
+  constructor(status: number, body: any) {
+    const msg = typeof body?.message === "string" ? body.message : JSON.stringify(body);
+    // Validation 400s carry a JSON-encoded array of Zod issues inside `message`.
+    const issues = msg.startsWith("[") ? JSON.parse(msg) : null;
+    super(`HTTP ${status}: ${issues ? JSON.stringify(issues) : msg}`);
+    this.status = status;
+    this.body = body;
+    this.issues = issues;
+  }
+}
+
+export async function vfyiGet(path: string, params: Record<string, unknown> = {}, maxAttempts = 5) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    for (const one of ([] as unknown[]).concat(v)) qs.append(k, String(one)); // repeat the key
+  }
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`https://api.vaults.fyi${path}${qs.size ? `?${qs}` : ""}`, {
+      headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! },
+    });
+    if (res.ok) return res.json();
+    if (!RETRYABLE.has(res.status) || attempt === maxAttempts - 1) {
+      const text = await res.text();
+      let body: any;
+      try { body = JSON.parse(text); } catch { body = { message: text.slice(0, 500) }; }
+      throw new VaultsFyiError(res.status, body);
+    }
+    const hint = res.headers.get("retry-after") ??
+      (res.status === 429 ? res.headers.get("x-ratelimit-reset") : null);
+    const delayS = hint ? Number(hint) : Math.min(60, 2 ** attempt);
+    await sleep((delayS + Math.random()) * 1000);
+  }
+}
+```
+
+## Related pages
+
+- [API overview](/api-reference/overview): base URL, auth and the first request.
+- [Conventions](/api-reference/conventions): units, identifiers, defaults and pagination.
+- [Plans and pricing](/plans/overview) and [Credits](/plans/credits): rate limits and costs.
+- [x402](/ai-agents/x402): paying per request without an API key.

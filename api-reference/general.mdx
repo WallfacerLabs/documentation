@@ -1,18 +1,50 @@
 ---
-title: "General"
-description: "Core endpoints for vault discovery, assets, networks, protocols, and curators."
+title: "General: vaults, assets, networks, protocols, curators and tags"
+sidebarTitle: "General"
+description: "Index of the cheap v2 reference-data endpoints (1 credit each): vault IDs on all networks, assets with decimals, networks, protocols, curators and tags, with links to every endpoint page."
 ---
 
-Core reference data endpoints — use these to browse available vaults, resolve asset and network metadata, and populate filter dropdowns.
+This section lists the v2 reference-data endpoints. Use them to enumerate vault IDs, resolve asset addresses and decimals, and get the valid values for network, protocol, curator and tag filters. Each costs 1 credit per call. None of them returns APY or TVL; for that, use [Detailed vaults](/api-reference/detailed-vaults).
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List supported vault identifiers | [`GET /v2/vaults`](/api-reference/general/list-vaults) | None. Optional query filters include `network`, `assetSymbol`, `onlyTransactional`, `onlyAppFeatured`, `page`, and `perPage` |
-| List supported assets and tokens | [`GET /v2/assets`](/api-reference/general/list-assets) | None. Optional query filters include `network`, `page`, and `perPage` |
-| List supported networks | [`GET /v2/networks`](/api-reference/general/list-networks) | None |
-| List vault tags | [`GET /v2/tags`](/api-reference/general/list-tags) | None. See [Vault Tags](/concepts/vault-discovery#vault-tags) for taxonomy definitions |
-| List vault curators | [`GET /v2/curators`](/api-reference/general/list-curators) | None |
-| List supported protocols and their filterable protocol IDs | [`GET /v2/protocols`](/api-reference/general/list-protocols) | None. See [Protocol names and IDs](/concepts/supported-protocols#protocol-names-and-ids) for filtering examples |
-| Check API availability | [`GET /v2/health`](/api-reference/health/health-check) | None |
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key.
 
-`GET /v2/curators` returns each curator's canonical `name` and an optional `displayName`. Use `name` for filtering and stable matching; use `displayName` for presentation, falling back to `name` when it is absent. The same fields appear in the optional `curator` object returned by both detailed-vault endpoints.
+## Endpoints
+
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/vaults`](/api-reference/general/list-vaults) | Enumerate or resolve `vaultId`s on **all** networks (no default network scope). Identity fields only: no APY or TVL. Filters: `network` (one value), `assetSymbol`, `onlyTransactional`, `onlyAppFeatured`. | None | 1 |
+| [`GET /v2/assets`](/api-reference/general/list-assets) | Map a token symbol to its `address`, `decimals` and CAIP-19 `assetCaip` on each network, e.g. to convert amounts to base units. | None | 1 |
+| [`GET /v2/networks`](/api-reference/general/list-networks) | Get the 22 supported EVM networks with `name`, `chainId` and `networkCaip`. Use the `name` or CAIP-2 value in other requests. | None | 1 |
+| [`GET /v2/protocols`](/api-reference/general/list-protocols) | Get protocol `name`s and `protocolId`s for `allowedProtocols` / `disallowedProtocols`. Some IDs contain spaces; URL-encode them. | None | 1 |
+| [`GET /v2/curators`](/api-reference/general/list-curators) | Get curator `name`s for the `curators` filter (unknown names are silently ignored) and `displayName`s for display. | None | 1 |
+| [`GET /v2/tags`](/api-reference/general/list-tags) | Get the valid values for the `tags` filter (exact names, e.g. `Liquid Staking`; case-insensitive, no abbreviations). | None | 1 |
+
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit.
+
+## Things to know
+
+- **Network scope differs from detailed vaults.** `/v2/vaults` and `/v2/assets` return data for **all** networks by default and take a single `network` query value. `/v2/detailed-vaults` covers only base, mainnet, arbitrum and optimism unless you pass `allowedNetworks`. On 2026-10-23, `/v2/vaults?perPage=5000` returned 3,662 vaults across 21 networks.
+- **`vaultId` is not always an address.** `/v2/vaults?network=base` returned some IDs such as `0x559756d476D5ed4533edC3Ac98E5A9468176378c-25`. Copy `vaultId` from these responses into paths; don't derive it from `address`.
+- **Networks:** use the `name` (`base`, `mainnet`) or the `networkCaip` (`eip155:8453`) from `/v2/networks`. A bare chain ID such as `8453`, or `ethereum`, is rejected.
+- **Curators:** use `name` in the `curators` filter and `displayName` for display (falling back to `name`). Unknown curator names return an empty result with no `errors` entry.
+- **Protocols:** `allowedProtocols` accepts a broad `name` (`morpho`) or a specific `protocolId` (`morpho-v2`). See [Supported protocols](/concepts/supported-protocols).
+- **Tags:** use exact names from `/v2/tags` (`Liquid Staking`, `RWA`); matching is case-insensitive but `lst` matches nothing. See [Vault discovery](/concepts/vault-discovery).
+- **Pagination:** `/v2/vaults` and `/v2/assets` are paginated (`page` from 0, `perPage` up to 5000, `nextPage` omitted on the last page). See [Conventions → Pagination](/api-reference/conventions#pagination).
+
+## Example
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" "https://api.vaults.fyi/v2/networks"
+```
+
+Response, captured 2026-10-23 (trimmed to 3 of 22 networks):
+
+```json
+[
+  { "name": "arbitrum", "chainId": 42161, "networkCaip": "eip155:42161" },
+  { "name": "base", "chainId": 8453, "networkCaip": "eip155:8453" },
+  { "name": "mainnet", "chainId": 1, "networkCaip": "eip155:1" }
+]
+```
+
+Related: [API overview](/api-reference/overview), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

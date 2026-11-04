@@ -1,0 +1,222 @@
+---
+title: "Recipe: claim every pending reward for a wallet"
+sidebarTitle: "Claim rewards"
+description: "Executed recipe: read GET /v2/transactions/rewards/context/:userAddress (claimable is an object keyed by network), pass the claimIds as repeated keys to GET /v2/transactions/rewards/claim/:userAddress, verify, and sign per network with viem (shown, not executed)."
+---
+
+This recipe answers "how do I claim every pending reward for this wallet, on every network?" It reads the wallet's claimable rewards, builds the claim transactions per network, verifies them, and shows how to sign them. Use it for "claim all" buttons and reward-harvesting agents. The claimable rewards observed in testing were Merkl rewards.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. All code on this page was run on 2026-10-23 against the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`; outputs are real. **No transaction was signed or sent.**
+
+## Benchmark tasks covered
+
+T12 (claim all rewards for a wallet). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+ with `viem` for signing.
+
+## Credit cost
+
+| Call | Cost |
+| - | - |
+| `GET /v2/transactions/rewards/context/{userAddress}` | 3 |
+| `GET /v2/transactions/rewards/claim/{userAddress}` (one per network in these examples) | 5 |
+
+One network with rewards: **8 credits** ([credits](/plans/credits)).
+
+## Response shapes
+
+- `rewards/context` → `{ claimable: { <network>: [ { claimId, asset: { symbol, claimableAmountInUsd?, ... } } ] }, actionUrl }`. `claimable` is an **object keyed by network name**, not an array.
+- `rewards/claim?claimIds=…&claimIds=…` → `{ <network>: { currentActionIndex, actions: [ { name, tx: { to, chainId, data, value? } } ] } }`, also keyed by network.
+- `claimIds` is a required array parameter: **repeat the key** once per id. Real ids look like `merkl:mainnet:0x3Ef3…-0xb755…`.
+
+## curl
+
+```bash
+# Claimable rewards for a wallet, then the claim payload for one network. Read-only.
+USER=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+CTX=$(curl -sS --fail-with-body "https://api.vaults.fyi/v2/transactions/rewards/context/$USER" -H "x-api-key: $VAULTSFYI_API_KEY")
+echo "$CTX" | jq '.claimable | to_entries | map({network: .key, claimIds: [.value[].claimId], usd: [.value[].asset.claimableAmountInUsd]})'
+# claimIds is an array param: repeat the key once per id.
+ARGS=$(echo "$CTX" | jq -r '.claimable.mainnet // [] | map("--data-urlencode claimIds=" + .claimId) | join(" ")')
+[ -z "$ARGS" ] && { echo "nothing to claim on mainnet"; exit 0; }
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/transactions/rewards/claim/$USER" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" $ARGS \
+| jq 'to_entries | map({network: .key, actions: [.value.actions[] | {name, to: .tx.to, chainId: .tx.chainId}]})'
+```
+
+Output (2026-10-23):
+
+```json
+[
+  {
+    "network": "mainnet",
+    "claimIds": [
+      "merkl:mainnet:0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae-0xb755506531786C8aC63B756BaB1ac387bACB0C04"
+    ],
+    "usd": [
+      "0.00000011"
+    ]
+  }
+]
+[
+  {
+    "network": "mainnet",
+    "actions": [
+      {
+        "name": "Claim Merkl rewards from 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae",
+        "to": "0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae",
+        "chainId": 1
+      }
+    ]
+  }
+]
+```
+
+## Python
+
+```python
+"""Build reward-claim transactions for every network a wallet has rewards on. Read-only."""
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+
+ctx = requests.get(f"{API}/v2/transactions/rewards/context/{USER}", headers=HEADERS, timeout=30)
+ctx.raise_for_status()
+claimable = ctx.json()["claimable"]  # OBJECT keyed by network name -> list of claims (not an array)
+
+for network, claims in claimable.items():
+    ids = [c["claimId"] for c in claims]  # real ids look like "merkl:mainnet:0x...-0x..."
+    usd = sum(float(c["asset"].get("claimableAmountInUsd") or 0) for c in claims)
+    print(f"{network}: {len(ids)} claim(s), ~${usd:.6f}")
+    # One call per network; claimIds repeats as a query key. Use ids from the context call.
+    r = requests.get(f"{API}/v2/transactions/rewards/claim/{USER}", headers=HEADERS, timeout=30,
+                     params=[("claimIds", i) for i in ids])
+    r.raise_for_status()
+    for net, plan in r.json().items():  # response is keyed by network too
+        for a in plan["actions"][plan["currentActionIndex"]:]:
+            print(f"  {net}: {a['name']}  to={a['tx']['to']}  chainId={a['tx']['chainId']}")
+if not claimable:
+    print("nothing to claim")
+```
+
+## TypeScript
+
+```typescript
+// Build reward-claim transactions for every network a wallet has rewards on. Read-only.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+
+async function get(path: string, qs?: URLSearchParams) {
+  const res = await fetch(`${API}${path}${qs ? `?${qs}` : ''}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+type Claim = { claimId: string; asset: { symbol: string; claimableAmountInUsd?: string } };
+const { claimable } = (await get(`/v2/transactions/rewards/context/${USER}`)) as { claimable: Record<string, Claim[]> };
+
+for (const [network, claims] of Object.entries(claimable)) { // object keyed by network
+  const qs = new URLSearchParams(claims.map((c): [string, string] => ['claimIds', c.claimId])); // repeated key
+  console.log(`${network}: ${claims.length} claim(s): ${claims.map((c) => c.asset.symbol).join(', ')}`);
+  const plan = await get(`/v2/transactions/rewards/claim/${USER}`, qs);
+  for (const [net, p] of Object.entries<any>(plan)) {
+    for (const a of p.actions.slice(p.currentActionIndex)) console.log(`  ${net}: ${a.name}  to=${a.tx.to}  chainId=${a.tx.chainId}`);
+  }
+}
+if (!Object.keys(claimable).length) console.log('nothing to claim');
+```
+
+### Output (2026-10-23)
+
+Python:
+
+```text
+mainnet: 1 claim(s), ~$0.000000
+  mainnet: Claim Merkl rewards from 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae  to=0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae  chainId=1
+```
+
+TypeScript:
+
+```text
+mainnet: 1 claim(s): ZARP
+  mainnet: Claim Merkl rewards from 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae  to=0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae  chainId=1
+```
+
+The test wallet's only claimable reward was worth about $0.0000001 (ZARP on mainnet). Gas would exceed it: a real UI should hide claims below a USD threshold.
+
+## Signing with viem (not executed)
+
+```typescript
+// Sign and send reward claims with viem, one network at a time, IN ORDER, only when SEND=1.
+import { createPublicClient, createWalletClient, http, type Chain, type Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { arbitrum, base, mainnet, optimism } from 'viem/chains';
+
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+const CHAINS: Record<string, Chain> = { mainnet, base, arbitrum, optimism }; // API network name -> viem chain
+
+const get = async (path: string) => {
+  const r = await fetch(`${API}${path}`, { headers });
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  return r.json();
+};
+
+const { claimable } = await get(`/v2/transactions/rewards/context/${USER}`); // keyed by network
+for (const [network, claims] of Object.entries<{ claimId: string }[]>(claimable)) {
+  const chain = CHAINS[network];
+  if (!chain) { console.log(`skip ${network}: add its viem chain`); continue; }
+  const qs = new URLSearchParams(claims.map((c): [string, string] => ['claimIds', c.claimId]));
+  const plan = (await get(`/v2/transactions/rewards/claim/${USER}?${qs}`))[network];
+  const actions: { name: string; tx: { to: Hex; chainId: number; data?: Hex; value?: string } }[] =
+    plan.actions.slice(plan.currentActionIndex);
+  for (const a of actions) {
+    if (a.tx.chainId !== chain.id) throw new Error(`${a.name}: chainId ${a.tx.chainId} != ${chain.id}`);
+    if (BigInt(a.tx.value ?? 0) !== 0n) throw new Error(`${a.name}: claims should not send native value`);
+    console.log(`verified ${network}: ${a.name} -> ${a.tx.to}`);
+  }
+  if (process.env.SEND !== '1') { console.log('SEND!=1: not signing (dry run)'); continue; }
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex); // USER's key; never hard-code it
+  const wallet = createWalletClient({ account, chain, transport: http() });
+  const pub = createPublicClient({ chain, transport: http() });
+  for (const a of actions) {
+    const hash = await wallet.sendTransaction({ to: a.tx.to, ...(a.tx.data !== undefined ? { data: a.tx.data } : {}), value: BigInt(a.tx.value ?? 0) });
+    if ((await pub.waitForTransactionReceipt({ hash })).status !== 'success') throw new Error(`${a.name} reverted`);
+  }
+}
+```
+
+Output (2026-10-23, dry run):
+
+```text
+verified mainnet: Claim Merkl rewards from 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae -> 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae
+SEND!=1: not signing (dry run)
+```
+
+## Pitfalls
+
+- **Iterating `claimable` as an array.** It is an object keyed by network.
+- **Invented or stale claim ids.** Always take ids from a fresh context call.
+- **Comma-joined `claimIds`.** Repeat the key.
+- **POST.** Both endpoints are GET.
+- **Per-vault vs wallet-level claims.** This recipe uses the wallet-level reward endpoints. Some vaults also expose a per-vault claim step via `/v2/transactions/{action}/...`; check the vault's transaction context.
+- **Dust claims.** Compare `claimableAmountInUsd` with the expected gas cost before suggesting a claim.
+
+## Related pages
+
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Transactions API](/api-reference/transactions).
+- [API conventions: array query parameters](/api-reference/conventions#array-query-parameters-repeat-the-key).
+- [Errors](/api-reference/errors).
+- [Redeem and queued withdrawals](/recipes/redeem-and-queued-withdrawal).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

@@ -1,92 +1,77 @@
 ---
-title: "Vaults.fyi API Plans & Pricing Overview"
-description: "Compare pay-as-you-go, Analyst, Growth, Builder, and Enterprise API plans — pricing, credit allowances, rate limits, and support to find the right fit."
+title: "API plans, pricing and rate limits"
 sidebarTitle: "Plans Overview"
+description: "Compare vaults.fyi API plans (pay-as-you-go at $0.002 per credit, Analyst, Growth, Builder, Enterprise): price, included credits, rate limit and support, plus rate-limit headers, what happens when credits run out, and keyless x402 access."
 ---
 
-The vaults.fyi API offers usage-based and subscription plans designed to match different usage levels, from individual analysts to enterprise-scale applications. Every API key can access all endpoints; plans differ by pricing model, included credits, rate limits, and support. Usage is measured in [Credits (Compute Units)](/plans/credits) that reflect the actual compute cost of each request.
+This page answers which vaults.fyi API plan fits your usage, what each costs, and what rate limit applies. It is the one place where plan rate limits are stated. Use it with [Credits](/plans/credits), which gives the credit cost of every endpoint.
 
-## Plan Comparison
+Every API key can call every endpoint: v2, beta and alpha. Plans differ only in pricing model, included credits, rate limit and support. Usage is measured in credits (also called Compute Units); a simple lookup costs 1 credit, and list endpoints add a cost per returned item.
 
-| Feature | Pay as you go | Analyst | Growth | Builder | Enterprise |
-|---|---|---|---|---|---|
-| **Price** | $0.002 / credit | $399 / mo | $599 / mo | $999 / mo | Custom |
-| **Included credits** | None — pay for usage | 250k / mo | 500k / mo | 1M / mo | Custom |
-| **Endpoint access** | All endpoints | All endpoints | All endpoints | All endpoints | All endpoints |
-| **Rate limits** | Standard | 10 req/s | 20 req/s | 50 req/s | Custom |
+## Plan comparison
 
-## Plan Details
+| | Pay as you go | Analyst | Growth | Builder | Enterprise |
+| - | - | - | - | - | - |
+| Price | $0.002 per credit | $399 / month | $599 / month | $999 / month | Custom |
+| Included credits | None; pay per credit used | 250,000 / month | 500,000 / month | 1,000,000 / month | Custom |
+| Rate limit | 600 requests/minute | 600 requests/minute | 1,200 requests/minute | 3,000 requests/minute | Custom |
+| Endpoint access | All | All | All | All | All |
+| Support | Not stated | Priority, under 24 h SLA | Priority, under 24 h SLA | Priority, under 24 h SLA | Dedicated, under 24 h SLA, on-call for critical issues |
+| Roadmap | — | Standard roadmap requests | Prioritized integrations for requested protocols | Prioritized integrations for requested protocols and chains; prioritized API features | Prioritized integrations and API features; custom feature development |
 
-<CardGroup cols={2}>
-  <Card title="Pay as you go" icon="credit-card">
-    **$0.002 / credit**
+At pay-as-you-go prices, the Analyst allowance (250,000 credits) would cost $500, Growth (500,000) $1,000 and Builder (1,000,000) $2,000.
 
-    Best for testing, variable workloads, and teams that want access to the full API without committing to a monthly credit package.
+Who each plan is for:
 
-    - No monthly credit commitment
-    - Flat $0.002 per credit
-    - Access to all endpoints
-    - Standard rate limits
-    - Upgrade to a subscription plan when usage becomes predictable
-  </Card>
-  <Card title="Analyst" icon="chart-line">
-    **$399 / month**
+- **Pay as you go:** testing, variable workloads, and agents. No commitment; switch to a subscription when usage becomes predictable.
+- **Analyst:** researchers and data teams pulling data across protocols and chains.
+- **Growth:** product teams launching yield features that need more included usage and throughput.
+- **Builder:** applications at scale with high throughput needs.
+- **Enterprise:** institutions and platforms needing custom volume, rate limits, SLAs or features. [Submit interest](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus).
 
-    Best for researchers and data teams that need comprehensive data across protocols and chains.
+## Rate limits
 
-    - 250,000 credits / month
-    - 10 requests per second
-    - Access to all endpoints
-    - Priority support, &lt;24 hr SLAs
-    - Standard product roadmap requests
-  </Card>
-  <Card title="Growth" icon="arrow-trend-up">
-    **$599 / month**
+Rate limits are set per API key as a number of requests per minute, enforced over a 60-second window, with bursts smoothed in 10-second buckets (about one sixth of the per-minute limit per 10 seconds). Requests without a key, including keyless x402 requests, are limited to 10 per minute per IP; that default is the "10 requests per minute" in the v2 spec. Limits per plan:
 
-    Best for product teams launching yield features that need higher included usage and more throughput.
+| Plan | Requests per minute | Average per second |
+| - | - | - |
+| Pay as you go | 600 | 10 |
+| Analyst | 600 | 10 |
+| Growth | 1,200 | 20 |
+| Builder | 3,000 | 50 |
+| Enterprise | Custom | Custom |
+| No API key (including x402) | 10 per IP | — |
 
-    - 500,000 credits / month
-    - 20 requests per second
-    - Access to all endpoints
-    - Priority support, &lt;24 hr SLAs
-    - Prioritized integrations for requested protocols
-  </Card>
-  <Card title="Builder" icon="hammer">
-    **$999 / month**
+Limits can be raised for an individual key on request. The `x-ratelimit-limit` header shows the limit applied to your key: rely on it rather than on the plan name.
 
-    Best for scaling applications with high throughput requirements and deep protocol coverage.
+### Rate-limit headers
 
-    - 1,000,000 credits / month
-    - 50 requests per second
-    - Access to all endpoints
-    - Priority support, &lt;24 hr SLAs
-    - Prioritized integrations for requested protocols and chains
-    - Prioritized API features
-  </Card>
-  <Card title="Enterprise" icon="building">
-    **Custom pricing**
+Authenticated responses, including most error responses, carry:
 
-    Best for institutional teams and platforms that need dedicated support, custom SLAs, and bespoke features.
+| Header | Meaning |
+| - | - |
+| `x-ratelimit-limit` | Requests allowed in the current window |
+| `x-ratelimit-remaining` | Requests left in the current window |
+| `x-ratelimit-reset` | Seconds until the window resets |
 
-    - Custom credit volume
-    - Custom rate limits
-    - Access to all endpoints
-    - Dedicated support, &lt;24 hr SLAs, on-call for critical issues
-    - Prioritized integrations, API features, and custom feature development
-    - [Submit interest](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to discuss
-  </Card>
-</CardGroup>
+The headers are absent on 401 and 402 responses, on unknown-route 404s and on the public `/v2/health` endpoint.
 
-## Subscribe or Upgrade
+When you exceed the limit the API returns HTTP 429 with a `Retry-After` header in seconds. Wait that long (or `x-ratelimit-reset` seconds) before retrying, and slow down before `x-ratelimit-remaining` reaches 0. Backoff code is on [Errors and rate limits](/api-reference/errors#retry-policy-and-backoff-code).
 
-To start on pay as you go, subscribe to a paid plan, or upgrade your existing plan, [sign up at the vaults.fyi portal](https://portal.vaults.fyi/signup). For Enterprise inquiries, [submit interest](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) and the team will follow up.
+## When credits run out
 
-<Note>
-  **Using AI agents or building agentic workflows?** Pay as you go gives you usage-based API-key access. The vaults.fyi API also supports keyless pay-per-request access via [x402](/ai-agents/x402), a micropayment protocol for autonomous systems that prefer to pay from an onchain wallet instead of managing an API key.
-</Note>
+When a key's credit balance reaches zero, priced endpoints return HTTP 403 `Forbidden` with "This API key has exhausted its available credits"; don't retry it, top up or upgrade instead. Free endpoints (`/v2/health`, alpha) keep working. See [Credits → When credits run out](/plans/credits#when-credits-run-out).
 
-## Understanding Credits
+Pay-as-you-go keys have no spending cap: usage is billed per credit with no upper limit, so set your own budget alerts or call limits if you need one.
 
-API usage is measured in Credits (Compute Units), which reflect the resources required to fulfill each type of request. Lightweight endpoints like `/v2/assets` cost 1 CU per call, while data-heavy endpoints return multiple datapoints and cost more per response. On pay as you go, each credit costs $0.002.
+## Keyless access with x402
 
-See the full breakdown of endpoint credit costs on the [Credits](/plans/credits) page.
+AI agents and other autonomous clients can call v2 REST endpoints without an API key by paying per request in USDC on Base with [x402](/ai-agents/x402). A v2 request sent without `x-api-key` returns HTTP 402 with the price. The price is the endpoint's credit cost × $0.002 (see [Credits → Credits and x402 prices](/plans/credits#credits-and-x402-prices)). x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints and the MCP server need a key.
+
+x402 payments don't draw on account credits. They are not exempt from rate limits: keyless traffic is limited to 10 requests per minute per IP.
+
+## Get a key or change plan
+
+Sign up, start pay-as-you-go, subscribe or upgrade at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup). Send the key as `x-api-key: $VAULTSFYI_API_KEY` on REST requests; the MCP server takes the same key as `Authorization: Bearer <key>`. See [API overview](/api-reference/overview).
+
+Related: [Credits](/plans/credits), [Errors and rate limits](/api-reference/errors), [x402](/ai-agents/x402).

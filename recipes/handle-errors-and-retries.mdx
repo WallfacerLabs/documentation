@@ -1,0 +1,269 @@
+---
+title: "Recipe: handle errors, soft errors and rate limits (402, 401, 400, 429)"
+sidebarTitle: "Handle errors and retries"
+description: "Executed recipe: a small client wrapper that branches on HTTP status, explains 402 without a key vs 401 invalid key vs 403 credits exhausted, parses 400 validation issues, surfaces 200 soft errors, reads x-ratelimit-* headers and retries only retryable statuses."
+---
+
+This recipe answers "why did my call fail, and should my client retry?" It shows what each failure looks like on the live API and gives a copy-paste wrapper in Python and TypeScript that branches on the HTTP status, retries only what is retryable, and turns soft errors into exceptions. Use it as the base client for any integration or agent.
+
+Requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. All code on this page was run on 2026-10-23; outputs are real and trimmed. The 429 and 403 branches were not triggered (the tests stay far below the limit and the key had credits).
+
+## Benchmark tasks covered
+
+T05 ("why does my call return 402?"), T15 (rate limits and backoff) and T16 (401 vs 403). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+Each successful call costs its normal price ([credits](/plans/credits)). Requests without a key are not charged credits: they get a 402 payment challenge. Requests that don't return 200 (400, 404, 500 and so on) are not charged.
+
+## Status codes at a glance
+
+| Status | Meaning on vaults.fyi | Retry? |
+| - | - | - |
+| 200 + non-empty `errors.unsupported*` | A filter value was not recognised (for example a comma-joined array) | No, fix the filter |
+| 400 | Validation error; `message` is a JSON-encoded list of issues | No |
+| 401 | Key sent but invalid (message says "required") | No |
+| 402 | **No `x-api-key` header** on a v2 endpoint: an x402 payment challenge | No: add the key, or pay via [x402](/ai-agents/x402) |
+| 403 | Credits exhausted (spec; not observed) | No: top up |
+| 404 | Unknown route | No |
+| 429 | Rate limit exceeded (spec; not observed) | Yes, after `retry-after` / `x-ratelimit-reset` |
+| 500 | Server error | No (at most once) |
+| 502, 503, 504 | Upstream unavailable or timeout | Yes, with backoff |
+
+The full catalogue with bodies is on [errors](/api-reference/errors).
+
+## What failures look like (curl)
+
+```bash
+# What each failure looks like. -i shows the status line and headers.
+# 1) No key -> 402 with an x402 payment challenge (not 401).
+curl -sS "https://api.vaults.fyi/v2/detailed-vaults?perPage=1" | jq '{x402Version, error, price_usdc_base_units: .accepts[0].amount, scheme: .accepts[0].scheme}'
+# 2) Comma-joined array -> 200 with soft errors and empty data (repeat the key instead).
+curl -sS "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base,arbitrum&perPage=1" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" | jq '{itemsOnPage, errors}'
+# 3) Rate-limit headers on a successful call
+curl -sS -o /dev/null -D - "https://api.vaults.fyi/v2/networks" -H "x-api-key: $VAULTSFYI_API_KEY" | grep -i '^x-ratelimit'
+```
+
+Output (2026-10-23, the 402 `error` text is complete):
+
+```text
+{
+  "x402Version": 2,
+  "error": "Payment required to process this request. You can use the x402 protocol for instant per-request payments, or visit https://portal.vaults.fyi/signup to top-up your account credits via our Pay-As-You-Go plan. Use of this API constitutes acceptance of our terms at https://www.wallfacer.io/legal",
+  "price_usdc_base_units": "8000",
+  "scheme": "exact"
+}
+{
+  "itemsOnPage": 0,
+  "errors": {
+    "unsupportedNetworks": [
+      "base,arbitrum"
+    ],
+    "unsupportedAssets": [],
+    "unsupportedProtocols": []
+  }
+}
+x-ratelimit-limit: 600
+x-ratelimit-remaining: 599
+x-ratelimit-reset: 60
+```
+
+- The 402 body is an x402 v2 challenge. `accepts[0].amount` is the price in USDC base units: 8000 = $0.008 for this call.
+- The comma-joined array returned **200** with zero results and the whole string in `errors.unsupportedNetworks`.
+- Rate-limit headers on that key: 600 requests per 60-second window. They are absent on 401, 402 and route-404 responses.
+
+## Python wrapper
+
+```python
+"""A vaults.fyi client wrapper: branch on HTTP status, retry only what is retryable, surface soft errors."""
+import json
+import os
+import random
+import time
+
+import requests
+
+API = "https://api.vaults.fyi"
+RETRYABLE = {408, 429, 502, 503, 504}
+
+
+class VaultsError(Exception):
+    def __init__(self, status, body):
+        self.status, self.body = status, body
+        super().__init__(f"HTTP {status}: {body}")
+
+
+def call(path, params=None, api_key=None, max_attempts=4):
+    headers = {"x-api-key": api_key} if api_key else {}
+    for attempt in range(1, max_attempts + 1):
+        r = requests.get(f"{API}{path}", params=params, headers=headers, timeout=30)
+        if r.ok:
+            body = r.json()
+            bad = {k: v for k, v in (body.get("errors") or {}).items() if v} if isinstance(body, dict) else {}
+            if bad:  # 200 + errors.unsupported*: a bad filter value, not "no results"
+                raise VaultsError(200, {"softErrors": bad})
+            remaining = r.headers.get("x-ratelimit-remaining")
+            if remaining is not None and int(remaining) < 5:  # slow down before you hit 429
+                time.sleep(int(r.headers.get("x-ratelimit-reset", "1")))
+            return body
+        try:
+            body = r.json()
+        except ValueError:
+            body = r.text
+        if r.status_code in RETRYABLE and attempt < max_attempts:
+            wait = r.headers.get("retry-after") or r.headers.get("x-ratelimit-reset")
+            delay = float(wait) if wait else min(30, 2 ** attempt) + random.random()
+            time.sleep(delay)
+            continue
+        if r.status_code == 400 and isinstance(body, dict) and str(body.get("message", "")).startswith("["):
+            body["issues"] = json.loads(body["message"])  # validation: JSON-encoded list of issues
+        raise VaultsError(r.status_code, body)  # 400/401/402/403/404/500: fix the request, don't retry
+
+
+KEY = os.environ["VAULTSFYI_API_KEY"]
+
+# 402: no key. The body is an x402 challenge; accepts[0].amount is USDC base units (6 decimals).
+try:
+    call("/v2/detailed-vaults", {"perPage": 1})
+except VaultsError as e:
+    print(e.status, "->", "add x-api-key or pay via x402; price", e.body["accepts"][0]["amount"], "USDC base units")
+
+# 401: key sent but invalid (the message says 'required'; branch on the status).
+try:
+    call("/v2/networks", api_key="not-a-real-key")
+except VaultsError as e:
+    print(e.status, "->", e.body.get("message", "")[:60])
+
+# 400: validation error with a parseable issue list.
+try:
+    call("/v2/detailed-vaults", {"sortBy": "apy", "perPage": 1}, api_key=KEY)
+except VaultsError as e:
+    i = e.body["issues"][0]
+    print(e.status, "->", i["path"], i["message"][:40], "options:", i.get("options"))
+
+# 200 with soft errors: a comma-joined array is treated as ONE unknown network.
+try:
+    call("/v2/detailed-vaults", {"allowedNetworks": "base,arbitrum", "perPage": 1}, api_key=KEY)
+except VaultsError as e:
+    print(e.status, "->", e.body)
+
+# Success path.
+nets = call("/v2/networks", api_key=KEY)
+print("200 ->", len(nets), "networks")
+```
+
+## TypeScript wrapper
+
+```typescript
+// A vaults.fyi fetch wrapper: branch on HTTP status, retry only what is retryable, surface soft errors.
+const API = 'https://api.vaults.fyi';
+const RETRYABLE = new Set([408, 429, 502, 503, 504]);
+
+class VaultsError extends Error {
+  constructor(public status: number, public body: any) { super(`HTTP ${status}: ${JSON.stringify(body)}`); }
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function call(path: string, params: Record<string, string> = {}, apiKey?: string, maxAttempts = 4) {
+  const headers: Record<string, string> = apiKey ? { 'x-api-key': apiKey } : {};
+  const qs = new URLSearchParams(params);
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(`${API}${path}${qs.size ? `?${qs}` : ''}`, { headers });
+    const text = await res.text();
+    let body: any; try { body = JSON.parse(text); } catch { body = text; }
+    if (res.ok) {
+      const bad = Object.entries(body?.errors ?? {}).filter(([, v]) => (v as unknown[]).length);
+      if (bad.length) throw new VaultsError(200, { softErrors: Object.fromEntries(bad) });
+      const remaining = res.headers.get('x-ratelimit-remaining');
+      if (remaining !== null && Number(remaining) < 5) await sleep(1000 * Number(res.headers.get('x-ratelimit-reset') ?? 1));
+      return body;
+    }
+    if (RETRYABLE.has(res.status) && attempt < maxAttempts) {
+      const wait = res.headers.get('retry-after') ?? res.headers.get('x-ratelimit-reset');
+      await sleep(wait ? Number(wait) * 1000 : Math.min(30_000, 2 ** attempt * 1000) + Math.random() * 1000);
+      continue;
+    }
+    if (res.status === 400 && typeof body?.message === 'string' && body.message.startsWith('[')) body.issues = JSON.parse(body.message);
+    throw new VaultsError(res.status, body); // 400/401/402/403/404/500: fix the request, don't retry
+  }
+}
+
+const KEY = process.env.VAULTSFYI_API_KEY!;
+
+async function demo(label: string, f: () => Promise<unknown>) {
+  try {
+    await f();
+  } catch (e) {
+    if (!(e instanceof VaultsError)) throw e;
+    if (e.status === 402) console.log(label, '-> add x-api-key or pay via x402; price', e.body.accepts[0].amount, 'USDC base units');
+    else if (e.status === 400) console.log(label, '->', e.body.issues[0].path, 'options:', e.body.issues[0].options);
+    else if (e.status === 200) console.log(label, '->', JSON.stringify(e.body));
+    else console.log(label, '->', String(e.body?.message ?? e.body).slice(0, 60));
+  }
+}
+await demo('402', () => call('/v2/detailed-vaults', { perPage: '1' }));               // no key
+await demo('401', () => call('/v2/networks', {}, 'not-a-real-key'));                   // invalid key
+await demo('400', () => call('/v2/detailed-vaults', { sortBy: 'apy', perPage: '1' }, KEY)); // bad enum
+await demo('200+errors', () => call('/v2/detailed-vaults', { allowedNetworks: 'base,arbitrum', perPage: '1' }, KEY));
+console.log('200 ->', (await call('/v2/networks', {}, KEY)).length, 'networks');
+```
+
+### Output (2026-10-23)
+
+Python:
+
+```text
+402 -> add x-api-key or pay via x402; price 8000 USDC base units
+401 -> An API key is required to access this service. Sign up at ht
+400 -> ['sortBy'] Invalid enum value. Expected 'tvl' | 'ap options: ['tvl', 'apy1day', 'apy7day', 'apy30day', 'apy90day']
+200 -> {'softErrors': {'unsupportedNetworks': ['base,arbitrum']}}
+200 -> 22 networks
+```
+
+TypeScript:
+
+```text
+402 -> add x-api-key or pay via x402; price 8000 USDC base units
+401 -> An API key is required to access this service. Sign up at ht
+400 -> [ 'sortBy' ] options: [ 'tvl', 'apy1day', 'apy7day', 'apy30day', 'apy90day' ]
+200+errors -> {"softErrors":{"unsupportedNetworks":["base,arbitrum"]}}
+200 -> 22 networks
+```
+
+## SDK behaviour
+
+The SDKs handle errors differently from these wrappers. Tested against a local stub server (no API calls):
+
+| Status | `vaultsfyi` 1.3.0 (Python), `max_retries=3` | `@vaultsfyi/sdk` 2.3.14 (TypeScript) |
+| - | - | - |
+| 400, 402, 404 | `HttpResponseError` (`status_code` set), 1 request | `Error` subclass with only `message`, 1 request |
+| 401 | `AuthenticationError`, 1 request | same plain error, no status |
+| 403 | `ForbiddenError`, 1 request | same plain error, no status |
+| 429, 500, 503 | `NetworkError` after 4 requests (3 retries, about 6 s) | plain error after 1 request (no retries) |
+
+So in Python, catch `NetworkError` for exhausted 429/5xx retries (not `RateLimitError`), and in TypeScript wrap SDK calls with your own retry. See [SDK reference: errors](/sdk/reference#errors-and-retries).
+
+## Pitfalls
+
+- **Reading 402 as "bad key".** 402 means **no** key reached the API. Check the header name is exactly `x-api-key` (REST). `Authorization: Bearer` is only for the [MCP server](/ai-agents/mcp-server).
+- **Retrying 401/402/403/400.** They won't succeed on retry.
+- **Treating 200 as success.** Check `errors.unsupportedNetworks`, `unsupportedAssets` and `unsupportedProtocols`.
+- **Parsing `statusCode` from the body.** Not every error has it; branch on the HTTP status.
+- **Inventing a `Retry-After` guarantee.** It was not observed on 429; fall back to `x-ratelimit-reset`, then exponential backoff with jitter.
+- **Retrying signing or broadcasting.** Retry read-only GETs only. See [transaction safety](/ai-agents/transaction-safety).
+
+## Related pages
+
+- [Errors](/api-reference/errors): every status, body and retry rule.
+- [API conventions](/api-reference/conventions): soft errors and array params.
+- [Plans: rate limits](/plans/overview).
+- [x402](/ai-agents/x402): paying without a key.
+- [Transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

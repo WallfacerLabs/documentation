@@ -1,0 +1,758 @@
+# vaults.fyi docs: Methodology (APY calculation, Reputation Score, benchmark rates, indexing) and the MCP server page
+
+Part of https://docs.vaults.fyi/llms-full.txt (core). Same page format: each page starts with `# Title` and a `Source:` line.
+
+# How vaults.fyi calculates APY
+Source: https://docs.vaults.fyi/methodology/calculating-apy
+
+> APY method and API representation: realized share-price APY, net of fees, decimal fraction, five windows (1hour–90day), base vs reward, and apyComposite for nested vaults.
+
+This page explains how vaults.fyi computes APY and how APY appears in API responses. Use it when you need to interpret, display or compare APY values, or to explain why vaults.fyi differs from a protocol's own UI. In short: APY is the realized yield from onchain share-price changes over a trailing window, net of fees, returned as a decimal fraction (`0.0316` = 3.16%) in the object `apy.<window>.{base,reward,total}`.
+
+## How APY appears in the API
+
+| Rule | Detail |
+| - | - |
+| Unit | Decimal fraction. `0.0316` = 3.16%. Multiply by 100 to display a percentage. |
+| Net of fees | Performance and management fees are already deducted. The `fees` object is for display only; do not subtract it again. |
+| Not clamped | Values can be negative or very large. A 7-day APY of `1522.9882` (152,299%) and `-0.1769` were both observed on 2026-10-23. Screen outliers before display. |
+| Shape | `apy.<window>.base`, `apy.<window>.reward`, `apy.<window>.total`, where `total = base + reward`. |
+| Windows on detailed-vault responses | `1hour`, `1day`, `7day`, `30day`, `90day` (`GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}`). |
+| Windows on `GET /v2/detailed-vaults/{network}/{vaultId}/apy` | `1day`, `7day`, `30day`, `90day` at the top level (no `1hour`, no `apy` wrapper). |
+| Single-window responses | Portfolio endpoints and `GET /v2/historical/...` return one window as `apy.{base,reward,total}`; choose it with `apyInterval` (`1day`, `7day`, `30day`, `90day`; default `7day`). |
+| Sorting | `sortBy=apy1day`, `apy7day`, `apy30day` or `apy90day` on `GET /v2/detailed-vaults`. `sortOrder` defaults to `asc`. |
+
+Older docs and SDK examples used flat names such as baseApy, rewardApy, apy7d or apy30d; those fields do not exist in any response. Read `apy.<window>.base`, `apy.<window>.reward` and `apy.<window>.total`. The names `totalApy` and `intrinsicApy` exist only inside `apyComposite` (see below).
+
+Real response from `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845` (2026-10-23, trimmed to `apy`):
+
+```json
+{
+  "apy": {
+    "1hour": { "base": 0.0317, "reward": 0, "total": 0.0317 },
+    "1day":  { "base": 0.0317, "reward": 0, "total": 0.0317 },
+    "7day":  { "base": 0.0316, "reward": 0, "total": 0.0316 },
+    "30day": { "base": 0.0305, "reward": 0, "total": 0.0305 },
+    "90day": { "base": 0.0293, "reward": 0, "total": 0.0293 }
+  }
+}
+```
+
+Read it in code:
+
+```python
+seven_day_pct = vault["apy"]["7day"]["total"] * 100   # 3.16
+```
+
+```typescript
+const sevenDayPct = vault.apy["7day"].total * 100;   // 3.16
+```
+
+## Share-price method
+
+Every yield-bearing vault issues shares. As the vault earns, the assets behind each share grow, so the share price rises. vaults.fyi reads share price from chain every hour and derives APY from its change over the window.
+
+```
+share price   = total assets / total shares
+interest rate = (current share price / previous share price) - 1
+```
+
+For vaults that compound automatically:
+
+```
+APY = (1 + interest rate) ^ (year / time) - 1
+```
+
+For vaults that pay simple (non-compounding) interest:
+
+```
+APY = interest rate × (year / time)
+```
+
+`time` is the window length in seconds; `year` is 31,536,000 seconds.
+
+How share price is read for each vault type (ERC-4626, rebasing, LST, staking, RWA) is in [Indexing onchain data](/methodology/indexing-onchain-data).
+
+## Trailing windows, not spot rates
+
+A spot rate captures one instant and is skewed by liquidity events, large deposits and the timing of reward distributions. Trailing windows show what depositors actually earned.
+
+| Window | Use |
+| - | - |
+| `1hour`, `1day` | Most responsive; noisy. Dashboards and anomaly detection. |
+| `7day` | Default for most endpoints (`apyInterval` default). Good for user-facing display. |
+| `30day`, `90day` | Most stable; slow to reflect strategy changes. |
+
+## Adjusting for TVL changes
+
+When TVL swings within a window, a simple average misstates yield. vaults.fyi weights each observation by the minimum TVL of two consecutive data points, which avoids inflating yield during large inflows:
+
+```
+weight_t      = min(TVL_t, TVL_(t-1))
+interest rate = Σ((share_price_t / share_price_(t-1)) × weight_t) / Σ(weight_t) - 1
+```
+
+This matters most for new vaults and vaults with sudden large deposits.
+
+## Base yield and reward yield
+
+- `apy.<window>.base`: yield from share-price growth (lending interest, strategy returns, staking).
+- `apy.<window>.reward`: yield from reward tokens distributed on top, converted into the deposit asset.
+- `apy.<window>.total`: `base + reward`.
+
+Reward APY is calculated per window as follows:
+
+1. Compute reward tokens distributed per deposited token, using a TVL-weighted average emission rate.
+2. Compute the time-weighted average price of the reward token in deposit-asset terms.
+3. Convert accumulated rewards into deposit-asset value with that price.
+4. Compare with the initial deposit to get APY.
+
+Per-token reward rates are in the `rewards` array (`rewards[].asset`, `rewards[].apy.<window>`, decimal fractions). They are already included in `apy.<window>.reward`; do not add them again.
+
+If a vault's `total` is higher than its share-price growth suggests, compare `apy.<window>.base` with `apy.<window>.reward`: the difference comes from reward tokens.
+
+## apyComposite: nested vaults
+
+`apyComposite` is present only when a vault's deposit asset is itself the share (LP) token of another vault that vaults.fyi tracks, for example an Aave v3 market whose deposit asset is weETH. It is absent on all other vaults; check for it before reading.
+
+| Field | Meaning | Unit |
+| - | - | - |
+| `apyComposite.vault.vaultId` | The underlying vault whose share token this vault accepts | — |
+| `apyComposite.asset` | The underlying vault's own deposit asset | — |
+| `apyComposite.intrinsicApy.<window>.{base,reward,total}` | **The yield of the underlying vault (`apyComposite.vault`) on its own**, before this vault adds anything | decimal fraction |
+| `apyComposite.totalApy.<window>.{base,reward,total}` | This vault's `apy.<window>` compounded with `intrinsicApy.<window>`: the full yield a depositor earns in terms of `apyComposite.asset` | decimal fraction |
+
+Windows are `1hour`, `1day`, `7day`, `30day`, `90day`.
+
+Real example (`GET /v2/detailed-vaults?...`, Aave v3 weETH on mainnet, 2026-10-23, trimmed): the Aave market itself earned 0 over 7 days, the weETH vault underneath earned 2.24%, so the compounded total is 2.24%.
+
+```json
+{
+  "name": "Aave v3 weETH",
+  "apy": { "7day": { "base": 0, "reward": 0, "total": 0 } },
+  "apyComposite": {
+    "vault": { "vaultId": "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee" },
+    "asset": { "symbol": "ETH", "decimals": 18 },
+    "intrinsicApy": { "7day": { "base": 0.0224, "reward": 0, "total": 0.0224 } },
+    "totalApy":     { "7day": { "base": 0.022399999999999975, "reward": 0, "total": 0.022399999999999975 } }
+  }
+}
+```
+
+```python
+comp = vault.get("apyComposite")
+full_7d = comp["totalApy"]["7day"]["total"] if comp else vault["apy"]["7day"]["total"]
+```
+
+## Frequently asked questions about APY
+
+### Why does vaults.fyi APY differ from what a protocol reports?
+
+Protocol UIs often show forward-looking or instantaneous rates from their interest-rate model. vaults.fyi reports trailing realized APY from what share prices actually did. The two differ when rates changed recently or when the protocol's compounding assumption does not match how yield accrues.
+
+### Why does APY spike for some vaults?
+
+Some vaults, especially liquid staking tokens and Yearn-style strategies, post earnings in batches. When a batch lands, the share price jumps and short windows (`1hour`, `1day`) spike. Use `7day` or `30day` for these vaults.
+
+### Do vault types need special share-price logic?
+
+Yes. Rebasing tokens (such as Aave aTokens) grow balances instead of share price; staking vaults (such as StakeWise) separate principal and reward tokens; RWA vaults use oracle prices. See [Indexing onchain data](/methodology/indexing-onchain-data).
+
+### How fresh is APY?
+
+APY is recomputed from the hourly index. Each vault's `lastUpdateTimestamp` (Unix seconds) shows the last index time.
+
+Related: [Yield and market data](/concepts/yield-and-market-data), [Benchmark rates](/methodology/benchmark-rates), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).
+
+
+# Reputation Score
+Source: https://docs.vaults.fyi/methodology/reputation-score
+
+> What score.vaultScore measures, its four weighted components and their response fields, flag penalties, and how to filter by score (check score.vaultScore client-side if you need a strict threshold).
+
+This page defines the vaults.fyi Reputation Score, maps each part of it to a response field, and shows how to filter vaults by it safely. Use it when you screen vaults for users or need to explain a score. The Reputation Score is one number per vault in the field `score.vaultScore`, returned by `GET /v2/detailed-vaults` and `GET /v2/detailed-vaults/{network}/{vaultId}` (REST, `x-api-key` header). Higher means a longer, larger track record. It is a track-record signal, not a full risk rating.
+
+## Definition
+
+`score.vaultScore` is a weighted sum of four component scores minus the current flag penalty, floored at zero:
+
+```text
+score.vaultScore = max(0,
+    0.45 * score.protocolTvlScore
+  + 0.25 * score.vaultTvlScore
+  + 0.15 * score.holderScore
+  + 0.15 * score.assetScore
+  - score.totalScorePenalty
+)
+```
+
+This formula reproduces `score.vaultScore` exactly (to floating-point precision) for every one of the 62 distinct vaults with a `score` object in the 2026-10-23 live captures.
+
+| Component | Weight | Response field | What it measures |
+| - | -: | - | - |
+| Protocol integrity | 45% | `score.protocolTvlScore` | How much TVL the protocol has secured and for how long (log-scaled, so a few huge protocols do not dominate). $500M held for two years scores higher than $500M held for a week. |
+| Pool diagnostics | 25% | `score.vaultTvlScore` | The same TVL-over-time measure applied to this specific vault or pool. Aave v3 USDT ($5B) and Aave v3 pyUSD ($12M) on mainnet score differently. |
+| Community adoption | 15% | `score.holderScore` | Number and distribution of holders; more unique holders means less concentration. |
+| Underlying asset reliability | 15% | `score.assetScore` | Peg stability, ±2% onchain liquidity depth and CEX/DEX volume of the deposit asset. |
+| Flag penalty | subtracted | `score.totalScorePenalty` | Point deduction from active or decaying flags (see below). |
+| Network (deprecated) | 0% | `score.networkScore` | Returned for backwards compatibility only. It is not part of the score. |
+
+### Range
+
+`score.vaultScore` and each component range from 0 to 100. The API does not round them (for example `81.72160425089307`). Observed values on 2026-10-23: `score.vaultScore` from 27.5 to 99.1. Because the weights sum to 1 and the result is floored at 0, `score.vaultScore` is at most the maximum component value.
+
+The API always returns a score, including for young vaults. app.vaults.fyi shows "Not Rated" for vaults younger than 90 days or with no holder score; apply the same check if you filter on score.
+
+Real response from `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845` (2026-10-23, trimmed to `score`):
+
+```json
+{
+  "score": {
+    "vaultScore": 81.72160425089307,
+    "vaultTvlScore": 69.75545503433813,
+    "protocolTvlScore": 79.89831763512478,
+    "holderScore": 93.08665037668256,
+    "networkScore": 60,
+    "assetScore": 95.77,
+    "totalScorePenalty": 0,
+    "penaltyComponents": []
+  }
+}
+```
+
+## Flag penalties
+
+vaults.fyi attaches flags to vaults for incidents and risks (for example compromised keys or bad debt). Flags appear in `flags[]` (`content`, `severity`, `endDate`, optional `resolution`), and `warnings` repeats the text of active non-`info` flags.
+
+- Flags reduce the score through `score.totalScorePenalty`: 25 points for a `warning` flag, 50 for a `critical` flag, 0 for `info`. Only the single largest penalty applies; penalties do not stack.
+- `score.penaltyComponents[]` lists the penalty that applies (the largest one): `type` (`flag`), `value` (points deducted now), `content`, `severity`, `endDate` (Unix seconds) and optional `resolution`.
+- While a flag is active the full penalty applies. After its `endDate` the penalty fades to zero over one year, so the score recovers gradually. A resolved flag carries no penalty.
+- `endDate` `4946619450` (year 2126) means the flag has no scheduled expiry.
+
+Observed on 2026-10-23: a `critical` flag (Swell, compromised hot keys) carried `score.totalScorePenalty` = 50.
+
+
+## What the score does not cover
+
+- Smart-contract audits, governance risk, upgradeability and admin-key exposure.
+- Security of the blockchain the vault runs on (network score has 0 weight).
+- Risks vaults.fyi has not flagged.
+
+A long-lived risky protocol can score well; a well-audited new protocol scores low until it builds a track record. Use the score for programmatic screening and use risk reports (for example LlamaRisk, Chaos Labs, Gauntlet) for due diligence.
+
+## Filtering by score
+
+The list endpoints accept `minVaultScore` (number). Use it to narrow the result set. Check `score.vaultScore` client-side if you need a strict threshold. Also exclude flagged vaults: `allowVaultsWithWarnings` defaults to `true` on `GET /v2/detailed-vaults`.
+
+```bash
+curl -s "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&minVaultScore=70&allowVaultsWithWarnings=false&sortBy=apy7day&sortOrder=desc&perPage=50" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
+```
+
+```python
+import os, requests
+
+MIN_SCORE = 70
+r = requests.get(
+    "https://api.vaults.fyi/v2/detailed-vaults",
+    headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+    params={"allowedNetworks": "base", "allowedAssets": "USDC", "minVaultScore": MIN_SCORE,
+            "allowVaultsWithWarnings": "false", "sortBy": "apy7day", "sortOrder": "desc", "perPage": 50},
+)
+r.raise_for_status()
+safe = [v for v in r.json()["data"]
+        if v["score"]["vaultScore"] >= MIN_SCORE   # client-side check for a strict threshold
+        and not v.get("flags") and not v.get("isCorrupted")]
+```
+
+```typescript
+const MIN_SCORE = 70;
+const url = new URL("https://api.vaults.fyi/v2/detailed-vaults");
+url.search = new URLSearchParams({
+  allowedNetworks: "base", allowedAssets: "USDC", minVaultScore: String(MIN_SCORE),
+  allowVaultsWithWarnings: "false", sortBy: "apy7day", sortOrder: "desc", perPage: "50",
+}).toString();
+const body = await (await fetch(url, { headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! } })).json();
+const safe = body.data.filter((v: any) =>
+  v.score.vaultScore >= MIN_SCORE && !(v.flags?.length) && !v.isCorrupted);
+```
+
+Choose the threshold for your users: consumer wallets typically use 70 or higher; tools for sophisticated users may go lower to include newer vaults.
+
+Note that `GET /v2/detailed-vaults` covers only `base`, `mainnet`, `arbitrum` and `optimism` and vaults with TVL ≥ 100,000 USD by default; pass `allowedNetworks` (repeat the key per network) and `minTvl` to change that. See [API conventions](/api-reference/conventions).
+
+
+The score is also shown on [app.vaults.fyi](https://app.vaults.fyi/). Background on the approach: [vaults.fyi reputation score blog post](https://blog.vaults.fyi/beyond-apy-the-vaultsfyi-reputation/).
+
+Related: [Vault discovery](/concepts/vault-discovery), [Glossary](/resources/glossary), [Rules for agents](/ai-agents/rules-for-agents).
+
+
+# Benchmark rates
+Source: https://docs.vaults.fyi/methodology/benchmark-rates
+
+> How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/{network}?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/{network}.
+
+This page explains how vaults.fyi builds its USD and ETH benchmark rates and how to fetch current and historical benchmarks from the API. Use it to compare a vault's APY with the market baseline for the same network and denomination. Benchmarks use the same APY method and units as vaults: decimal fractions (`0.0407` = 4.07%), net of fees, in `apy.<window>.{base,reward,total}`.
+
+## What a benchmark measures
+
+A benchmark is the TVL-weighted average APY of the five largest featured vaults of one denomination on one network, each with more than $1M TVL. There are two denominations:
+
+| Code | Denomination | Tracks |
+| - | - | - |
+| `usd` | USD-denominated vaults (USDC, USDT, DAI, USDS, USDe) | Stablecoin lending and savings yield |
+| `eth` | ETH-denominated vaults (WETH, ETH) | ETH staking yield (consensus and execution rewards); usually steadier than lending rates |
+
+The set of five is chosen dynamically by TVL, so composition changes with the market. If fewer than five vaults qualify, the benchmark uses as many as qualify, but a network needs at least three qualifying vaults to have a benchmark that day.
+
+There is no fixed list of benchmark networks: any network with enough qualifying vaults has one. For a network or code with no benchmark data, both `GET /v2/benchmarks/{network}` and `GET /v2/historical-benchmarks/{network}` return 404 ("No benchmark data found for code … on network …"). If a network has data but no vault qualified on the latest day, `/v2/benchmarks/{network}` can return 200 with `apy: null`, so check for `null` before reading `apy`.
+
+## Get the current benchmark
+
+`GET /v2/benchmarks/{network}?code=usd` or `?code=eth`.
+
+- `code` is **required** and selects **one** benchmark. Omitting it returns HTTP 400; `code=btc` returns 400 (only `usd` and `eth` exist). To get both, make two calls.
+- `network` is a network slug (`mainnet`, `base`, ...) or CAIP-2 id (`eip155:8453`). A bare chain id is rejected.
+- Response: `apy` with windows `1day`, `7day`, `30day`, `90day` (no `1hour`), each `{base, reward, total}`; and `timestamp` (Unix seconds).
+- Cost: 3 credits ([Credits](/plans/credits)).
+
+```bash
+curl -s "https://api.vaults.fyi/v2/benchmarks/base?code=usd" -H "x-api-key: $VAULTSFYI_API_KEY"
+```
+
+```python
+import os, requests
+H = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+usd = requests.get("https://api.vaults.fyi/v2/benchmarks/base", headers=H, params={"code": "usd"}).json()
+eth = requests.get("https://api.vaults.fyi/v2/benchmarks/base", headers=H, params={"code": "eth"}).json()
+print(usd["apy"]["7day"]["total"], eth["apy"]["7day"]["total"])
+```
+
+```typescript
+const H = { "x-api-key": process.env.VAULTSFYI_API_KEY! };
+const usd = await (await fetch("https://api.vaults.fyi/v2/benchmarks/base?code=usd", { headers: H })).json();
+console.log(usd.apy["7day"].total); // decimal fraction
+```
+
+Real response (2026-10-23, `GET /v2/benchmarks/base?code=usd`):
+
+```json
+{
+  "apy": {
+    "1day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "7day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "30day": { "base": 0.0395, "reward": 0, "total": 0.0395 },
+    "90day": { "base": 0.0382, "reward": 0, "total": 0.0382 }
+  },
+  "timestamp": 1792713600
+}
+```
+
+Error without `code` (real, trimmed). The `message` is a JSON-encoded string; see [Errors](/api-reference/errors):
+
+```json
+{ "statusCode": 400, "error": "Bad Request",
+  "message": "[{\"expected\": \"'usd' | 'eth'\", \"received\": \"undefined\", \"code\": \"invalid_type\", \"path\": [\"code\"], \"message\": \"Required\"}]" }
+```
+
+## Get historical benchmarks
+
+`GET /v2/historical-benchmarks/{network}?code=usd&fromTimestamp=<s>&toTimestamp=<s>`
+
+- `code` is required (`usd` or `eth`). Timestamps are Unix **seconds**.
+- Paginated: `page` (from 0), `perPage` (default 50). Response `{itemsOnPage, nextPage?, data[]}`; each item is `{apy: {1day,7day,30day,90day}, timestamp}`. `nextPage` is absent on the last page.
+- Results are oldest first.
+- Cost: 3 credits + 3 per data point.
+
+Data availability: history has one point per UTC day. Windows before the first data point return an empty `data` array; check `itemsOnPage`.
+
+## Comparing vaults with benchmarks
+
+Benchmarks are per network, so compare a vault with the benchmark for its own network and denomination and the same window:
+
+```python
+spread_7d = vault["apy"]["7day"]["total"] - usd_benchmark["apy"]["7day"]["total"]
+```
+
+A 6% vault on Arbitrum and a 6% vault on mainnet perform differently relative to their markets if the benchmarks differ. Showing the spread is more informative than raw APY. Match the denomination to the vault's `asset.assetGroup` (`USD` → `code=usd`, `ETH` → `code=eth`).
+
+## Update frequency
+
+Benchmarks are computed once per day (UTC) from the previous day's hourly vault data, not on every hourly indexing cycle. The `timestamp` in the response shows the data time.
+
+## Legacy v1 benchmarks (not used by v2)
+
+The v1 API has fixed-composition benchmarks for Ethereum mainnet only, at `GET /v1/benchmarks` (latest USD and ETH rates; no history and no network parameter). It is still served and not marked deprecated. They are not what `GET /v2/benchmarks/{network}` returns; use v2 for new work.
+
+| v1 USD benchmark (mainnet) | v1 ETH benchmark (mainnet) |
+| - | - |
+| Aave v3 USDT, Aave v3 USDC, MakerDAO sDAI, Compound v3 USDC | Lido stETH, ether.fi eETH, Coinbase cbETH, Rocket Pool rETH |
+
+Related: [Calculating APY](/methodology/calculating-apy), [Yield and market data](/concepts/yield-and-market-data), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).
+
+
+# Indexing onchain data
+Source: https://docs.vaults.fyi/methodology/indexing-onchain-data
+
+> How vaults.fyi reads vault state from chain every hour, how share price is derived per vault type (ERC-4626, rebasing, LST, staking, RWA), and how to check data freshness (lastUpdateTimestamp, NRT endpoints).
+
+This page explains where vaults.fyi data comes from: how vault state is read from chain, how share price is derived for each vault type, and how fresh the data in API responses is. Use it to judge how far you can trust a value, or to reproduce an APY yourself. Summary: vaults.fyi reads contract state directly every hour (no protocol-reported numbers), stores it, and computes APY, TVL and scores from it; per-vault freshness is in `lastUpdateTimestamp` (Unix seconds), and the near-real-time (NRT) endpoints read chain state on demand.
+
+## The indexing pipeline
+
+Every hour, vaults.fyi runs purpose-built contracts as **static calls**. A static call executes without writing to chain storage, so it costs no gas and leaves no footprint.
+
+- **Efficiency:** one call can read a value and feed it into the next calculation, which a standard multicall cannot do.
+- **Consistency:** all values in one calculation are read at the same block height.
+
+Results are stored in the vaults.fyi database and used for APY, TVL, scores and API responses. RPC requests are spread across Infura, Alchemy and Ankr so one provider's outage does not stall indexing.
+
+## How share price is read, by vault type
+
+APY is derived from share-price change (see [Calculating APY](/methodology/calculating-apy)). Each vault type exposes share price differently.
+
+### ERC-4626 vaults: totalAssets / totalSupply
+
+- `totalSupply()`: shares outstanding.
+- `totalAssets()`: assets held by the vault.
+- Share price = `totalAssets / totalSupply`.
+
+### Non-ERC-4626 vaults: derived from mint, deposit, burn, redeem
+
+Vaults that predate or do not implement ERC-4626 expose the share/asset relationship through function parameters or return values, typically `mint`, `deposit`, `burn` or `redeem`. Many need individual integration work.
+
+### Liquid staking and restaking tokens (LSTs, LRTs)
+
+- Total shares: `totalSupply()`.
+- Total value: `getEthValue(totalSupply())`.
+
+LSTs often post earnings in batches. When a batch lands, share price jumps and short-window APY (`1hour`, `1day`) spikes; `7day` and `30day` smooth it out.
+
+### Rebasing supply tokens (for example Aave aTokens)
+
+Rebasing tokens grow the holder's balance instead of the share price, so the ratio is inverted:
+
+- `scaledTotalSupply()`: treated as total shares.
+- `totalSupply()`: treated as total share value.
+
+### Staking-mechanism vaults (StakeWise V2 style)
+
+Some staking vaults do not auto-compound: principal and rewards are separate tokens, so the share/value ratio does not show yield. vaults.fyi simulates a share price:
+
+```
+total principal value = sETH2.totalSupply()
+total rewards value   = rETH2.totalSupply()
+TVL                   = total principal value + total rewards value
+share price           = 1 + rETH2.rewardPerToken()
+totalSupply           = TVL / share price
+```
+
+The resulting `totalSupply` is simulated, not read from a contract.
+
+### Real-world-asset (RWA) vaults
+
+RWA tokens represent offchain assets, so share price needs oracle prices:
+
+- `totalSupply()`: total shares.
+- `RWAOracle.price()`: RWA share price in USD.
+- `StablecoinOracle.price()`: deposit-asset price in USD.
+
+```
+total shares in USD   = total shares × RWA oracle price
+total shares in asset = total shares in USD / stablecoin oracle price
+total shares value    = total shares in asset
+```
+
+## Data freshness
+
+| What you need | Where to get it |
+| - | - |
+| When a vault's indexed data was last updated | `lastUpdateTimestamp` (Unix seconds) on `GET /v2/detailed-vaults` and `GET /v2/detailed-vaults/{network}/{vaultId}` |
+| Indexed APY, TVL, score | Detailed-vault endpoints; updated once per hourly cycle |
+| Current chain state between cycles | NRT endpoints: `GET /v2/nrt/vault/{network}/{vaultId}` and its single-value variants `/sharePrice`, `/totalAssets`, `/totalSupply`, `/underlyingAssetPrice` |
+
+Indexed values reflect the last hourly cycle. A large deposit or earnings update in the past hour is not reflected until the next cycle completes. Example: `"lastUpdateTimestamp": 1792742400` = 2026-10-23 08:00 UTC.
+
+NRT response units (real capture, `GET /v2/nrt/vault/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845`, 2026-10-23):
+
+```json
+{
+  "totalSupply": "461739224418397752974334633",
+  "totalAssets": "468178256927439",
+  "sharePrice": 1.013945135111877,
+  "underlyingAssetPrice": 0.99985668
+}
+```
+
+| Field | Unit |
+| - | - |
+| `totalSupply` | Integer string in **LP (share) token base units** (`lpToken.decimals`, here 18) |
+| `totalAssets` | Integer string in **asset base units** (`asset.decimals`, here 6 for USDC) |
+| `sharePrice` | Number: assets per whole share |
+| `underlyingAssetPrice` | Number: USD price of the deposit asset |
+
+NRT values are read from the chain's latest block when you call the endpoint (no response cache), so they are typically at most a block or a second old. Each NRT call costs 1 credit.
+
+## Why direct indexing matters
+
+Many aggregators take APY from protocol APIs or front ends, which often return model-based or forward-looking rates. vaults.fyi derives yield from raw contract state:
+
+- **No dependence on protocol reporting.**
+- **One method for every vault**, regardless of how the protocol presents its data.
+- **Verifiable:** anyone with an archive node and the block heights used can reproduce the numbers.
+
+Related: [Calculating APY](/methodology/calculating-apy), [Vault discovery](/concepts/vault-discovery), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).
+
+
+# MCP Server: Onchain Yield Tools for Claude, Cursor, and Any MCP Client
+Source: https://docs.vaults.fyi/ai-agents/mcp-server
+
+> Connect Claude Desktop, Claude Code, Cursor, and any streamable-HTTP MCP client to the full Vaults.fyi data and transaction surface — discovery, history, recommendations, position tracking, and onchain transaction building.
+
+The Vaults.fyi MCP server connects MCP-compatible clients to the full Vaults.fyi data and transaction surface. Discovery, history, recommendations, position tracking, and transaction building are all callable as tools — your client decides which to use and how to chain them.
+
+Hosted at `https://mcp.vaults.fyi/mcp` over streamable HTTP. 38 tools. Bearer-token auth. No server-side private keys: every transaction tool returns calldata for your client to sign.
+
+## What people use it for
+
+A few prompts that exercise meaningful tool chains:
+
+**Discover yield**
+
+> "Find me the best USDC yields right now with TVL over \$10M and no active warnings."
+> "What yields beat the USDC benchmark by more than 200 bps over the last 30 days?"
+
+**Filter by curator or protocol**
+
+> "Show me Steakhouse and Gauntlet curated Morpho vaults across all stablecoins."
+> "Which Aave v3 markets have the highest USDC supply APY across networks?"
+
+**Model layered yield**
+
+> "I'd consider sUSDe and sUSDS — find vaults with composite APY above 8% accounting for the underlying asset rate."
+
+**Run history and benchmarks**
+
+> "Plot Fluid USD Vault APY against the USDC benchmark for the last 90 days."
+
+**Audit positions**
+
+> "Audit positions for 0xabc… — total deposited, current value, unclaimed rewards, and any flagged exposure."
+
+**Build transaction payloads**
+
+> "Build a deposit of 10,000 USDC into the highest-rated Morpho vault on Base and return the calldata."
+
+## Quickstart
+
+> [!NOTE]
+>
+> You'll need a Vaults.fyi API key. Request one at [portal.vaults.fyi](https://portal.vaults.fyi/).
+
+### Recommended setup
+
+Configure Vaults.fyi across supported MCP clients with one command:
+
+```bash
+npx @vaultsfyi/scripts init-mcp --api-key YOUR_VAULTS_API_KEY
+```
+
+To configure one client:
+
+```bash
+npx @vaultsfyi/scripts init-mcp --api-key YOUR_VAULTS_API_KEY --client cursor
+```
+
+The installer creates or updates your local MCP config and adds the `vaults-fyi` server entry without removing existing servers.
+
+Supported clients: Claude Desktop, Cursor, Claude Code, Windsurf, VS Code, Zed, Amazon Q, and GitHub Copilot CLI.
+
+Restart your client after installation. The 38 Vaults.fyi tools should appear in the client's MCP tools list.
+
+> [!NOTE]
+>
+> Without `--api-key`, the installer prompts interactively. In CI and other non-interactive environments, pass `--api-key`.
+
+### Manual setup
+
+**Claude Desktop**
+
+Claude Desktop may require a local bridge for remote MCP servers. Add Vaults.fyi through [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) in your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "vaults-fyi": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.vaults.fyi/mcp",
+        "--header",
+        "Authorization:${VAULTS_AUTH_HEADER}",
+        "--transport",
+        "http-only"
+      ],
+      "env": {
+        "VAULTS_AUTH_HEADER": "Bearer YOUR_VAULTS_API_KEY"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop. The 38 Vaults.fyi tools will appear in the tools menu.
+
+**Claude Code**
+
+Add the server with one command:
+
+```bash
+claude mcp add --transport http vaults-fyi https://mcp.vaults.fyi/mcp \
+  --header "Authorization: Bearer YOUR_VAULTS_API_KEY"
+```
+
+Verify with `claude mcp list`.
+
+**Cursor & other clients**
+
+Any client that supports streamable-HTTP MCP works. Point it at `https://mcp.vaults.fyi/mcp` and pass `Authorization: Bearer YOUR_VAULTS_API_KEY` as a header.
+
+Health check:
+
+```bash
+curl -i https://mcp.vaults.fyi/health
+```
+
+## What you can do
+
+Six capability surfaces, each backed by several tools:
+
+- [Discover and filter](/concepts/vault-discovery.md): Search across networks, protocols, assets, curators, and tags. Filter by TVL, APY, score, and active warnings in a single structured query.
+
+- [Evaluate risk](/methodology/reputation-score.md): Reputation Scores and inline flags (bad debt exposure, qualified-investor gates, depegs, recent incidents) ship with the data. No separate lookup.
+
+- [Analyze history](/api-reference/historical.md): APY, TVL, share-price, and total-return time series for any vault. Asset-price history and benchmark APY for relative performance.
+
+- [Build transaction payloads](/concepts/transaction-flows.md): Deposit, withdraw, claim rewards, and approve. Tools return decoded calldata and signing instructions; your client signs and submits.
+
+- [Track portfolios](/concepts/portfolio-tracking.md): Aggregate positions and rewards across networks for any address. Drill into per-position cost basis and event history.
+
+**Operate on tokens**
+
+Approve, transfer, wrap, and unwrap as primitives — useful when an agent is composing multi-step flows.
+
+## Tool inventory
+
+38 tools, grouped by purpose. Each returns structured JSON optimized for agent consumption.
+
+**Discovery and search (7)**
+
+| Tool | Purpose |
+| - | - |
+| `vaults_search` | Filtered search across vaults (TVL, APY, score, curator, tags, warnings) |
+| `vaults_list` | Paginated full vault list |
+| `networks` | Supported chains |
+| `protocols` | Supported protocols |
+| `assets` | Supported assets |
+| `curators` | Named curators (79+) |
+| `tags` | Vault tags (e.g., `top-curator`, `lst`, `rwa`) |
+
+**Vault detail (3)**
+
+| Tool | Purpose |
+| - | - |
+| `vault_details` | Full vault metadata, including flags and Reputation Score |
+| `vault_apy` | Current APY (headline, base, rewards, composite) |
+| `vault_tvl` | Current TVL |
+
+**History and benchmarks (8)**
+
+| Tool | Purpose |
+| - | - |
+| `vault_apy_history` | APY time series |
+| `vault_tvl_history` | TVL time series |
+| `vault_share_price_history` | Share-price time series |
+| `vault_history` | Combined APY/TVL/share-price |
+| `vault_returns` | Realized total returns |
+| `asset_price_history` | Underlying asset price |
+| `benchmark_apy` | Asset-level benchmark APY |
+| `benchmark_apy_history` | Benchmark APY time series |
+
+**Recommendations (2)**
+
+| Tool | Purpose |
+| - | - |
+| `best_vault` | Single best-fit vault for a given asset/criteria |
+| `best_deposit_options` | Ranked deposit options |
+
+**Wallet and positions (6)**
+
+| Tool | Purpose |
+| - | - |
+| `positions` | All positions for an address |
+| `position_details` | Per-position cost basis, current value, P\&L |
+| `wallet_balances` | Token balances across networks |
+| `token_balance` | Single token balance |
+| `user_events` | Deposit/withdraw/claim history |
+| `rewards` | Outstanding reward entitlements |
+
+**Vault transactions (7)**
+
+| Tool | Purpose |
+| - | - |
+| `transaction_context` | Pre-flight context (allowance, balances, gas) |
+| `build_vault_tx` | Deposit/withdraw calldata with decoded steps |
+| `build_claim_rewards` | Claim calldata for a single vault |
+| `claim_all_rewards` | Multi-vault claim calldata |
+| `withdraw_all_positions` | Multi-vault withdraw calldata |
+| `submit_tx_hash` | Register a submitted hash for status tracking |
+| `get_transaction_status` | Status of a tracked transaction |
+
+**Token utilities (5)**
+
+| Tool | Purpose |
+| - | - |
+| `approve_erc20` | ERC-20 approval calldata |
+| `transfer_erc20` | ERC-20 transfer calldata |
+| `transfer_native` | Native transfer calldata |
+| `wrap_native` | Wrap native to wrapped equivalent |
+| `unwrap_native` | Unwrap |
+
+## Authentication
+
+Every request requires a bearer token:
+
+```
+Authorization: Bearer YOUR_VAULTS_API_KEY
+```
+
+> [!NOTE]
+>
+> The API key is forwarded only to Vaults.fyi API calls and is never placed in signing URLs or transaction payloads.
+
+Request a key at [portal.vaults.fyi](https://portal.vaults.fyi/). For keyless pay-per-request access via USDC on Base, see [x402](/ai-agents/x402.md).
+
+## Signing model
+
+Transaction tools (`build_vault_tx`, `build_claim_rewards`, `approve_erc20`, etc.) return structured calldata, not signed transactions. The server holds no private keys.
+
+Each response includes:
+
+* `stepDecodings` — human-readable description of each call
+* `signingInstructions` — step-by-step guidance for the signer
+* `signingPaths` — supported signing surfaces (e.g., wallet, [OWS](https://docs.openwallet.sh/))
+* `submitTool` — the tool to call after signing (`submit_tx_hash`)
+* `statusTool` — the tool to call for status (`get_transaction_status`)
+
+This keeps key custody with the client. Agents that integrate with [OpenWallet Standard](https://docs.openwallet.sh/) can sign and submit without leaving the conversation.
+
+## Going further
+
+- [AI agents overview](/ai-agents/overview.md): The full surface area for agents: MCP, x402, and the LLM-optimized API reference.
+
+- [Keyless access via x402](/ai-agents/x402.md): Pay-per-request access on Base, no API key required.
+
+- [LLM-optimized API reference](https://api.vaults.fyi/llms.txt): Full reference at `llms.txt` and `llms-full.txt`.
+
+- [OpenAPI spec](https://api.vaults.fyi/v2/documentation/json): Underlying REST API the MCP wraps.

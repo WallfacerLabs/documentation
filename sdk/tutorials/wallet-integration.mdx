@@ -1,269 +1,234 @@
 ---
-title: "Add Yield to a Wallet App with Vaults.fyi"
-description: "Learn how to detect idle assets, surface deposit options, execute vault transactions, and track user positions in a wallet integration."
+title: "Tutorial: add yield to a wallet with the vaults.fyi SDK"
 sidebarTitle: "Wallet integration"
+description: "Tested SDK walkthrough for wallets: detect idle assets, show deposit options, read the transaction context, build and verify an unsigned deposit, sign it in order with viem (shown, not executed), then track the position; with credit cost per step."
 ---
 
-This tutorial walks you through building a yield integration for a wallet application. You will detect idle assets in a user's wallet, show them personalized deposit opportunities, prepare and execute a deposit transaction, and then track the resulting position.
+This tutorial builds the core yield flow of a wallet with the vaults.fyi SDK: find the user's idle tokens, suggest vaults for them, build a deposit the user signs, and show the resulting position. Use it when you integrate Earn into a wallet or consumer app. The REST equivalents of each step are in the [recipes](/recipes/overview).
 
-The full example code is available in the official tutorial repositories:
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** and **`vaultsfyi` 1.3.0** against the live API, read-only, for the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`. The SDKs send the key as `x-api-key`. Balances are base-unit strings; APY values are decimal fractions. **The signing step was not executed** (it runs only with `SEND=1`).
 
-<CodeGroup>
+## Prerequisites
 
-```bash javascript
-git clone https://github.com/WallfacerLabs/js-examples.git
-```
+- An API key in `VAULTSFYI_API_KEY` ([SDK quickstart](/sdk/quickstart) covers install and setup).
+- TypeScript: Node.js 18+, `@vaultsfyi/sdk@2.3.14`, `viem` 2.x, an ESM project. Python: Python 3.8+, `vaultsfyi==1.3.0`.
 
-```bash python
-git clone https://github.com/WallfacerLabs/python-examples.git
-```
+## Credit cost of one full flow
 
-</CodeGroup>
+| Step | SDK method | REST endpoint | Credits |
+| - | - | - | - |
+| 1. Idle assets | `getIdleAssets` / `get_idle_assets` | `GET /v2/portfolio/idle-assets/{userAddress}` | 5 |
+| 2. Deposit options | `getDepositOptions` / `get_deposit_options` | `GET /v2/portfolio/best-deposit-options/{userAddress}` | 1 + 2 per vault (this run: 9 vaults = 19) |
+| 3. Context | `getTransactionsContext` / `get_transactions_context` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | 3 |
+| 4. Payload | `getActions` / `get_actions` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | 5 |
+| 5. Position | `getPositions` / `get_positions` | `GET /v2/portfolio/positions/{userAddress}` | 5 |
+| **Total** | | | **37** |
 
-## Run the example
+([credits](/plans/credits)). Cache steps 1, 2 and 5 per session; always run 3 and 4 fresh right before signing.
 
-<Steps>
-  <Step title="Install dependencies">
-    <CodeGroup>
+## The full script (TypeScript)
 
-    ```bash javascript
-    cd js-examples/
-    npm install
-    ```
+```typescript
+// Wallet integration with @vaultsfyi/sdk 2.3.14: idle assets -> deposit options -> context ->
+// payload -> verify -> sign (only when SEND=1) -> position. Node >= 18, ESM.
+import { VaultsSdk } from '@vaultsfyi/sdk';
+import { createPublicClient, createWalletClient, getAddress, http, type Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base } from 'viem/chains';
 
-    ```bash python
-    cd python_examples/
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'; // the connected wallet
+const NETWORK = 'base';
 
-    </CodeGroup>
-  </Step>
+// Base-unit string -> human string, exact (no float rounding).
+const human = (raw: string, decimals: number, dp = 4) => {
+  const s = BigInt(raw).toString().padStart(decimals + 1, '0');
+  return decimals ? `${s.slice(0, -decimals)}.${s.slice(-decimals).slice(0, dp)}` : s;
+};
 
-  <Step title="Set your API key">
-    ```bash
-    export VAULTS_FYI_API_KEY="your_api_key_here"
-    ```
-  </Step>
+// 1) Idle assets: tokens in the wallet that are not deposited anywhere (5 credits).
+const idle = await sdk.getIdleAssets({ path: { userAddress: USER }, query: { allowedNetworks: [NETWORK] } });
+for (const a of idle.data.slice(0, 3)) {
+  console.log(`idle ${a.symbol}: ${human(a.balanceNative, a.decimals)} (~$${Number(a.balanceUsd ?? 0).toFixed(2)})`);
+}
 
-  <Step title="Run the wallet integration script">
-    <CodeGroup>
-
-    ```bash javascript
-    npm run wallet_integration
-    ```
-
-    ```bash python
-    python wallet_integration.py
-    ```
-
-    </CodeGroup>
-  </Step>
-</Steps>
-
----
-
-## Step-by-step walkthrough
-
-### 1. Initialize the SDK
-
-Create the client once and reuse it across all calls.
-
-<CodeGroup>
-
-```javascript index.js
-import pkg from '@vaultsfyi/sdk';
-const { VaultsSdk } = pkg;
-
-const vaultsFyi = new VaultsSdk({
-  apiKey: process.env.VAULTS_FYI_API_KEY,
+// 2) Deposit options for what the wallet holds (1 credit + 2 per vault returned).
+const options = await sdk.getDepositOptions({
+  path: { userAddress: USER },
+  query: { allowedNetworks: [NETWORK], onlyTransactional: true, maxVaultsPerAsset: 2 },
 });
+for (const b of options.userBalances.slice(0, 2)) {
+  for (const v of b.depositOptions) {
+    console.log(`option ${b.asset?.symbol} -> ${v.name}: ${(v.apy.total * 100).toFixed(2)} % (vaultId ${v.vaultId})`);
+  }
+}
+
+// 3) The user picks a vault in your UI. Read its transaction context first (3 credits).
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+const ctx = await sdk.getTransactionsContext({ path: { userAddress: USER, network: NETWORK, vaultId: VAULT_ID } });
+if (ctx.currentDepositStep !== 'deposit') throw new Error(`next step is ${ctx.currentDepositStep}`);
+const amount = 10n ** BigInt(ctx.asset.decimals); // 1 USDC in base units = 1000000
+if (amount > BigInt(ctx.asset.balanceNative)) throw new Error('insufficient balance'); // the API does not check
+
+// 4) Build the unsigned payload (5 credits). amount is a base-unit integer string.
+const tx = await sdk.getActions({
+  path: { action: 'deposit', userAddress: USER, network: NETWORK, vaultId: VAULT_ID },
+  query: { assetAddress: ctx.asset.address, amount: amount.toString() },
+});
+
+// 5) Verify every action before showing it to the user.
+const allowedTargets = [getAddress(ctx.asset.address), getAddress(VAULT_ID)];
+for (const a of tx.actions) {
+  if (a.tx.chainId !== base.id) throw new Error(`wrong chain ${a.tx.chainId}`);
+  if (!allowedTargets.includes(getAddress(a.tx.to))) throw new Error(`unexpected target ${a.tx.to}`);
+  console.log(`action: ${a.name} -> ${a.tx.to}`);
+}
+
+// 6) Sign and send IN ORDER, waiting for each receipt. Never runs unless SEND=1.
+if (process.env.SEND === '1') {
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex); // the user's key, held by the wallet
+  const wallet = createWalletClient({ account, chain: base, transport: http() });
+  const pub = createPublicClient({ chain: base, transport: http() });
+  for (const a of tx.actions.slice(tx.currentActionIndex)) {
+    const hash = await wallet.sendTransaction({ to: a.tx.to as Hex, ...(a.tx.data !== undefined ? { data: a.tx.data as Hex } : {}), value: BigInt(a.tx.value ?? 0) });
+    const receipt = await pub.waitForTransactionReceipt({ hash });
+    if (receipt.status !== 'success') throw new Error(`${a.name} reverted: ${hash}`);
+  }
+} else {
+  console.log('dry run: not signing (set SEND=1 in a real wallet)');
+}
+
+// 7) Track the position (5 credits). Position size = asset.positionValueInAsset, NOT asset.balanceNative.
+const positions = await sdk.getPositions({ path: { userAddress: USER }, query: { allowedNetworks: [NETWORK] } });
+for (const p of positions.data) {
+  console.log(`position ${p.name}: ${human(p.asset.positionValueInAsset ?? '0', p.asset.decimals)} ${p.asset.symbol}`);
+}
 ```
 
-```python main.py
+Output (2026-10-23, dry run):
+
+```text
+idle WETH: 0.2225 (~$533.16)
+idle USDbC: 4.3907 (~$4.39)
+idle USDC: 78.9959 (~$78.98)
+option ETH -> Base cbETH Loooper: 5.96 % (vaultId 0x5900C3b72458F12967DC1bef35b92d271F5cDBc1)
+option ETH -> DeTrade Core ETH: 5.13 % (vaultId 0x9b97BFDfE44D1B113ECD4BF2f243ed36acA34523)
+option USDC -> Midas mLIQUIDITY: 69.75 % (vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873)
+option USDC -> Harvest 40 Acres USDC: 27.84 % (vaultId 0xC777031D50F632083Be7080e51E390709062263E)
+action: Approve USDC for Steakhouse High Yield USDC Edition vault -> 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+action: Deposit USDC to Steakhouse High Yield USDC Edition vault -> 0xbeeff2490FEffa212faC2f6553682C219E6a8845
+dry run: not signing (set SEND=1 in a real wallet)
+position True Yield Dollar: 920.9162 USDC
+```
+
+## The same flow in Python (build and verify only)
+
+The Python SDK has no signer; hand `actions[currentActionIndex:]` to your wallet library and send them in order.
+
+```python
+"""Wallet integration with the vaultsfyi Python SDK 1.3.0: idle assets -> deposit options -> context ->
+payload -> verify. Signing is left to your wallet library; this script never signs."""
 import os
+from decimal import Decimal
+
 from vaultsfyi import VaultsSdk
 
-client = VaultsSdk(api_key=os.getenv("VAULTS_FYI_API_KEY"))
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"  # the connected wallet
+NETWORK, CHAIN_ID = "base", 8453
+
+
+def human(raw, decimals):
+    """Base-unit integer string -> Decimal tokens."""
+    return Decimal(raw) / (Decimal(10) ** decimals)
+
+
+# 1) Idle assets (5 credits). balanceNative is a base-unit string.
+idle = client.get_idle_assets(USER, allowed_networks=[NETWORK])
+for a in idle["data"][:3]:
+    print(f'idle {a["symbol"]}: {human(a["balanceNative"], a["decimals"]):.4f} (~${float(a.get("balanceUsd") or 0):.2f})')
+
+# 2) Deposit options (1 credit + 2 per vault returned).
+options = client.get_deposit_options(USER, allowed_networks=[NETWORK], only_transactional=True, max_vaults_per_asset=2)
+for b in options["userBalances"][:2]:
+    for v in b["depositOptions"]:
+        print(f'option {b["asset"]["symbol"]} -> {v["name"]}: {v["apy"]["total"] * 100:.2f} % (vaultId {v["vaultId"]})')
+
+# 3) Context for the vault the user picked (3 credits). The SDK calls the vaultId argument vault_address.
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC
+ctx = client.get_transactions_context(USER, NETWORK, VAULT_ID)
+assert ctx["currentDepositStep"] == "deposit", ctx["currentDepositStep"]
+amount = 10 ** ctx["asset"]["decimals"]  # 1 USDC = 1000000 base units
+assert amount <= int(ctx["asset"]["balanceNative"]), "insufficient balance"  # the API does not check
+
+# 4) Unsigned payload (5 credits).
+tx = client.get_actions("deposit", USER, NETWORK, VAULT_ID, asset_address=ctx["asset"]["address"], amount=str(amount))
+
+# 5) Verify chain and targets, then hand actions[currentActionIndex:] to the wallet IN ORDER.
+allowed = {ctx["asset"]["address"].lower(), VAULT_ID.lower()}
+for a in tx["actions"][tx["currentActionIndex"]:]:
+    assert a["tx"]["chainId"] == CHAIN_ID and a["tx"]["to"].lower() in allowed, a
+    print(f'action: {a["name"]} -> {a["tx"]["to"]}')
+
+# 6) Position (5 credits): size is asset.positionValueInAsset; asset.balanceNative is the idle wallet balance.
+for p in client.get_positions(USER, allowed_networks=[NETWORK])["data"]:
+    print(f'position {p["name"]}: {human(p["asset"]["positionValueInAsset"], p["asset"]["decimals"]):.4f} {p["asset"]["symbol"]}')
 ```
 
-</CodeGroup>
+Output (2026-10-23):
 
-### 2. Detect idle assets
-
-Call `getIdleAssets` to find tokens sitting in a wallet that are not currently earning yield. This is the starting point for any yield nudge or suggestion UI.
-
-<CodeGroup>
-
-```javascript index.js
-async function getUserBalances(userAddress) {
-  const idleAssets = await vaultsFyi.getIdleAssets({
-    path: { userAddress }
-  });
-
-  return idleAssets;
-}
+```text
+idle WETH: 0.2225 (~$533.16)
+idle USDbC: 4.3908 (~$4.39)
+idle USDC: 78.9960 (~$78.98)
+option ETH -> Base cbETH Loooper: 5.96 % (vaultId 0x5900C3b72458F12967DC1bef35b92d271F5cDBc1)
+option ETH -> DeTrade Core ETH: 5.13 % (vaultId 0x9b97BFDfE44D1B113ECD4BF2f243ed36acA34523)
+option USDC -> Midas mLIQUIDITY: 69.75 % (vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873)
+option USDC -> Harvest 40 Acres USDC: 27.84 % (vaultId 0xC777031D50F632083Be7080e51E390709062263E)
+action: Approve USDC for Steakhouse High Yield USDC Edition vault -> 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+action: Deposit USDC to Steakhouse High Yield USDC Edition vault -> 0xbeeff2490FEffa212faC2f6553682C219E6a8845
+position True Yield Dollar: 920.9162 USDC
 ```
 
-```python main.py
-def get_user_balances(user_address):
-    idle_assets = client.get_idle_assets(user_address)
-    return idle_assets
-```
+## Step notes
 
-</CodeGroup>
+### 1. Idle assets
 
-The response includes each asset's symbol, balance, and USD value. Use this data to decide which assets to surface deposit options for.
+Returns `{ data: [{ symbol, decimals, balanceNative, balanceUsd?, network, … }], errors }`. Defaults to the four networks base, mainnet, arbitrum and optimism; pass `allowedNetworks` for others. Hide dust balances before suggesting deposits: gas can exceed the yield.
 
-<Tip>
-  Filter out assets below a minimum USD threshold before presenting options to the user. Small balances often produce high gas costs relative to yield earned.
-</Tip>
+### 2. Deposit options
 
-### 3. Get personalized deposit options
+Returns `{ requestedAddress, userBalances: [{ asset, depositOptions: [{ vaultId, name, network, apy: { base, reward, total }, tvl, projectedUsdAnnualEarnings }] }] }`. Defaults: `minTvl=100000`, `onlyAppFeatured=true`, `allowVaultsWithWarnings=false`, `maxVaultsPerAsset=3`, 7-day APY. Pass `onlyTransactional: true` so every option can be deposited through the Transactions API. Very high APYs (69.75 % above) are real values; apply your own TVL and score policy.
 
-Call `getDepositOptions` with a list of assets the user holds. The API returns ranked vault opportunities filtered to those assets, sorted by APY.
+### 3. Context
 
-<CodeGroup>
+`currentDepositStep` tells you what to build next (`deposit` here). `asset.address` and `asset.decimals` give you the `assetAddress` and the base-unit scale. The API does **not** check the balance or limits for you; compare `amount` with `asset.balanceNative` yourself.
 
-```javascript index.js
-async function getBestDepositOptions(userAddress) {
-  const depositOptions = await vaultsFyi.getDepositOptions({
-    path: { userAddress },
-    query: { allowedAssets: ['USDC', 'USDS'] }
-  });
+### 4. Payload and verification
 
-  return depositOptions;
-}
-```
+`getActions` returns `{ currentActionIndex, actions: [{ name, tx: { to, chainId, data, value? } }] }`, here an `approve` on USDC and a `deposit` on the vault. Verify `chainId`, `to`, `value` and, ideally, the decoded arguments ([build a deposit](/recipes/deposit-transaction) decodes them with viem). Show `actions[].name` and the amount to the user before signing.
 
-```python main.py
-def get_best_deposit_options(user_address):
-    deposit_options = client.get_deposit_options(
-        user_address,
-        allowed_assets=["USDC", "USDS"]
-    )
-    return deposit_options
-```
+### 5. Sign and send in order
 
-</CodeGroup>
+Send `actions[currentActionIndex:]` one at a time and wait for each receipt; the deposit fails if the approval is not mined. Never let an API, SDK or agent hold the user's private key. For smart-contract wallets you can batch the calls yourself; see [transaction flows](/concepts/transaction-flows#eoa-and-smart-contract-wallets).
 
-Each option in the response includes the vault address, network, protocol name, current APY, and TVL — everything you need to render a yield card in your UI.
+### 6. Position
 
-### 4. Check transaction context
+The position size is `asset.positionValueInAsset` (asset base units). `asset.balanceNative` on a position is the wallet's **idle** balance of that asset; don't add it. Returns and events (`getUserVaultTotalReturns`, `getUserVaultEvents`) need `userEventsIndexed: true` on the vault.
 
-Before building a deposit transaction, call `getTransactionsContext` to confirm the vault is ready to accept a deposit. The response tells you which steps are required (for example, an ERC-20 approval before the deposit itself) and the current deposit limits.
+## Pitfalls fixed from earlier versions of this tutorial
 
-<CodeGroup>
+- `import pkg from '@vaultsfyi/sdk'` → `import { VaultsSdk } from '@vaultsfyi/sdk'`.
+- `path: { …, vaultAddress }` → `path: { …, vaultId }` (TypeScript).
+- `cd python_examples/` → the repository directory is `python-examples`.
+- "Context reports deposit limits and the API rejects deposits over them" → the API does no balance or limit check; check yourself.
+- The flow stopped before signing → step 5 shows ordered signing with receipts.
 
-```javascript index.js
-async function getTransactionContext(userAddress, network, vaultAddress) {
-  const context = await vaultsFyi.getTransactionsContext({
-    path: { userAddress, network, vaultAddress }
-  });
+## Related pages
 
-  return context;
-}
-```
+- [Transaction safety](/ai-agents/transaction-safety): the pre-sign checklist.
+- [Build a deposit](/recipes/deposit-transaction), [positions and balances](/recipes/positions-and-balances).
+- [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors).
+- [For wallets and apps](/use-cases/for-wallets-and-apps).
 
-```python main.py
-def get_transaction_context(user_address, network, vault_address):
-    context = client.get_transactions_context(
-        user_address=user_address,
-        network=network,
-        vault_address=vault_address
-    )
-    return context
-```
-
-</CodeGroup>
-
-### 5. Build the deposit transaction
-
-Call `getActions` with `action: 'deposit'` to receive ready-to-sign transaction calldata. Pass the calldata directly to the user's wallet or signer library — no intermediate contract needed.
-
-<CodeGroup>
-
-```javascript index.js
-async function generateDepositTransaction(
-  userAddress,
-  network,
-  vaultAddress,
-  assetAddress,
-  amount
-) {
-  const transaction = await vaultsFyi.getActions({
-    path: {
-      action: 'deposit',
-      userAddress,
-      network,
-      vaultAddress
-    },
-    query: {
-      amount,
-      assetAddress
-    }
-  });
-
-  return transaction;
-}
-```
-
-```python main.py
-def generate_deposit_transaction(
-    user_address, network, vault_address, asset_address, amount
-):
-    transaction = client.get_actions(
-        action="deposit",
-        user_address=user_address,
-        network=network,
-        vault_address=vault_address,
-        amount=amount,
-        asset_address=asset_address,
-    )
-    return transaction
-```
-
-</CodeGroup>
-
-`getActions` may return multiple steps when an approval is required before the deposit. Execute each step in order using the user's wallet.
-
-<Warning>
-  Always call `getTransactionsContext` before `getActions`. Skipping the context check can result in failed transactions if deposit limits are reached or approvals are stale.
-</Warning>
-
-### 6. Track the user's position
-
-After the deposit confirms onchain, call `getPositions` to retrieve the user's updated vault positions. Display the balance, current APY, and accumulated returns in your portfolio view.
-
-<CodeGroup>
-
-```javascript index.js
-async function getUserPositions(userAddress) {
-  const positions = await vaultsFyi.getPositions({
-    path: { userAddress }
-  });
-
-  return positions;
-}
-```
-
-```python main.py
-def get_user_positions(user_address):
-    positions = client.get_positions(user_address)
-    return positions
-```
-
-</CodeGroup>
-
-To show total earnings for a specific vault, use `getUserVaultTotalReturns` with the same `userAddress`, `network`, and `vaultAddress`.
-
----
-
-## What to build next
-
-- Surface pending rewards with `getRewardsTransactionsContext` and let users claim in one tap using `getRewardsClaimActions`.
-- Show per-vault event history (deposits and withdrawals) with `getUserVaultEvents`.
-- Compare the vault's current APY against benchmark rates using `getBenchmarks` to give users context on whether the yield is competitive.
-
-See the [SDK Reference](/sdk/reference) for full parameter details on every method used in this tutorial.
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

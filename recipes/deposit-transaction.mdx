@@ -1,0 +1,285 @@
+---
+title: "Recipe: build, verify and sign a vault deposit (EVM)"
+sidebarTitle: "Deposit into a vault"
+description: "Executed recipe: read GET /v2/transactions/context/:userAddress/:network/:vaultId, build GET /v2/transactions/deposit/:userAddress/:network/:vaultId with assetAddress and a base-unit amount, decode and verify every action, then sign in order with viem (shown, not executed), in curl, Python and TypeScript."
+---
+
+This recipe answers "how do I deposit N tokens into a vault for a user?" It reads the transaction context, builds the unsigned payload for a base-unit amount, verifies chain, target, value and decoded arguments of every action, and shows how to sign them in order with viem. Use it in wallets, apps and agents that execute deposits. vaults.fyi never signs or holds funds: your wallet signs.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. `amount` is a **base-unit integer string** (1,000 USDC = `1000000000`; 25 USDC = `25000000`). All code on this page was run on 2026-10-23 against the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`; outputs are real and trimmed. **The signing step was not executed**: the tests run without `SEND=1`.
+
+## Benchmark tasks covered
+
+T04 (build a 1,000 USDC deposit transaction) and T22 (what to verify before signing). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- The vault's `network` and `vaultId` (from [find and rank vaults](/recipes/find-and-rank-vaults)) and the user's 0x address.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+ with `viem` (2.x) for decoding and signing.
+
+## Credit cost
+
+| Call | Cost |
+| - | - |
+| `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | 3 |
+| `GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId}` | 5 |
+| **One deposit flow** | **8 credits** |
+
+([credits](/plans/credits)). Path order is **user, network, vault**.
+
+## Step 1: context, then payload (curl)
+
+```bash
+# Deposit flow, read-only: context -> payload. Nothing is signed or sent.
+USER=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+VAULT=0xbeeff2490FEffa212faC2f6553682C219E6a8845   # Steakhouse High Yield USDC on Base
+# 1) Context: steps, asset address/decimals, wallet balance (path order: user, network, vault)
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/transactions/context/$USER/base/$VAULT" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+| jq '{currentDepositStep, depositSteps: [.depositSteps[] | {name, actions}],
+       asset: .asset | {address, symbol, decimals, balanceNative}}'
+# 2) Payload for 25 USDC = 25 * 10^6 = 25000000 base units (1,000 USDC would be 1000000000)
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/transactions/deposit/$USER/base/$VAULT" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "assetAddress=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" \
+  --data-urlencode "amount=25000000" \
+| jq '{currentActionIndex, actions: [.actions[] | {name, to: .tx.to, chainId: .tx.chainId, value: .tx.value, selector: .tx.data[0:10]}]}'
+```
+
+Output (2026-10-23, trimmed to the fields that matter):
+
+```json
+{
+  "currentDepositStep": "deposit",
+  "depositSteps": [
+    {
+      "name": "deposit",
+      "actions": [
+        "approve",
+        "deposit"
+      ]
+    }
+  ],
+  "asset": {
+    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "symbol": "USDC",
+    "decimals": 6,
+    "balanceNative": "78995979"
+  }
+}
+{
+  "currentActionIndex": 0,
+  "actions": [
+    {
+      "name": "Approve USDC for Steakhouse High Yield USDC Edition vault",
+      "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chainId": 8453,
+      "value": null,
+      "selector": "0x095ea7b3"
+    },
+    {
+      "name": "Deposit USDC to Steakhouse High Yield USDC Edition vault",
+      "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+      "chainId": 8453,
+      "value": null,
+      "selector": "0x6e553f65"
+    }
+  ]
+}
+```
+
+`currentDepositStep: "deposit"` means the vault accepts a direct deposit now. `actions` must be sent in order, from `currentActionIndex`: the approval, then the deposit. The live payload has **no `value` key** on these ERC-20 actions (jq prints the missing key as `null`): treat a missing `value` as 0, as the snippets do (`BigInt(value ?? 0)`).
+
+## Step 2: verify every action (Python)
+
+The Python example builds and verifies only; sign with your wallet library.
+
+```python
+"""Build and verify a deposit payload (read-only). Sign it with your wallet library; this never signs."""
+import os
+from decimal import Decimal
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+NETWORK, CHAIN_ID = "base", 8453
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC
+HUMAN_AMOUNT = Decimal("25")                              # 25 USDC
+
+
+def get(path, params=None):
+    r = requests.get(f"{API}{path}", headers=HEADERS, params=params, timeout=30)
+    if not r.ok:
+        raise SystemExit(f"HTTP {r.status_code}: {r.text}")
+    return r.json()
+
+
+# 1) Context first: which step is next, the asset's address/decimals, and the wallet balance.
+ctx = get(f"/v2/transactions/context/{USER}/{NETWORK}/{VAULT_ID}")
+asset = ctx["asset"]
+if ctx["currentDepositStep"] != "deposit":
+    raise SystemExit(f"next step is {ctx['currentDepositStep']!r}, not deposit")
+amount = int(HUMAN_AMOUNT * 10 ** asset["decimals"])  # base units: 25 USDC -> 25000000
+if amount > int(asset["balanceNative"]):  # the API does NOT check the balance for you
+    raise SystemExit(f"insufficient {asset['symbol']}: have {asset['balanceNative']}, need {amount}")
+
+# 2) Payload. assetAddress is required; amount is a base-unit integer string.
+payload = get(f"/v2/transactions/deposit/{USER}/{NETWORK}/{VAULT_ID}",
+              {"assetAddress": asset["address"], "amount": str(amount)})
+
+
+# 3) Verify every action before anything is signed.
+def word(data, i):  # i-th 32-byte ABI argument of calldata
+    return data[10 + 64 * i: 10 + 64 * (i + 1)]
+
+
+allowed_to = {asset["address"].lower(), VAULT_ID.lower()}
+for i, a in enumerate(payload["actions"]):
+    tx = a["tx"]
+    assert tx["chainId"] == CHAIN_ID, f"wrong chain {tx['chainId']}"
+    assert tx["to"].lower() in allowed_to, f"unexpected target {tx['to']}"
+    assert int(tx.get("value") or 0) == 0, "ERC-20 deposit should not send native value"
+    sel = tx["data"][:10]
+    if sel == "0x095ea7b3":  # approve(spender, amount)
+        spender, approved = "0x" + word(tx["data"], 0)[24:], int(word(tx["data"], 1), 16)
+        assert spender.lower() == VAULT_ID.lower(), "approval spender is not the vault"
+        assert approved == amount, f"approval {approved} != amount {amount}"
+    elif sel == "0x6e553f65":  # ERC-4626 deposit(assets, receiver)
+        assets, receiver = int(word(tx["data"], 0), 16), "0x" + word(tx["data"], 1)[24:]
+        assert assets == amount and receiver.lower() == USER.lower(), "deposit args mismatch"
+    print(f"action {i}: {a['name']}  to={tx['to']}  selector={sel}  OK")
+
+print(f"verified {len(payload['actions'])} actions for {HUMAN_AMOUNT} {asset['symbol']} ({amount} base units)")
+print("next: sign and send each action IN ORDER, waiting for each receipt (not done here)")
+```
+
+Output (2026-10-23):
+
+```text
+action 0: Approve USDC for Steakhouse High Yield USDC Edition vault  to=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  selector=0x095ea7b3  OK
+action 1: Deposit USDC to Steakhouse High Yield USDC Edition vault  to=0xbeeff2490FEffa212faC2f6553682C219E6a8845  selector=0x6e553f65  OK
+verified 2 actions for 25 USDC (25000000 base units)
+next: sign and send each action IN ORDER, waiting for each receipt (not done here)
+```
+
+## Step 3: verify and sign in order (TypeScript, viem)
+
+The signing branch runs only when `SEND=1` and `PRIVATE_KEY` are set. Keep keys in the user's wallet; never send them to any API.
+
+```typescript
+// Build, verify and (only when SEND=1) sign a deposit with viem. Tests never set SEND.
+import { createWalletClient, createPublicClient, http, decodeFunctionData, erc20Abi, erc4626Abi, getAddress, type Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base } from 'viem/chains';
+
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = getAddress('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045');
+const NETWORK = 'base';
+const VAULT_ID = getAddress('0xbeeff2490FEffa212faC2f6553682C219E6a8845'); // Steakhouse High Yield USDC
+const HUMAN_AMOUNT = '25'; // 25 USDC
+
+async function get(path: string, params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params);
+  const res = await fetch(`${API}${path}${qs.size ? `?${qs}` : ''}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+// 1) Context: next step, asset address/decimals, wallet balance.
+const ctx = await get(`/v2/transactions/context/${USER}/${NETWORK}/${VAULT_ID}`);
+if (ctx.currentDepositStep !== 'deposit') throw new Error(`next step is ${ctx.currentDepositStep}`);
+const asset = ctx.asset as { address: Hex; symbol: string; decimals: number; balanceNative: string };
+const [whole, frac = ''] = HUMAN_AMOUNT.split('.');
+const amount = BigInt(whole + frac.padEnd(asset.decimals, '0').slice(0, asset.decimals)); // exact base units
+if (amount > BigInt(asset.balanceNative)) throw new Error(`insufficient ${asset.symbol}`); // API doesn't check
+
+// 2) Payload: assetAddress required, amount as base-unit string.
+const payload = await get(`/v2/transactions/deposit/${USER}/${NETWORK}/${VAULT_ID}`, {
+  assetAddress: asset.address,
+  amount: amount.toString(),
+});
+
+// 3) Verify chain, target and decoded arguments of every action.
+type Action = { name: string; tx: { to: Hex; chainId: number; data?: Hex; value?: string } };
+const actions: Action[] = payload.actions;
+for (const [i, a] of actions.entries()) {
+  const { to, chainId, data, value } = a.tx;
+  if (chainId !== base.id) throw new Error(`action ${i}: wrong chain ${chainId}`);
+  if (![getAddress(asset.address), VAULT_ID].includes(getAddress(to))) throw new Error(`action ${i}: unexpected target ${to}`);
+  if (BigInt(value ?? 0) !== 0n) throw new Error(`action ${i}: unexpected native value`);
+  if (getAddress(to) === getAddress(asset.address)) {
+    const { functionName, args } = decodeFunctionData({ abi: erc20Abi, data });
+    if (functionName !== 'approve' || getAddress(args[0] as Hex) !== VAULT_ID || args[1] !== amount)
+      throw new Error(`action ${i}: approval is not exactly ${amount} to the vault`);
+  } else {
+    const { functionName, args } = decodeFunctionData({ abi: erc4626Abi, data });
+    if (functionName !== 'deposit' || args[0] !== amount || getAddress(args[1] as Hex) !== USER)
+      throw new Error(`action ${i}: deposit args mismatch`);
+  }
+  console.log(`action ${i}: ${a.name}  to=${to}  OK`);
+}
+console.log(`verified ${actions.length} actions for ${HUMAN_AMOUNT} ${asset.symbol} (${amount} base units)`);
+
+// 4) Sign and send IN ORDER, waiting for each receipt. Gated: never runs unless SEND=1.
+if (process.env.SEND === '1') {
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex); // must be USER's key; never hard-code it
+  const wallet = createWalletClient({ account, chain: base, transport: http() });
+  const pub = createPublicClient({ chain: base, transport: http() });
+  for (const a of actions.slice(payload.currentActionIndex)) {
+    const hash = await wallet.sendTransaction({ to: a.tx.to, ...(a.tx.data !== undefined ? { data: a.tx.data } : {}), value: BigInt(a.tx.value ?? 0) });
+    const receipt = await pub.waitForTransactionReceipt({ hash });
+    if (receipt.status !== 'success') throw new Error(`${a.name} reverted: ${hash}`);
+    console.log(`${a.name}: ${hash}`);
+  }
+} else {
+  console.log('SEND!=1: not signing (dry run)');
+}
+```
+
+Output (2026-10-23, dry run):
+
+```text
+action 0: Approve USDC for Steakhouse High Yield USDC Edition vault  to=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  OK
+action 1: Deposit USDC to Steakhouse High Yield USDC Edition vault  to=0xbeeff2490FEffa212faC2f6553682C219E6a8845  OK
+verified 2 actions for 25 USDC (25000000 base units)
+SEND!=1: not signing (dry run)
+```
+
+## What the verification checks
+
+| Check | Why |
+| - | - |
+| `tx.chainId` equals the intended network (8453 for Base) | Prevents signing on the wrong chain. |
+| `tx.to` is the asset (for `approve`) or the vault (for `deposit`) | Payloads target protocol contracts directly; anything else is suspicious. |
+| `tx.value` is absent or 0 for ERC-20 deposits | No native coin should move. |
+| `approve(spender, amount)`: spender = vault, amount = your amount | Bounded approval, to the right spender. |
+| `deposit(assets, receiver)`: assets = amount, receiver = user | The shares go to the user. |
+| `amount ≤ asset.balanceNative` from the context | The API does not check the balance for you. |
+
+The full checklist is on [transaction safety](/ai-agents/transaction-safety).
+
+## Pitfalls
+
+- **Human amounts.** `amount=1000` deposits 0.001 USDC. Multiply by `10^asset.decimals`; `amount=1.5` is a 400 ("Expected bigint").
+- **Skipping the context.** It tells you whether the next step is `deposit` or something else (for example `request-deposit` on async vaults) and gives the asset address and decimals.
+- **Wrong path order.** `/v2/transactions/deposit/{userAddress}/{network}/{vaultId}`; other orders return 400.
+- **Missing `assetAddress`.** It is required.
+- **Sending actions in parallel.** Wait for each receipt; the deposit reverts if the approval is not mined.
+- **`simulate=true`.** Deprecated and ignored; v2 does not simulate. Simulate yourself (for example with `eth_call`) before signing.
+- **Stale payloads.** Rebuild after a long delay or a failed action; re-read the context.
+- **Appending the attribution suffix again.** Transactions API payloads already include it; see [TVL attribution suffix](/recipes/tvl-attribution-suffix).
+
+## Related pages
+
+- [Transaction safety](/ai-agents/transaction-safety): the pre-sign checklist.
+- [Transaction flows](/concepts/transaction-flows): steps, actions, smart wallets.
+- [Transactions API](/api-reference/transactions).
+- [API conventions: token amounts](/api-reference/conventions#token-amounts-and-decimals).
+- [Errors](/api-reference/errors).
+- [Redeem and queued withdrawals](/recipes/redeem-and-queued-withdrawal) and [Solana deposit](/recipes/solana-deposit).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

@@ -1,0 +1,185 @@
+---
+title: "Recipe: wallet positions with correct balance math"
+sidebarTitle: "Positions and balances"
+description: "Executed recipe: list a wallet's vault positions with GET /v2/portfolio/positions/:userAddress, convert asset.positionValueInAsset from base units, and avoid counting asset.balanceNative (the idle wallet balance), in curl, Python and TypeScript."
+---
+
+This recipe answers "how much does this wallet hold in each vault, in human units and USD?" It lists all positions on the chosen networks and converts each position size correctly. Use it for portfolio screens and for agents asked "what is my balance in vault X?"
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Amounts are **base-unit integer strings**. All code on this page was run on 2026-10-23 against the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`; outputs are real and trimmed.
+
+## Benchmark tasks covered
+
+T09 (turn a position balance into human units). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+`GET /v2/portfolio/positions/{userAddress}` costs **5 credits** per call, whatever it returns. One vault: `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}` costs 1 ([credits](/plans/credits)).
+
+## Which field is the position
+
+| Field | Meaning | Unit |
+| - | - | - |
+| `asset.positionValueInAsset` | **The position**, valued in the deposit asset | asset base units (÷ 10^`asset.decimals`) |
+| `lpToken.balanceNative` | Vault shares held | share base units (÷ 10^`lpToken.decimals`) |
+| `lpToken.balanceUsd` | The position in USD (may be absent) | USD decimal string |
+| `asset.balanceNative` / `asset.balanceUsd` | The wallet's **idle** balance of the deposit asset, outside the vault | base units / USD |
+
+Adding `asset.balanceNative` to the position double-counts: it is the same idle balance repeated on every position with that asset.
+
+## curl
+
+```bash
+# Positions of one wallet: position size is asset.positionValueInAsset (base units),
+# NOT asset.balanceNative (that is the wallet's idle balance of the same token).
+USER=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/portfolio/positions/$USER" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "allowedNetworks=base" --data-urlencode "allowedNetworks=mainnet" \
+  --data-urlencode "allowedNetworks=arbitrum" --data-urlencode "allowedNetworks=optimism" \
+| jq '[.data[:3][] | {network: .network.name, name, decimals: .asset.decimals,
+        positionValueInAsset: .asset.positionValueInAsset, lpUsd: .lpToken.balanceUsd,
+        walletIdleBalanceNative: .asset.balanceNative}]'
+```
+
+Output (2026-10-23, first 3 positions):
+
+```json
+[
+  {
+    "network": "mainnet",
+    "name": "Lido stETH",
+    "decimals": 18,
+    "positionValueInAsset": "10424842274072",
+    "lpUsd": "0.02497878904295415474884848",
+    "walletIdleBalanceNative": "5773252986299759339"
+  },
+  {
+    "network": "mainnet",
+    "name": "ether.fi eETH",
+    "decimals": 18,
+    "positionValueInAsset": "0",
+    "lpUsd": "0",
+    "walletIdleBalanceNative": "5773252986299759339"
+  },
+  {
+    "network": "mainnet",
+    "name": "Savings USDS",
+    "decimals": 18,
+    "positionValueInAsset": "47995657165167470897",
+    "lpUsd": "47.9794682300056599090664419",
+    "walletIdleBalanceNative": "0"
+  }
+]
+```
+
+## Python
+
+```python
+"""List a wallet's vault positions with correct balance math (base units, no double counting)."""
+import os
+from decimal import Decimal
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+NETWORKS = ["base", "mainnet", "arbitrum", "optimism"]  # default scope; add more to see other chains
+
+r = requests.get(f"{API}/v2/portfolio/positions/{USER}", headers=HEADERS, timeout=30,
+                 params=[("allowedNetworks", n) for n in NETWORKS])
+r.raise_for_status()
+body = r.json()  # {"data": [...], "errors": {...}} -- not paginated, no nextPage
+
+
+def tokens(raw, decimals):
+    """Base-unit integer string -> Decimal tokens. Never use float for amounts."""
+    return Decimal(raw) / (Decimal(10) ** decimals)
+
+
+total_usd = Decimal(0)
+for p in body["data"]:
+    a = p["asset"]
+    size = tokens(a["positionValueInAsset"], a["decimals"])  # the position, in asset units
+    usd = Decimal(p["lpToken"].get("balanceUsd") or 0)          # the position, in USD (may be absent)
+    total_usd += usd
+    idle = tokens(a["balanceNative"], a["decimals"])           # wallet's IDLE balance of the asset
+    print(f'{p["network"]["name"]:8} {p["name"][:30]:30} position {size:.6f} {a["symbol"]} (~${usd:,.2f})'
+          f'   [idle {a["symbol"]} in wallet: {idle:.4f} -- do not add]')
+print(f"{len(body['data'])} positions, total ~${total_usd:,.2f} (sum of lpToken.balanceUsd)")
+```
+
+## TypeScript
+
+```typescript
+// List a wallet's vault positions with correct balance math (base units, no double counting).
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+const NETWORKS = ['base', 'mainnet', 'arbitrum', 'optimism']; // default scope; add more for other chains
+
+const qs = new URLSearchParams(NETWORKS.map((n) => ['allowedNetworks', n]));
+const res = await fetch(`${API}/v2/portfolio/positions/${USER}?${qs}`, { headers });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const body = await res.json(); // { data: Position[], errors } -- not paginated
+
+// Base-unit string -> decimal string, exact (BigInt), no float rounding.
+function tokens(raw: string, decimals: number, dp = 6): string {
+  const v = BigInt(raw);
+  const base = 10n ** BigInt(decimals);
+  const frac = (v % base).toString().padStart(decimals, '0').slice(0, dp);
+  return `${v / base}${dp && decimals ? `.${frac}` : ''}`;
+}
+
+let totalUsd = 0;
+for (const p of body.data) {
+  const a = p.asset;
+  const usd = Number(p.lpToken.balanceUsd ?? 0); // position in USD (display only)
+  totalUsd += usd;
+  console.log(
+    `${p.network.name.padEnd(8)} ${p.name.slice(0, 30).padEnd(30)} position ${tokens(a.positionValueInAsset, a.decimals)} ${a.symbol} (~$${usd.toFixed(2)})` +
+      `   [idle ${a.symbol} in wallet: ${tokens(a.balanceNative, a.decimals, 4)} -- do not add]`,
+  );
+}
+console.log(`${body.data.length} positions, total ~$${totalUsd.toFixed(2)} (sum of lpToken.balanceUsd)`);
+```
+
+### Output (2026-10-23)
+
+Python (TypeScript prints the same rows; its 4th decimal can differ because it truncates instead of rounding):
+
+```text
+mainnet  Lido stETH                     position 0.000010 ETH (~$0.02)   [idle ETH in wallet: 5.7733 -- do not add]
+mainnet  ether.fi eETH                  position 0.000000 ETH (~$0.00)   [idle ETH in wallet: 5.7733 -- do not add]
+mainnet  Savings USDS                   position 47.995657 USDS (~$47.98)   [idle USDS in wallet: 0.0000 -- do not add]
+...
+arbitrum Hop USDC.e                     position 0.020317 USDC (~$0.02)   [idle USDC in wallet: 0.1000 -- do not add]
+base     True Yield Dollar              position 920.916210 USDC (~$920.78)   [idle USDC in wallet: 78.9960 -- do not add]
+10 positions, total ~$1,098.54 (sum of lpToken.balanceUsd)
+```
+
+Note how the same idle ETH balance (5.7733) appears on every ETH-denominated position: it is the wallet balance, not part of the positions.
+
+## Pitfalls
+
+- **Using `asset.balanceNative` as the position size.** It is the wallet's idle balance. Use `asset.positionValueInAsset`.
+- **Float math on base units.** 18-decimal amounts overflow float precision; use `Decimal` or `BigInt`.
+- **Share vs asset units.** `lpToken.balanceNative` is in shares; shares and assets differ unless the share price is 1.
+- **Expecting pagination.** `/v2/portfolio/positions/{userAddress}` returns `{ data, errors }`, no `nextPage`.
+- **Default 4-network scope.** Positions on other networks are not returned unless you pass them in `allowedNetworks`.
+- **Returns and events** (`/v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}`, `/v2/portfolio/events/{userAddress}/{network}/{vaultId}`) are only meaningful when the vault has `userEventsIndexed: true`.
+
+## Related pages
+
+- [API conventions: positions](/api-reference/conventions#positions-wallet-balance-vs-position-size).
+- [Portfolio tracking](/concepts/portfolio-tracking).
+- [Errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

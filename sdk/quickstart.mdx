@@ -1,117 +1,171 @@
 ---
-title: "Get Started with the Vaults.fyi SDK"
-description: "Install the TypeScript or Python SDK, configure your API key, and make your first call to the Vaults.fyi yield API in under five minutes."
+title: "SDK quickstart: TypeScript (@vaultsfyi/sdk) and Python (vaultsfyi)"
 sidebarTitle: "Quickstart"
+description: "Install @vaultsfyi/sdk 2.3.14 or vaultsfyi 1.3.0, set VAULTSFYI_API_KEY, and run a tested first script that fetches deposit options for a wallet and one vault's APY; includes response shape, defaults, credit cost and SDK-specific pitfalls."
 ---
 
-The Vaults.fyi SDK gives you typed access to 1,000+ DeFi yield strategies across 80+ protocols. This guide walks you through installation, authentication, and your first API call.
+This page gets you from nothing to a working vaults.fyi SDK call in TypeScript or Python. It installs the published packages, sets the API key, runs one script that fetches personalized deposit options for a wallet and one vault's APY, and lists the SDK quirks that break code copied from older docs. Use it before the [SDK reference](/sdk/reference).
 
-<Steps>
-  <Step title="Install the SDK">
-    Add the SDK to your project using your preferred package manager.
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** (Node.js 18+, ESM) and **`vaultsfyi` 1.3.0** (Python 3.8+; tested on 3.9), from a clean install in an empty directory. Both SDKs call the REST API at `https://api.vaults.fyi` and send your key in the `x-api-key` header. Outputs below are real.
 
-    <CodeGroup>
+## 1. Install
 
-    ```bash npm
-    npm install @vaultsfyi/sdk
-    ```
+TypeScript (the script runs with `tsx`; any ESM TypeScript runner works):
 
-    ```bash yarn
-    yarn add @vaultsfyi/sdk
-    ```
+```bash
+npm install @vaultsfyi/sdk@2.3.14 tsx
+```
 
-    ```bash pnpm
-    pnpm add @vaultsfyi/sdk
-    ```
+Python:
 
-    ```bash bun
-    bun add @vaultsfyi/sdk
-    ```
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install vaultsfyi==1.3.0
+```
 
-    ```bash pip
-    pip install vaultsfyi
-    ```
+## 2. Set your API key
 
-    ```bash poetry
-    poetry add vaultsfyi
-    ```
+Get a key at [portal.vaults.fyi](https://portal.vaults.fyi/signup) (pay-as-you-go is $0.002 per credit). Keep it in the environment, never in code:
 
-    </CodeGroup>
-  </Step>
+```bash
+export VAULTSFYI_API_KEY="<your API key from portal.vaults.fyi>"
+```
 
-  <Step title="Set your API key">
-    Export your API key as an environment variable so the SDK can authenticate your requests.
+## 3. First script
 
-    ```bash
-    export VAULTS_FYI_API_KEY="your_api_key_here"
-    ```
+TypeScript, saved as `quickstart.ts` (the project's `package.json` needs `"type": "module"`):
 
-    <Note>
-      You need an API key to use the SDK. [Sign up at the vaults.fyi portal](https://portal.vaults.fyi/signup) to generate one. We offer a Pay-As-You-Go plan so you only pay for what you use, with no commitments.
-    </Note>
-  </Step>
+```typescript
+// SDK quickstart (TypeScript, @vaultsfyi/sdk 2.3.14). Node >= 18, ESM ("type": "module").
+import { VaultsSdk } from '@vaultsfyi/sdk';
 
-  <Step title="Initialize the client">
-    Import the SDK and create a client instance using your API key from the environment.
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
 
-    <CodeGroup>
+// First call: personalized deposit options for a wallet (GET /v2/portfolio/best-deposit-options/{userAddress}).
+const options = await sdk.getDepositOptions({
+  path: { userAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045' },
+  query: { allowedAssets: ['USDC'], onlyTransactional: true, maxVaultsPerAsset: 2 },
+});
+for (const b of options.userBalances) {
+  if (!b.asset) continue; // typed optional in the SDK; always present in practice
+  console.log(b.asset.symbol, 'balance (base units):', b.asset.balanceNative, 'decimals:', b.asset.decimals);
+  for (const v of b.depositOptions) {
+    console.log(`  ${v.network.name} ${v.name}: ${(v.apy.total * 100).toFixed(2)} %  vaultId ${v.vaultId}`);
+  }
+}
 
-    ```javascript index.js
-    import pkg from '@vaultsfyi/sdk';
-    const { VaultsSdk } = pkg;
+// One vault (path key is vaultId, not vaultAddress).
+const vault = await sdk.getVault({ path: { network: 'base', vaultId: '0xbeeff2490FEffa212faC2f6553682C219E6a8845' } });
+console.log(vault.name, '7d APY', `${(vault.apy['7day'].total * 100).toFixed(2)} %`);
+```
 
-    const vaultsFyi = new VaultsSdk({
-      apiKey: process.env.VAULTS_FYI_API_KEY,
-    });
-    ```
+Python, saved as `quickstart.py`:
 
-    ```python main.py
-    import os
-    from vaultsfyi import VaultsSdk
+```python
+"""SDK quickstart (Python, vaultsfyi 1.3.0). Python >= 3.8."""
+import os
 
-    api_key = os.getenv("VAULTS_FYI_API_KEY")
-    client = VaultsSdk(api_key=api_key)
-    ```
+from vaultsfyi import VaultsSdk
 
-    </CodeGroup>
-  </Step>
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
 
-  <Step title="Make your first call">
-    Call `getDepositOptions` to fetch personalized yield opportunities for a wallet address. The response is filtered by the assets you specify.
+options = client.get_deposit_options(
+    "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    allowed_assets=["USDC"],
+    only_transactional=True,
+    max_vaults_per_asset=2,
+)
+for b in options["userBalances"]:
+    print(b["asset"]["symbol"], "balance (base units):", b["asset"]["balanceNative"], "decimals:", b["asset"]["decimals"])
+    for v in b["depositOptions"]:
+        print(f'  {v["network"]["name"]} {v["name"]}: {v["apy"]["total"] * 100:.2f} %  vaultId {v["vaultId"]}')
 
-    <CodeGroup>
+# One vault. The Python SDK names this argument vault_address, but it is the REST vaultId.
+vault = client.get_vault("base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845")
+print(vault["name"], "7d APY", f'{vault["apy"]["7day"]["total"] * 100:.2f} %')
+```
 
-    ```javascript index.js
-    const depositOptions = await vaultsFyi.getDepositOptions({
-      path: { userAddress: '0xdB79e7E9e1412457528e40db9fCDBe69f558777d' },
-      query: { allowedAssets: ['USDC', 'USDS'] }
-    });
+## 4. Run it
 
-    console.log(depositOptions);
-    ```
+```bash
+npx tsx quickstart.ts
+```
 
-    ```python main.py
-    user_address = "0xdB79e7E9e1412457528e40db9fCDBe69f558777d"
-    deposit_options = client.get_deposit_options(
-        user_address,
-        allowed_assets=["USDC", "USDS"]
-    )
+```bash
+python quickstart.py
+```
 
-    print(deposit_options)
-    ```
+Output (2026-10-23, identical for both; trimmed to the first network and the last line):
 
-    </CodeGroup>
+```text
+USDC balance (base units): 78995979 decimals: 6
+  base Midas mLIQUIDITY: 69.75 %  vaultId 0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873
+  base Harvest 40 Acres USDC: 27.84 %  vaultId 0xC777031D50F632083Be7080e51E390709062263E
+...
+Steakhouse High Yield USDC Edition 7d APY 3.15 %
+```
 
-    <Tip>
-      `getDepositOptions` ranks results by APY and filters out vaults below minimum TVL thresholds. It's the fastest way to surface relevant opportunities for a specific wallet.
-    </Tip>
-  </Step>
-</Steps>
+## What the first call returned
+
+`getDepositOptions` / `get_deposit_options` wraps `GET /v2/portfolio/best-deposit-options/{userAddress}` and costs **1 credit + 2 per vault returned** (this run: 9 vaults, 19 credits). `getVault` / `get_vault` wraps `GET /v2/detailed-vaults/{network}/{vaultId}` (3 credits). The response, trimmed to one balance and one option (real values):
+
+```json
+{
+  "requestedAddress": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  "userBalances": [
+    {
+      "asset": {
+        "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "symbol": "USDC",
+        "decimals": 6,
+        "balanceNative": "78995979",
+        "balanceUsd": "78.98465729628973"
+      },
+      "depositOptions": [
+        {
+          "vaultId": "0x6B35F2E4C9D4c1da0eDaf7fd7Dc90D9bCa4b0873",
+          "name": "Midas mLIQUIDITY",
+          "network": {
+            "name": "base",
+            "chainId": 8453
+          },
+          "isTransactional": true,
+          "tvl": {
+            "usd": "736693",
+            "native": "736798625343"
+          },
+          "apy": {
+            "base": 0.6975,
+            "reward": 0,
+            "total": 0.6975
+          },
+          "projectedUsdAnnualEarnings": "55.09179846416209"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`balanceNative` is base units (78995979 = 78.995979 USDC); `apy` is a decimal fraction (0.6975 = 69.75 %, a real but unusual value: check TVL and score before showing it). Defaults of this endpoint: networks base, mainnet, arbitrum and optimism; `minTvl=100000`; `onlyAppFeatured=true`; `allowVaultsWithWarnings=false`; `maxVaultsPerAsset=3`; APY window `7day`. The wallet holds USDC on several networks, so USDC appears once per network.
+
+## Things that differ from older SDK docs
+
+- **Import (TypeScript):** `import { VaultsSdk } from '@vaultsfyi/sdk'`. The package exports only `VaultsSdk` and `SUPPORTED_NETWORKS`; it has no default export.
+- **Vault path key (TypeScript):** `path: { network, vaultId }`. With `vaultAddress` the SDK requests `/undefined` and fails.
+- **Vault argument (Python):** positional or `vault_address=`, but pass the REST **`vaultId`** (usually the address; not always).
+- **Responses are envelopes, not arrays:** list methods return `{ itemsOnPage, nextPage?, data }`; `nextPage` is absent on the last page.
+- **Units are unchanged by the SDK:** APY is a decimal fraction (`0.0315` = 3.15 %), amounts are base-unit strings, timestamps are Unix seconds.
+- **Arrays** (`allowedNetworks: ['base', 'arbitrum']`) are sent as repeated query keys, which is what the API expects.
+- **Errors:** the TypeScript SDK throws an `Error` with only a `message` (no status code) and does not retry; the Python SDK raises typed exceptions and retries 429/5xx. See [SDK reference: errors](/sdk/reference#errors-and-retries).
+- **Keyless x402 mode (TypeScript):** `new VaultsSdk({ client: signer })` exists; 2.3.14 uses an x402 v1 client, while the API uses x402 v2. Use an API key, or an x402 v2 client as shown on [x402](/ai-agents/x402).
 
 ## Next steps
 
-Now that your client is working, explore the full set of SDK methods or follow a tutorial for your use case.
+- [SDK reference](/sdk/reference): every method, its REST endpoint, parameters and credit cost.
+- [Wallet integration tutorial](/sdk/tutorials/wallet-integration): idle assets → deposit → position.
+- [Data analytics tutorial](/sdk/tutorials/data-analytics): lists, history, benchmarks.
+- [Recipes](/recipes/overview): the same tasks in curl, Python and TypeScript.
+- [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-- [SDK Reference](/sdk/reference) — every method, parameter, and response type
-- [Wallet integration tutorial](/sdk/tutorials/wallet-integration) — detect idle assets, build deposit flows, and track positions
-- [Data analytics tutorial](/sdk/tutorials/data-analytics) — fetch vault data, historical APY, and benchmark comparisons
+_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder._

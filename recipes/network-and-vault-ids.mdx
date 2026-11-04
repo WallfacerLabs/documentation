@@ -1,0 +1,145 @@
+---
+title: "Recipe: map network names and chain IDs, and find a vaultId"
+sidebarTitle: "Network and vault IDs"
+description: "Executed recipe: resolve user input such as \"Ethereum\" or \"chain 8453\" to API network values (mainnet, base or CAIP-2) with GET /v2/networks, and get vaultId values from list endpoints, including non-address vaultIds."
+---
+
+This recipe answers "what do I put in `{network}` and `{vaultId}`?" It maps everyday names and chain IDs to the values the API accepts, and shows where `vaultId` comes from, including the vaults whose `vaultId` is not a plain contract address. Use it in any code or agent that turns user words into API paths.
+
+Requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. All code on this page was run on 2026-10-23; outputs are real.
+
+## Benchmark tasks covered
+
+T19 (network identifiers) and T21 (what is `vaultId`, and where do I get it?). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+`GET /v2/networks` 1 credit, `GET /v2/vaults` 1 credit per call (3,662 vaults in one call with `perPage=5000`). **2 credits** total; cache both ([credits](/plans/credits)).
+
+## The rules
+
+| Input | API value | Notes |
+| - | - | - |
+| "Ethereum", "eth" | `mainnet` or `eip155:1` | `ethereum` is rejected |
+| "chain 8453", `8453` | `base` or `eip155:8453` | Bare chain IDs are rejected; map them via `/v2/networks` |
+| `eip155:42161` | `arbitrum` or `eip155:42161` | CAIP-2 is accepted as is |
+| Solana | not a v2 network | Use the Beta `/beta/svm/*` endpoints, which have no network segment ([Solana deposit](/recipes/solana-deposit)) |
+
+`GET /v2/networks` returns a plain array of `{ name, chainId, networkCaip }` (22 networks on 2026-10-23).
+
+**`vaultId`** is the stable vault identifier used in every `{vaultId}` path segment. It is usually the vault contract address, but not always: on 2026-10-23, 53 of 3,662 vaults had a non-address `vaultId` (for example Aave v4 spokes such as `0x94e7…c485-0`). Always take `vaultId` from `data[].vaultId` of `/v2/vaults` or `/v2/detailed-vaults`; don't derive it from `address`.
+
+## Python
+
+```python
+"""Resolve user words ("Ethereum", "chain 8453") to API network ids, and find vaultIds (incl. non-address ids)."""
+import os
+import re
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+
+networks = requests.get(f"{API}/v2/networks", headers=HEADERS, timeout=30).json()  # plain array
+by_chain = {n["chainId"]: n for n in networks}
+ALIASES = {"ethereum": "mainnet", "eth": "mainnet"}  # 'ethereum' is NOT a valid network value
+
+
+def to_network(user_input):
+    s = str(user_input).strip().lower().removeprefix("chain ")
+    if s.isdigit():
+        return by_chain[int(s)]["name"]  # bare chain ids are rejected by the API -> map them
+    s = ALIASES.get(s, s)
+    for n in networks:
+        if s in (n["name"], n["networkCaip"]):
+            return n["name"]
+    raise ValueError(f"unknown network {user_input!r}")
+
+
+for q in ["Ethereum", "chain 8453", "eip155:42161", "optimism"]:
+    name = to_network(q)
+    caip = next(n["networkCaip"] for n in networks if n["name"] == name)
+    print(f"{q!r:16} -> {name} (or {caip})")
+
+# vaultId: take it from list endpoints. Most are addresses; some (e.g. Aave v4 spokes) are not.
+vaults = requests.get(f"{API}/v2/vaults", headers=HEADERS, params={"perPage": 5000}, timeout=60).json()["data"]
+non_addr = [v for v in vaults if not re.fullmatch(r"0x[0-9a-fA-F]{40}", v["vaultId"])]
+print(f"{len(vaults)} vaults, {len(non_addr)} with a non-address vaultId, e.g.:")
+for v in non_addr[:2]:
+    print(f'  {v["network"]["name"]} {v["name"]}: vaultId={v["vaultId"]} address={v["address"]}')
+```
+
+Output (2026-10-23):
+
+```text
+'Ethereum'       -> mainnet (or eip155:1)
+'chain 8453'     -> base (or eip155:8453)
+'eip155:42161'   -> arbitrum (or eip155:42161)
+'optimism'       -> optimism (or eip155:10)
+3662 vaults, 53 with a non-address vaultId, e.g.:
+  mainnet Aave v4 Main WETH: vaultId=0x94e7A5dCbE816e498b89aB752661904E2F56c485-0 address=0x94e7A5dCbE816e498b89aB752661904E2F56c485
+  mainnet Aave v4 Etherfi weETH: vaultId=0xbF10BDfE177dE0336aFD7fcCF80A904E15386219-0 address=0xbF10BDfE177dE0336aFD7fcCF80A904E15386219
+```
+
+## TypeScript
+
+```typescript
+// Resolve "Ethereum" / "chain 8453" to API network ids, and find vaultIds (incl. non-address ids).
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const get = async (p: string) => { const r = await fetch(`${API}${p}`, { headers }); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
+
+type Net = { name: string; chainId: number; networkCaip: string };
+const networks: Net[] = await get('/v2/networks'); // plain array
+const ALIASES: Record<string, string> = { ethereum: 'mainnet', eth: 'mainnet' };
+
+function toNetwork(input: string): string {
+  const s = input.trim().toLowerCase().replace(/^chain /, '');
+  if (/^\d+$/.test(s)) { // bare chain ids are rejected by the API -> map them
+    const n = networks.find((x) => x.chainId === Number(s));
+    if (!n) throw new Error(`unknown chain ${s}`);
+    return n.name;
+  }
+  const want = ALIASES[s] ?? s;
+  const n = networks.find((x) => x.name === want || x.networkCaip === want);
+  if (!n) throw new Error(`unknown network ${input}`);
+  return n.name;
+}
+for (const q of ['Ethereum', 'chain 8453', 'eip155:42161', 'optimism']) console.log(`${q.padEnd(14)} -> ${toNetwork(q)}`);
+
+const { data: vaults } = await get('/v2/vaults?perPage=5000');
+const nonAddr = vaults.filter((v: any) => !/^0x[0-9a-fA-F]{40}$/.test(v.vaultId));
+console.log(`${vaults.length} vaults, ${nonAddr.length} with a non-address vaultId, e.g. ${nonAddr[0].vaultId} (${nonAddr[0].name})`);
+```
+
+Output (2026-10-23):
+
+```text
+Ethereum       -> mainnet
+chain 8453     -> base
+eip155:42161   -> arbitrum
+optimism       -> optimism
+3662 vaults, 53 with a non-address vaultId, e.g. 0x94e7A5dCbE816e498b89aB752661904E2F56c485-0 (Aave v4 Main WETH)
+```
+
+## Pitfalls
+
+- **`network=ethereum`, `network=1`, `network=8453`.** All rejected; use `mainnet`, `base` or CAIP-2.
+- **Assuming `vaultId == address`.** True for most vaults, false for some. Use the `vaultId` field.
+- **SDK naming.** The Python SDK calls this argument `vault_address`, but you must pass the `vaultId`. The TypeScript SDK uses `path.vaultId`. See [SDK reference](/sdk/reference).
+- **Solana addresses in v2 paths.** Solana vaults live under `/beta/svm/*` with base58 `vaultAddress`.
+
+## Related pages
+
+- [API conventions: networks](/api-reference/conventions#networks) and [identifiers](/api-reference/conventions#vault-asset-and-market-identifiers).
+- [Supported protocols and networks](/concepts/supported-protocols).
+- [Errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
