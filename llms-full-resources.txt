@@ -368,7 +368,7 @@ _Last updated: 2026-10-23. Facts on this page were checked against the live API 
 # vaults.fyi for protocols and curators: get listed, check your vault data, track attribution
 Source: https://docs.vaults.fyi/use-cases/for-protocols
 
-> How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/{network}/{vaultId}, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi.
+> How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/:network/:vaultId, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi.
 
 This page explains how a protocol or curator gets vaults into vaults.fyi, how to check what integrators see about a vault, and how to measure the capital partners route to it. Use it when you want wallets, apps, analysts and agents building on vaults.fyi to surface your vaults.
 

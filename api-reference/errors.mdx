@@ -175,7 +175,7 @@ v2 and beta disagree here: the same "not found" case is 400 in v2 and 404 in bet
 
 ## 429: rate limit exceeded
 
-Not observed in the captures for these docs, which stayed far below the limit. Rate limits are set per API key in requests per minute and enforced over a 60-second window, with bursts smoothed in 10-second buckets. Requests without a key (including keyless x402 requests) are limited to 10 per minute per IP. Responses that are not successful (status 400 or above) don't count toward the limit.
+Not observed in the captures for these docs, which stayed far below the limit. Rate limits are set per API key in requests per minute and enforced over a 60-second window, with bursts smoothed in 10-second buckets. Responses that are not successful (status 400 or above) don't count toward the limit.
 
 Every authenticated response (including 400, 404 and 500 responses) carries these headers:
 

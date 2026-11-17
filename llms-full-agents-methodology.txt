@@ -290,7 +290,7 @@ Related: [Vault discovery](/concepts/vault-discovery), [Glossary](/resources/glo
 # Benchmark rates
 Source: https://docs.vaults.fyi/methodology/benchmark-rates
 
-> How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/{network}?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/{network}.
+> How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/:network?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/:network.
 
 This page explains how vaults.fyi builds its USD and ETH benchmark rates and how to fetch current and historical benchmarks from the API. Use it to compare a vault's APY with the market baseline for the same network and denomination. Benchmarks use the same APY method and units as vaults: decimal fractions (`0.0407` = 4.07%), net of fees, in `apy.<window>.{base,reward,total}`.
 

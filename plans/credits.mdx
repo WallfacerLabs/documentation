@@ -239,9 +239,9 @@ Requests sent **without** an API key to a v2 endpoint get an HTTP 402 [x402](/ai
 | `GET /v2/historical/base/{vaultId}/apy?perPage=1` | 4000 (scheme `upto`, a maximum) | $0.004 | 1 + 1 × 1 = 2 |
 | `GET /v2/historical/base/{vaultId}/apy?perPage=10` | 22000 (scheme `upto`, a maximum) | $0.022 | 1 + 10 × 1 = 11 |
 
-The x402 price is defined as the credit cost × $0.002 (2000 USDC base units per credit), with list and historical endpoints priced for the full `perPage` you request. Historical endpoints use the `upto` scheme and settle only for the data points actually returned; other endpoints, including `/v2/detailed-vaults`, charge the quoted amount even if fewer items come back. x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints need an API key. Always pay the amount in `accepts[].amount` rather than hard-coding it.
+The x402 price is defined as the credit cost × $0.002 (2000 USDC base units per credit), with endpoints that charge per returned item (detailed vaults, best deposit options, historical, the beta lists) priced for the full `perPage` you request; flat-priced endpoints such as `/v2/vaults` don't change with `perPage`. Historical endpoints use the `upto` scheme and settle only for the data points actually returned; other endpoints, including `/v2/detailed-vaults`, charge the quoted amount even if fewer items come back. x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints need an API key. Always pay the amount in `accepts[].amount` rather than hard-coding it.
 
-x402 payments don't draw on account credits. Keyless (x402) traffic is limited to 10 requests per minute per IP.
+x402 payments don't draw on account credits.
 
 ## When credits run out
 

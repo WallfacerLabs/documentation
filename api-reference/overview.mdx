@@ -248,7 +248,7 @@ Use the specs for code generation and agent tool definitions. Remember to set th
 - beta: [https://api.vaults.fyi/beta/documentation/json](https://api.vaults.fyi/beta/documentation/json)
 - alpha: [https://api.vaults.fyi/alpha/documentation/json](https://api.vaults.fyi/alpha/documentation/json)
 
-The v2 spec's `info.description` says "Basic API key use is limited to 10 requests per minute". That figure is the limit for requests without an API key (per IP), not a plan limit. Keys get 600 to 3,000 requests per minute depending on the plan: see [Plans and pricing](/plans/overview) and the `x-ratelimit-*` headers.
+The v2 spec's `info.description` says "Basic API key use is limited to 10 requests per minute". That figure is not a plan limit. Keys get 600 to 3,000 requests per minute depending on the plan: see [Plans and pricing](/plans/overview) and the `x-ratelimit-*` headers.
 
 ## Transactions are unsigned
 

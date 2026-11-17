@@ -171,7 +171,7 @@ Steakhouse High Yield USDC Edition 7d APY 3.15 %
 - [Recipes](/recipes/overview): the same tasks in curl, Python and TypeScript.
 - [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder._
 
 
 # SDK reference: every @vaultsfyi/sdk and vaultsfyi method with its REST endpoint
@@ -684,7 +684,7 @@ Report SDK issues to the maintainers; see the package pages on npm and PyPI.
 - [Transaction safety](/ai-agents/transaction-safety)
 - [Recipes](/recipes/overview) and [credits](/plans/credits)
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Tutorial: add yield to a wallet with the vaults.fyi SDK
@@ -919,7 +919,7 @@ The position size is `asset.positionValueInAsset` (asset base units). `asset.bal
 - [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors).
 - [For wallets and apps](/use-cases/for-wallets-and-apps).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Tutorial: yield analytics with the vaults.fyi SDK
@@ -1109,4 +1109,4 @@ Output (2026-10-23):
 - [Paginate all vaults](/recipes/paginate-all-vaults), [vault history vs benchmark](/recipes/vault-history-vs-benchmark), [display APY correctly](/recipes/display-apy-correctly), [estimate credit cost](/recipes/estimate-credit-cost).
 - [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

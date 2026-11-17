@@ -11,7 +11,7 @@ What you need to know first:
 - **No opt-in header.** Every paid v2 endpoint called **without** `x-api-key` returns `402 Payment Required` with an x402 v2 challenge. Sending `x-402-auth: true` gives the same 402.
 - **The price is `accepts[].amount`**, in USDC base units (6 decimals): `"2000"` = $0.002. There is no `maxAmountRequired` field. That field belongs to x402 v1.
 - **REST only.** The MCP server (`https://mcp.vaults.fyi/mcp`) needs an API key and has no x402 option.
-- **Separate from credits, not from rate limits.** x402 payments don't draw on any account's credits. Keyless requests are limited to 10 per minute per IP.
+- **Separate from credits.** x402 payments don't draw on any account's credits. Unpaid 402 responses carry no rate-limit headers (30 keyless requests in about 11 seconds on 2026-11-06 all returned 402, none 429).
 - **Status of this page:** the 402 challenge and the client libraries' parsing of it were verified on 2026-10-23. **A paid request was not executed end to end**, because no payment was made. The retry and settlement headers below are confirmed from the vaults.fyi API implementation.
 
 ## How the flow works
@@ -102,14 +102,18 @@ Prices come from `accepts[].amount` in real 402 responses. **Always read the pri
 | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | exact, batch-settlement | 6000 | $0.006 |
 | `GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId}?assetAddress=…&amount=…` | exact, batch-settlement | 10000 | $0.010 |
 | `GET /v2/transactions/rewards/context/{userAddress}` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/portfolio/best-deposit-options/{userAddress}` (default) | exact, batch-settlement | 202000 | $0.202 |
+| `POST /beta/advanced-analytics` (empty body, default `perPage`) | **upto**, batch-settlement | 1302000 (maximum) | up to $1.302 |
+| `POST /beta/advanced-analytics?perPage=5` | **upto**, batch-settlement | 132000 (maximum) | up to $0.132 |
 | `GET /v2/health` | free (200 with no key) | — | $0 |
 
-The x402 price is the endpoint's credit cost on [Credits](/plans/credits) × $0.002, the pay-as-you-go credit price (2000 USDC base units per credit). List and historical endpoints are priced for the full `perPage` you request. For example, `/v2/detailed-vaults` costs 1 + 3 per vault: (1 + 3 × 50) × 2000 = 302000. List and history prices therefore grow with `perPage`. Historical endpoints use `upto` and settle only for the data points actually returned; other endpoints (including `/v2/detailed-vaults`) charge the quoted amount even if fewer items come back. Always pay the amount in `accepts[].amount`.
+The x402 price is the endpoint's credit cost on [Credits](/plans/credits) × $0.002, the pay-as-you-go credit price (2000 USDC base units per credit). Endpoints that charge per returned item are priced for the full `perPage` you request: `/v2/detailed-vaults`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/historical/*` and the beta lists, including `POST /beta/advanced-analytics`. For example, `/v2/detailed-vaults` costs 1 + 3 per vault: (1 + 3 × 50) × 2000 = 302000, and 3002000 ($3.002) at `perPage=500`. Flat-priced endpoints don't change with `perPage`: `/v2/vaults` and `/v2/assets` cost 2000 whether `perPage` is 1 or 500. Historical endpoints use `upto` and settle only for the data points actually returned; other endpoints (including `/v2/detailed-vaults`) charge the quoted amount even if fewer items come back. Always pay the amount in `accepts[].amount`.
 
 ### Which endpoints are payable
 
-- **Payable (observed 402 with an offer):** `/v2/networks`, `/v2/vaults`, `/v2/detailed-vaults`, `/v2/detailed-vaults/{network}/{vaultId}` and its `/apy`, `/v2/benchmarks/{network}`, `/v2/historical/*` (yes, historical data is payable, via `upto`), `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}`, `/v2/transactions/context/{userAddress}/{network}/{vaultId}`, `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}`, `/v2/transactions/rewards/context/{userAddress}`. The v2 OpenAPI spec declares a 402 response on every v2 operation except `/v2/health`.
-- **Also payable:** every other `/v2/*` data endpoint (for example `/v2/tags`, `/v2/assets`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/transactions/rewards/claim/{userAddress}`) and `POST /beta/advanced-analytics` (and its single-vault variant, via `upto`).
+- **Payable (observed 402 with an offer):** `/v2/networks`, `/v2/vaults`, `/v2/detailed-vaults`, `/v2/detailed-vaults/{network}/{vaultId}` and its `/apy`, `/v2/benchmarks/{network}`, `/v2/historical/*` (yes, historical data is payable, via `upto`), `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}`, `/v2/transactions/context/{userAddress}/{network}/{vaultId}`, `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}`, `/v2/transactions/rewards/context/{userAddress}`. The v2 OpenAPI spec declares a 402 response on every v2 operation except `/v2/health`, including `/v2/nrt/*`, which is not payable (see below).
+- **API key only (no x402 offer):** `/v2/nrt/*`. Without a key it returns 401 and no payment offer (re-checked 2026-11-06), even though the OpenAPI spec declares a 402 response on it.
+- **Also payable:** the other `/v2/*` data endpoints (for example `/v2/tags`, `/v2/assets`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/transactions/rewards/claim/{userAddress}`) and `POST /beta/advanced-analytics` (and its single-vault variant, via `upto`).
 - **Don't buy:** `/v2/transactions/suffix/{userAddress}/{vaultId}` returns a 402 challenge, but it needs an API key with attribution enabled, so a keyless call always fails with 400 (and is not charged).
 
 ## TypeScript: `@x402/fetch`
@@ -183,7 +187,7 @@ If every offer is filtered out, the call raises `PaymentError: Failed to handle 
 
 ### Notes on the `upto` scheme
 
-Historical endpoints offer only `upto` and `batch-settlement`. In both libraries the `upto` client signs a Permit2 authorization, so the wallet needs a USDC allowance for the Permit2 contract (a one-time on-chain approval that costs gas). This is inferred from the library source and was not tested. If you only register `exact`, historical requests fail with no matching scheme, and you pay nothing.
+Historical endpoints offer only `upto` and `batch-settlement`. In both libraries the `upto` client signs a Permit2 authorization, so before the first `upto` payment approve USDC to the Permit2 contract: a one-time on-chain approval, paid in Base ETH for gas. In TypeScript, `@x402/evm/upto/client` exports `getPermit2AllowanceReadParams` (check the current allowance) and `createPermit2ApprovalTx` (build the approval transaction); in Python, the `upto` client (`x402.mechanisms.evm.upto.client`) builds the Permit2 payload. The approval and a paid `upto` request were not executed for these docs. If you only register `exact`, historical requests fail with no matching scheme, and you pay nothing. The `upto` offer's `extra.facilitatorAddress` changes from one 402 response to the next, so read it from each challenge and don't pin it.
 
 ### The vaults.fyi SDK's keyless mode
 
@@ -193,9 +197,10 @@ The previous version of this page imported `wrapAxios` from `x402/axios` and `Cl
 
 ## Budget and failure handling
 
-- **Cap every payment.** Filter `accepts[]` by `amount` before signing (both examples do). Both libraries also refuse payments above $1 by default (`DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"`). A `/v2/detailed-vaults` call with `perPage=5000` would cost about $30 and is refused by that default.
+- **Package versions.** The examples were tested with `@x402/*` 2.28.0 and `x402` 2.25.0. Newer releases exist (`@x402/*` 2.31.0 on npm, `x402` 2.28.0 on PyPI as of 2026-11-06); re-test before upgrading.
+- **Cap every payment.** Filter `accepts[]` by `amount` before signing (both examples do). Both libraries also refuse payments above $1 by default (`DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"`). A `/v2/detailed-vaults` call with `perPage=5000` would cost about $30 and is refused by that default. So is `POST /beta/advanced-analytics` with its default page size (up to $1.302): pass a smaller `perPage` query parameter (`?perPage=5` quotes up to $0.132). Choosing fewer `select` fields did not lower the quote on 2026-11-06; the maximum depends on `perPage`.
 - **Cap total spend.** Track the sum of paid `amount`s per day in your agent and stop when you reach the budget.
-- **Keep `perPage` small** on list and history endpoints: their price grows with `perPage`.
+- **Keep `perPage` small** on endpoints priced per returned item (detailed vaults, best deposit options, history, advanced analytics): their price grows with `perPage`.
 - **Do not retry a paid request blindly.** Payment is settled only when the request returns 200, so a failed paid retry (4xx or 5xx) is not charged. If settlement itself fails you get a 402 and no data. Read the response before paying again: a second successful request is a second charge.
 - **Use a dedicated wallet** with only the USDC you are willing to spend. Never load the user's main key into an x402 client.
 - **402 vs 401:** 402 means no key was sent (pay, or add `x-api-key`). 401 means an invalid key was sent; no x402 offer is made.
@@ -208,4 +213,4 @@ The previous version of this page imported `wrapAxios` from `x402/axios` and `Cl
 - [Credits](/plans/credits): credit cost per endpoint (the x402 price is credits × $0.002)
 - [MCP server](/ai-agents/mcp-server): needs an API key; no x402
 
-_Last updated: 2026-10-23. Facts on this page were checked against the live API and MCP server on that date._
+_Last updated: 2026-11-06. Facts on this page were checked against the live API and MCP server on 2026-10-23; prices, NRT, `perPage` scaling and keyless rate limiting were re-checked on 2026-11-06._

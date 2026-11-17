@@ -2,7 +2,7 @@
 
 > REST API for DeFi vault data (APY, TVL, Reputation Score), wallet portfolios and unsigned, ready-to-sign vault transactions across 22 EVM networks (v2, stable), plus Solana, borrow markets and other features in beta/alpha. Also a hosted MCP server and keyless x402 pay-per-request access.
 
-Docs for agents: every page below is plain Markdown (`.md`). Everything in one file: [llms-full.txt](https://docs.vaults.fyi/llms-full.txt) (~94k tokens, condensed core: rules, conventions, errors, recipes with one code language, concepts, plans and a summary of every v2 endpoint with links to the full pages; fits in one model context) or [llms-full-complete.txt](https://docs.vaults.fyi/llms-full-complete.txt) (~268k tokens, every page in full; for search or RAG, not for pasting whole). Facts were checked against the live API on 2026-10-23.
+Docs for agents: every page below is plain Markdown (`.md`). Everything in one file: [llms-full.txt](https://docs.vaults.fyi/llms-full.txt) (~95k tokens, condensed core: rules, conventions, errors, recipes with one code language, concepts, plans and a summary of every v2 endpoint with links to the full pages; fits in one model context) or [llms-full-complete.txt](https://docs.vaults.fyi/llms-full-complete.txt) (~269k tokens, every page in full; for search or RAG, not for pasting whole). Facts were checked against the live API on 2026-10-23.
 
 Agent essentials (details: [Rules for agents](https://docs.vaults.fyi/ai-agents/rules-for-agents.md), [API conventions](https://docs.vaults.fyi/api-reference/conventions.md)):
 
@@ -384,7 +384,7 @@ Use the specs for code generation and agent tool definitions. Remember to set th
 - beta: [https://api.vaults.fyi/beta/documentation/json](https://api.vaults.fyi/beta/documentation/json)
 - alpha: [https://api.vaults.fyi/alpha/documentation/json](https://api.vaults.fyi/alpha/documentation/json)
 
-The v2 spec's `info.description` says "Basic API key use is limited to 10 requests per minute". That figure is the limit for requests without an API key (per IP), not a plan limit. Keys get 600 to 3,000 requests per minute depending on the plan: see [Plans and pricing](/plans/overview) and the `x-ratelimit-*` headers.
+The v2 spec's `info.description` says "Basic API key use is limited to 10 requests per minute". That figure is not a plan limit. Keys get 600 to 3,000 requests per minute depending on the plan: see [Plans and pricing](/plans/overview) and the `x-ratelimit-*` headers.
 
 ## Transactions are unsigned
 
@@ -994,7 +994,7 @@ v2 and beta disagree here: the same "not found" case is 400 in v2 and 404 in bet
 
 ## 429: rate limit exceeded
 
-Not observed in the captures for these docs, which stayed far below the limit. Rate limits are set per API key in requests per minute and enforced over a 60-second window, with bursts smoothed in 10-second buckets. Requests without a key (including keyless x402 requests) are limited to 10 per minute per IP. Responses that are not successful (status 400 or above) don't count toward the limit.
+Not observed in the captures for these docs, which stayed far below the limit. Rate limits are set per API key in requests per minute and enforced over a 60-second window, with bursts smoothed in 10-second buckets. Responses that are not successful (status 400 or above) don't count toward the limit.
 
 Every authenticated response (including 400, 404 and 500 responses) carries these headers:
 
@@ -1357,7 +1357,7 @@ The [SDK quickstart](/sdk/quickstart) and [SDK reference](/sdk/reference) cover 
 - [Rules for agents](/ai-agents/rules-for-agents)
 - [Credits](/plans/credits)
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: find and rank vaults (top USDC vaults by 7-day APY)
@@ -1656,7 +1656,7 @@ Both printed the same five vaults as the REST call above.
 - [Vault discovery](/concepts/vault-discovery) and [Calculating APY](/methodology/calculating-apy).
 - Next recipes: [paginate all vaults](/recipes/paginate-all-vaults), [display APY correctly](/recipes/display-apy-correctly), [build a deposit](/recipes/deposit-transaction).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: paginate every vault (stop when nextPage is absent)
@@ -1867,13 +1867,13 @@ Python and TypeScript printed identical lines:
 - [Transaction safety](/ai-agents/transaction-safety).
 - [Estimate credit cost](/recipes/estimate-credit-cost) and [find and rank vaults](/recipes/find-and-rank-vaults).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: read and display APY correctly (total, base, reward, apyComposite)
 Source: https://docs.vaults.fyi/recipes/display-apy-correctly
 
-> Executed recipe: read apy.<window>.{base,reward,total} as decimal fractions, pick a window, handle outliers, and use apyComposite on nested vaults, in curl, Python and TypeScript.
+> Executed recipe: read apy.<window>.(base,reward,total) as decimal fractions, pick a window, handle outliers, and use apyComposite on nested vaults, in curl, Python and TypeScript.
 
 This recipe answers "which APY number do I show, and how do I format it?" It reads every APY window of a vault, explains `total` vs `base` vs `reward`, and shows how `apyComposite` changes the answer for nested vaults (vaults whose deposit asset is another vault's share). Use it whenever you render a yield.
 
@@ -2058,7 +2058,7 @@ The second vault ("Covered Steakhouse High Yield Instant") accepts another vault
 - [Transaction safety](/ai-agents/transaction-safety).
 - [Vault history vs benchmark](/recipes/vault-history-vs-benchmark).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: 90 days of daily APY and comparison with the USD benchmark
@@ -2269,13 +2269,13 @@ vault 7d 3.15 % vs USD benchmark 7d 4.07 % -> -92 bp (below benchmark)
 - [Transaction safety](/ai-agents/transaction-safety).
 - [Display APY correctly](/recipes/display-apy-correctly).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: wallet positions with correct balance math
 Source: https://docs.vaults.fyi/recipes/positions-and-balances
 
-> Executed recipe: list a wallet's vault positions with GET /v2/portfolio/positions/{userAddress}, convert asset.positionValueInAsset from base units, and avoid counting asset.balanceNative (the idle wallet balance), in curl, Python and TypeScript.
+> Executed recipe: list a wallet's vault positions with GET /v2/portfolio/positions/:userAddress, convert asset.positionValueInAsset from base units, and avoid counting asset.balanceNative (the idle wallet balance), in curl, Python and TypeScript.
 
 This recipe answers "how much does this wallet hold in each vault, in human units and USD?" It lists all positions on the chosen networks and converts each position size correctly. Use it for portfolio screens and for agents asked "what is my balance in vault X?"
 
@@ -2455,13 +2455,13 @@ Note how the same idle ETH balance (5.7733) appears on every ETH-denominated pos
 - [Errors](/api-reference/errors).
 - [Transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: build, verify and sign a vault deposit (EVM)
 Source: https://docs.vaults.fyi/recipes/deposit-transaction
 
-> Executed recipe: read GET /v2/transactions/context/{userAddress}/{network}/{vaultId}, build GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId} with assetAddress and a base-unit amount, decode and verify every action, then sign in order with viem (shown, not executed), in curl, Python and TypeScript.
+> Executed recipe: read GET /v2/transactions/context/:userAddress/:network/:vaultId, build GET /v2/transactions/deposit/:userAddress/:network/:vaultId with assetAddress and a base-unit amount, decode and verify every action, then sign in order with viem (shown, not executed), in curl, Python and TypeScript.
 
 This recipe answers "how do I deposit N tokens into a vault for a user?" It reads the transaction context, builds the unsigned payload for a base-unit amount, verifies chain, target, value and decoded arguments of every action, and shows how to sign them in order with viem. Use it in wallets, apps and agents that execute deposits. vaults.fyi never signs or holds funds: your wallet signs.
 
@@ -2741,7 +2741,7 @@ The full checklist is on [transaction safety](/ai-agents/transaction-safety).
 - [Errors](/api-reference/errors).
 - [Redeem and queued withdrawals](/recipes/redeem-and-queued-withdrawal) and [Solana deposit](/recipes/solana-deposit).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: withdraw from instant and queued vaults (redeem, request-redeem, claim-redeem)
@@ -3015,13 +3015,13 @@ SEND!=1: not signing (dry run)
 - [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
 - [Build a deposit](/recipes/deposit-transaction) and [claim rewards](/recipes/claim-rewards).
 
-_Updated 2026-10-30. Historical live results: `recipes-tests/RESULTS.md`; the revised arithmetic/unit handling was checked offline, not live-rerun._
+_Updated 2026-10-30. Code ran against the live API on 2026-10-23; the revised arithmetic/unit handling was checked offline, not live-rerun._
 
 
 # Recipe: claim every pending reward for a wallet
 Source: https://docs.vaults.fyi/recipes/claim-rewards
 
-> Executed recipe: read GET /v2/transactions/rewards/context/{userAddress} (claimable is an object keyed by network), pass the claimIds as repeated keys to GET /v2/transactions/rewards/claim/{userAddress}, verify, and sign per network with viem (shown, not executed).
+> Executed recipe: read GET /v2/transactions/rewards/context/:userAddress (claimable is an object keyed by network), pass the claimIds as repeated keys to GET /v2/transactions/rewards/claim/:userAddress, verify, and sign per network with viem (shown, not executed).
 
 This recipe answers "how do I claim every pending reward for this wallet, on every network?" It reads the wallet's claimable rewards, builds the claim transactions per network, verifies them, and shows how to sign them. Use it for "claim all" buttons and reward-harvesting agents. The claimable rewards observed in testing were Merkl rewards.
 
@@ -3238,13 +3238,13 @@ SEND!=1: not signing (dry run)
 - [Errors](/api-reference/errors).
 - [Redeem and queued withdrawals](/recipes/redeem-and-queued-withdrawal).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: near-real-time share price for a deposit preview
 Source: https://docs.vaults.fyi/recipes/near-real-time-share-price
 
-> Executed recipe: read sharePrice, totalAssets, totalSupply and underlyingAssetPrice from GET /v2/nrt/vault/{network}/{vaultId}, convert units with asset and lpToken decimals, and preview shares for a deposit, in curl, Python and TypeScript.
+> Executed recipe: read sharePrice, totalAssets, totalSupply and underlyingAssetPrice from GET /v2/nrt/vault/:network/:vaultId, convert units with asset and lpToken decimals, and preview shares for a deposit, in curl, Python and TypeScript.
 
 This recipe answers "what is the vault's share price right now?" The standard index refreshes about hourly; the near-real-time (NRT) endpoints read fresher on-chain state. The recipe reads all four NRT metrics, checks them against each other, and previews how many shares a 1,000 USDC deposit buys. Use it for deposit previews and fresh TVL figures.
 
@@ -3383,7 +3383,7 @@ preview: 1000 USDC -> ~986.2330 sirloinUSDC
 - [Transaction safety](/ai-agents/transaction-safety).
 - [Build a deposit](/recipes/deposit-transaction).
 
-_Updated 2026-10-30. Historical live results: `recipes-tests/RESULTS.md`; the revised arithmetic/unit handling was checked offline, not live-rerun._
+_Updated 2026-10-30. Code ran against the live API on 2026-10-23; the revised arithmetic/unit handling was checked offline, not live-rerun._
 
 
 # Recipe: handle errors, soft errors and rate limits (402, 401, 400, 429)
@@ -3653,7 +3653,7 @@ So in Python, catch `NetworkError` for exhausted 429/5xx retries (not `RateLimit
 - [x402](/ai-agents/x402): paying without a key.
 - [Transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: estimate the credit cost of a workload (hourly dashboard example)
@@ -3823,7 +3823,7 @@ smallest plan that fits: Growth
 - [Transaction safety](/ai-agents/transaction-safety).
 - [Paginate all vaults](/recipes/paginate-all-vaults).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: map network names and chain IDs, and find a vaultId
@@ -3969,13 +3969,13 @@ optimism       -> optimism
 - [Errors](/api-reference/errors).
 - [Transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: TVL attribution suffix for calldata you build yourself
 Source: https://docs.vaults.fyi/recipes/tvl-attribution-suffix
 
-> Executed recipe: get the attribution suffix from GET /v2/transactions/suffix/{userAddress}/{vaultId} (hex without 0x) and append it to self-encoded calldata; Transactions API payloads already include it.
+> Executed recipe: get the attribution suffix from GET /v2/transactions/suffix/:userAddress/:vaultId (hex without 0x) and append it to self-encoded calldata; Transactions API payloads already include it.
 
 This recipe answers "I build vault transactions myself; how do I get the deposits attributed to my app?" It fetches the attribution suffix and appends it to calldata you encode yourself. If you use the Transactions API payloads, **do nothing**: they already include it. Use it in apps with their own transaction builder.
 
@@ -4087,13 +4087,13 @@ The suffix adds 24 bytes after the ABI-encoded arguments; contracts ignore trail
 - [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
 - [Build a deposit](/recipes/deposit-transaction).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Recipe: Solana (SVM) vault deposit payload (Beta)
 Source: https://docs.vaults.fyi/recipes/solana-deposit
 
-> Executed recipe: build an unsigned Solana deposit with the Beta /beta/svm/transactions/{action}/{userAddress}/{vaultAddress} endpoints (no network segment, base58 addresses, SPL mint as assetAddress, base-unit amount) and decode the base64 transaction, in curl, Python and TypeScript.
+> Executed recipe: build an unsigned Solana deposit with the Beta /beta/svm/transactions/:action/:userAddress/:vaultAddress endpoints (no network segment, base58 addresses, SPL mint as assetAddress, base-unit amount) and decode the base64 transaction, in curl, Python and TypeScript.
 
 This recipe answers "how do I deposit into a Solana vault?" Solana is not a v2 network: it has its own **Beta** endpoints under `/beta/svm/*`, with base58 addresses and no network path segment. The recipe reads the context, builds an unsigned deposit for 1 USDC, and decodes the returned base64 transaction for signing. Use it to add Solana vaults next to EVM ones. Beta endpoints may change; monitor them ([versioning](/api-reference/versioning)).
 
@@ -4244,13 +4244,13 @@ action deposit: type=solana, 777 bytes (unsigned)
 - [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
 - [Build an EVM deposit](/recipes/deposit-transaction).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Vault discovery: detailed-vault fields
 Source: https://docs.vaults.fyi/concepts/vault-discovery
 
-> Field-by-field reference for vault objects from GET /v2/detailed-vaults and GET /v2/detailed-vaults/{network}/{vaultId}: identity, asset, LP token, APY, TVL, score, flags, capacity, fees, transactional support, plus advanced analytics, history and NRT.
+> Field-by-field reference for vault objects from GET /v2/detailed-vaults and GET /v2/detailed-vaults/:network/:vaultId: identity, asset, LP token, APY, TVL, score, flags, capacity, fees, transactional support, plus advanced analytics, history and NRT.
 
 This page explains every field of a vaults.fyi vault object, what unit it is in, and what to use it for, plus the related endpoints for analytics, history and near-real-time state. Use it to build vault lists, vault detail pages and filters, or to decide which vaults to show users. Vault objects come from `GET /v2/detailed-vaults` (list, in `data[]`) and `GET /v2/detailed-vaults/{network}/{vaultId}` (one vault); both need the `x-api-key` header on `https://api.vaults.fyi`. Field names and units below were checked against the v2 OpenAPI spec and live responses captured on 2026-10-23.
 
@@ -4835,7 +4835,7 @@ Related: [Transaction flows](/concepts/transaction-flows), [API conventions](/ap
 # Transaction flows
 Source: https://docs.vaults.fyi/concepts/transaction-flows
 
-> Build unsigned vault transactions: GET /v2/transactions/context/{userAddress}/{network}/{vaultId}, then GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}?assetAddress=&amount=<base units>; execute actions[] in order. No balance check, no simulation.
+> Build unsigned vault transactions: GET /v2/transactions/context/:userAddress/:network/:vaultId, then GET /v2/transactions/:action/:userAddress/:network/:vaultId?assetAddress=&amount=<base units>; execute actions[] in order. No balance check, no simulation.
 
 This page shows how to build deposit, withdrawal (redeem), queued-withdrawal and reward-claim transactions with the vaults.fyi Transactions API, and what to check before the user signs. Use it whenever your app or agent moves funds into or out of a vault. The API returns **unsigned** EVM calls (`to`, `chainId`, `data`, optional `value`) that the user's wallet signs and sends directly to the protocol contract; vaults.fyi never holds funds, inserts no wrapper contract, and does not submit anything. REST auth: `x-api-key` header on `https://api.vaults.fyi`.
 
@@ -5078,7 +5078,7 @@ Payloads from `/v2/transactions/*` already include the attribution suffix, so de
 # TVL attribution
 Source: https://docs.vaults.fyi/concepts/tvl-attribution
 
-> Attribute vault deposits and withdrawals to your app: payloads from /v2/transactions/* already carry the suffix; for your own transactions append the suffix from GET /v2/transactions/suffix/{userAddress}/{vaultId} to calldata, then view attributed TVL in portal.vaults.fyi.
+> Attribute vault deposits and withdrawals to your app: payloads from /v2/transactions/* already carry the suffix; for your own transactions append the suffix from GET /v2/transactions/suffix/:userAddress/:vaultId to calldata, then view attributed TVL in portal.vaults.fyi.
 
 This page explains how to attribute vault deposits and withdrawals to your wallet, app or frontend so you can see the TVL you drive in [portal.vaults.fyi](https://portal.vaults.fyi). Use it if you build vault transactions (yourself or through vaults.fyi) and want reporting, or to qualify for fee-rebate programs where they exist. Attribution works by appending a short suffix to the transaction calldata. The suffix does not change what the transaction does: the user still calls the vault or protocol contract directly, with the same recipient, value and arguments.
 
@@ -5721,7 +5721,7 @@ Related: [Vault discovery](/concepts/vault-discovery), [Glossary](/resources/glo
 # Benchmark rates
 Source: https://docs.vaults.fyi/methodology/benchmark-rates
 
-> How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/{network}?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/{network}.
+> How vaults.fyi USD and ETH benchmark rates are built and how to fetch them: GET /v2/benchmarks/:network?code=usd|eth (code required, one benchmark per call) and GET /v2/historical-benchmarks/:network.
 
 This page explains how vaults.fyi builds its USD and ETH benchmark rates and how to fetch current and historical benchmarks from the API. Use it to compare a vault's APY with the market baseline for the same network and denomination. Benchmarks use the same APY method and units as vaults: decimal fractions (`0.0407` = 4.07%), net of fees, in `apy.<window>.{base,reward,total}`.
 
@@ -8966,7 +8966,7 @@ Example (Real response captured 2026-10-23; arrays trimmed to 2 items): `GET /v2
 
 ## Errors
 
-Declared statuses: `400`, `401`, `402`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
+Declared statuses: `400`, `401`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
 
 _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documentation/json). Last updated: 2026-10-23._
 
@@ -9019,7 +9019,7 @@ Example (Real response captured 2026-10-23; arrays trimmed to 2 items): `GET /v2
 
 ## Errors
 
-Declared statuses: `400`, `401`, `402`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
+Declared statuses: `400`, `401`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
 
 _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documentation/json). Last updated: 2026-10-23._
 
@@ -9072,7 +9072,7 @@ Example (Real response captured 2026-10-23; arrays trimmed to 2 items): `GET /v2
 
 ## Errors
 
-Declared statuses: `400`, `401`, `402`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
+Declared statuses: `400`, `401`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
 
 _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documentation/json). Last updated: 2026-10-23._
 
@@ -9125,7 +9125,7 @@ Example (Real response captured 2026-10-23; arrays trimmed to 2 items): `GET /v2
 
 ## Errors
 
-Declared statuses: `400`, `401`, `402`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
+Declared statuses: `400`, `401`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
 
 _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documentation/json). Last updated: 2026-10-23._
 
@@ -9178,7 +9178,7 @@ Example (Real response captured 2026-10-23; arrays trimmed to 2 items): `GET /v2
 
 ## Errors
 
-Declared statuses: `400`, `401`, `402`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
+Declared statuses: `400`, `401`, `403`, `404`, `408`, `422`, `429`, `500`, `503`. This endpoint needs an API key; it is not offered over x402. Causes, bodies and retry rules: [Errors, rate limits and retries](/api-reference/errors).
 
 _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documentation/json). Last updated: 2026-10-23._
 
@@ -9186,7 +9186,7 @@ _Generated from the vaults.fyi OpenAPI spec (https://api.vaults.fyi/v2/documenta
 # Health: public API liveness check
 Source: https://docs.vaults.fyi/api-reference/health
 
-> Index of the public v2 health endpoint: no API key, free, not rate limited, no rate-limit headers; returns {"status":"Success"} when the API is up. It does not validate your key.
+> Index of the public v2 health endpoint: no API key, free, not rate limited, no rate-limit headers; returns "status":"Success" when the API is up. It does not validate your key.
 
 This section has one endpoint: a public liveness check for uptime monitoring. Unlike every other endpoint, it needs no API key and costs nothing.
 
@@ -9623,7 +9623,7 @@ What you need to know first:
 - **No opt-in header.** Every paid v2 endpoint called **without** `x-api-key` returns `402 Payment Required` with an x402 v2 challenge. Sending `x-402-auth: true` gives the same 402.
 - **The price is `accepts[].amount`**, in USDC base units (6 decimals): `"2000"` = $0.002. There is no `maxAmountRequired` field. That field belongs to x402 v1.
 - **REST only.** The MCP server (`https://mcp.vaults.fyi/mcp`) needs an API key and has no x402 option.
-- **Separate from credits, not from rate limits.** x402 payments don't draw on any account's credits. Keyless requests are limited to 10 per minute per IP.
+- **Separate from credits.** x402 payments don't draw on any account's credits. Unpaid 402 responses carry no rate-limit headers (30 keyless requests in about 11 seconds on 2026-11-06 all returned 402, none 429).
 - **Status of this page:** the 402 challenge and the client libraries' parsing of it were verified on 2026-10-23. **A paid request was not executed end to end**, because no payment was made. The retry and settlement headers below are confirmed from the vaults.fyi API implementation.
 
 ## How the flow works
@@ -9714,14 +9714,18 @@ Prices come from `accepts[].amount` in real 402 responses. **Always read the pri
 | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | exact, batch-settlement | 6000 | $0.006 |
 | `GET /v2/transactions/deposit/{userAddress}/{network}/{vaultId}?assetAddress=…&amount=…` | exact, batch-settlement | 10000 | $0.010 |
 | `GET /v2/transactions/rewards/context/{userAddress}` | exact, batch-settlement | 6000 | $0.006 |
+| `GET /v2/portfolio/best-deposit-options/{userAddress}` (default) | exact, batch-settlement | 202000 | $0.202 |
+| `POST /beta/advanced-analytics` (empty body, default `perPage`) | **upto**, batch-settlement | 1302000 (maximum) | up to $1.302 |
+| `POST /beta/advanced-analytics?perPage=5` | **upto**, batch-settlement | 132000 (maximum) | up to $0.132 |
 | `GET /v2/health` | free (200 with no key) | — | $0 |
 
-The x402 price is the endpoint's credit cost on [Credits](/plans/credits) × $0.002, the pay-as-you-go credit price (2000 USDC base units per credit). List and historical endpoints are priced for the full `perPage` you request. For example, `/v2/detailed-vaults` costs 1 + 3 per vault: (1 + 3 × 50) × 2000 = 302000. List and history prices therefore grow with `perPage`. Historical endpoints use `upto` and settle only for the data points actually returned; other endpoints (including `/v2/detailed-vaults`) charge the quoted amount even if fewer items come back. Always pay the amount in `accepts[].amount`.
+The x402 price is the endpoint's credit cost on [Credits](/plans/credits) × $0.002, the pay-as-you-go credit price (2000 USDC base units per credit). Endpoints that charge per returned item are priced for the full `perPage` you request: `/v2/detailed-vaults`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/historical/*` and the beta lists, including `POST /beta/advanced-analytics`. For example, `/v2/detailed-vaults` costs 1 + 3 per vault: (1 + 3 × 50) × 2000 = 302000, and 3002000 ($3.002) at `perPage=500`. Flat-priced endpoints don't change with `perPage`: `/v2/vaults` and `/v2/assets` cost 2000 whether `perPage` is 1 or 500. Historical endpoints use `upto` and settle only for the data points actually returned; other endpoints (including `/v2/detailed-vaults`) charge the quoted amount even if fewer items come back. Always pay the amount in `accepts[].amount`.
 
 ### Which endpoints are payable
 
-- **Payable (observed 402 with an offer):** `/v2/networks`, `/v2/vaults`, `/v2/detailed-vaults`, `/v2/detailed-vaults/{network}/{vaultId}` and its `/apy`, `/v2/benchmarks/{network}`, `/v2/historical/*` (yes, historical data is payable, via `upto`), `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}`, `/v2/transactions/context/{userAddress}/{network}/{vaultId}`, `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}`, `/v2/transactions/rewards/context/{userAddress}`. The v2 OpenAPI spec declares a 402 response on every v2 operation except `/v2/health`.
-- **Also payable:** every other `/v2/*` data endpoint (for example `/v2/tags`, `/v2/assets`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/transactions/rewards/claim/{userAddress}`) and `POST /beta/advanced-analytics` (and its single-vault variant, via `upto`).
+- **Payable (observed 402 with an offer):** `/v2/networks`, `/v2/vaults`, `/v2/detailed-vaults`, `/v2/detailed-vaults/{network}/{vaultId}` and its `/apy`, `/v2/benchmarks/{network}`, `/v2/historical/*` (yes, historical data is payable, via `upto`), `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, `/v2/portfolio/best-vault/{userAddress}`, `/v2/transactions/context/{userAddress}/{network}/{vaultId}`, `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}`, `/v2/transactions/rewards/context/{userAddress}`. The v2 OpenAPI spec declares a 402 response on every v2 operation except `/v2/health`, including `/v2/nrt/*`, which is not payable (see below).
+- **API key only (no x402 offer):** `/v2/nrt/*`. Without a key it returns 401 and no payment offer (re-checked 2026-11-06), even though the OpenAPI spec declares a 402 response on it.
+- **Also payable:** the other `/v2/*` data endpoints (for example `/v2/tags`, `/v2/assets`, `/v2/portfolio/best-deposit-options/{userAddress}`, `/v2/transactions/rewards/claim/{userAddress}`) and `POST /beta/advanced-analytics` (and its single-vault variant, via `upto`).
 - **Don't buy:** `/v2/transactions/suffix/{userAddress}/{vaultId}` returns a 402 challenge, but it needs an API key with attribution enabled, so a keyless call always fails with 400 (and is not charged).
 
 ## TypeScript: `@x402/fetch`
@@ -9795,7 +9799,7 @@ If every offer is filtered out, the call raises `PaymentError: Failed to handle 
 
 ### Notes on the `upto` scheme
 
-Historical endpoints offer only `upto` and `batch-settlement`. In both libraries the `upto` client signs a Permit2 authorization, so the wallet needs a USDC allowance for the Permit2 contract (a one-time on-chain approval that costs gas). This is inferred from the library source and was not tested. If you only register `exact`, historical requests fail with no matching scheme, and you pay nothing.
+Historical endpoints offer only `upto` and `batch-settlement`. In both libraries the `upto` client signs a Permit2 authorization, so before the first `upto` payment approve USDC to the Permit2 contract: a one-time on-chain approval, paid in Base ETH for gas. In TypeScript, `@x402/evm/upto/client` exports `getPermit2AllowanceReadParams` (check the current allowance) and `createPermit2ApprovalTx` (build the approval transaction); in Python, the `upto` client (`x402.mechanisms.evm.upto.client`) builds the Permit2 payload. The approval and a paid `upto` request were not executed for these docs. If you only register `exact`, historical requests fail with no matching scheme, and you pay nothing. The `upto` offer's `extra.facilitatorAddress` changes from one 402 response to the next, so read it from each challenge and don't pin it.
 
 ### The vaults.fyi SDK's keyless mode
 
@@ -9805,9 +9809,10 @@ The previous version of this page imported `wrapAxios` from `x402/axios` and `Cl
 
 ## Budget and failure handling
 
-- **Cap every payment.** Filter `accepts[]` by `amount` before signing (both examples do). Both libraries also refuse payments above $1 by default (`DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"`). A `/v2/detailed-vaults` call with `perPage=5000` would cost about $30 and is refused by that default.
+- **Package versions.** The examples were tested with `@x402/*` 2.28.0 and `x402` 2.25.0. Newer releases exist (`@x402/*` 2.31.0 on npm, `x402` 2.28.0 on PyPI as of 2026-11-06); re-test before upgrading.
+- **Cap every payment.** Filter `accepts[]` by `amount` before signing (both examples do). Both libraries also refuse payments above $1 by default (`DEFAULT_MAX_AMOUNT_PER_PAYMENT = "$1"`). A `/v2/detailed-vaults` call with `perPage=5000` would cost about $30 and is refused by that default. So is `POST /beta/advanced-analytics` with its default page size (up to $1.302): pass a smaller `perPage` query parameter (`?perPage=5` quotes up to $0.132). Choosing fewer `select` fields did not lower the quote on 2026-11-06; the maximum depends on `perPage`.
 - **Cap total spend.** Track the sum of paid `amount`s per day in your agent and stop when you reach the budget.
-- **Keep `perPage` small** on list and history endpoints: their price grows with `perPage`.
+- **Keep `perPage` small** on endpoints priced per returned item (detailed vaults, best deposit options, history, advanced analytics): their price grows with `perPage`.
 - **Do not retry a paid request blindly.** Payment is settled only when the request returns 200, so a failed paid retry (4xx or 5xx) is not charged. If settlement itself fails you get a 402 and no data. Read the response before paying again: a second successful request is a second charge.
 - **Use a dedicated wallet** with only the USDC you are willing to spend. Never load the user's main key into an x402 client.
 - **402 vs 401:** 402 means no key was sent (pay, or add `x-api-key`). 401 means an invalid key was sent; no x402 offer is made.
@@ -9820,7 +9825,7 @@ The previous version of this page imported `wrapAxios` from `x402/axios` and `Cl
 - [Credits](/plans/credits): credit cost per endpoint (the x402 price is credits × $0.002)
 - [MCP server](/ai-agents/mcp-server): needs an API key; no x402
 
-_Last updated: 2026-10-23. Facts on this page were checked against the live API and MCP server on that date._
+_Last updated: 2026-11-06. Facts on this page were checked against the live API and MCP server on 2026-10-23; prices, NRT, `perPage` scaling and keyless rate limiting were re-checked on 2026-11-06._
 
 
 # Transaction safety: what to verify before signing a vaults.fyi transaction
@@ -10130,7 +10135,7 @@ Steakhouse High Yield USDC Edition 7d APY 3.15 %
 - [Recipes](/recipes/overview): the same tasks in curl, Python and TypeScript.
 - [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed on that date from a clean install, except the `export` line, which contains a placeholder._
 
 
 # SDK reference: every @vaultsfyi/sdk and vaultsfyi method with its REST endpoint
@@ -10643,7 +10648,7 @@ Report SDK issues to the maintainers; see the package pages on npm and PyPI.
 - [Transaction safety](/ai-agents/transaction-safety)
 - [Recipes](/recipes/overview) and [credits](/plans/credits)
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Tutorial: add yield to a wallet with the vaults.fyi SDK
@@ -10878,7 +10883,7 @@ The position size is `asset.positionValueInAsset` (asset base units). `asset.bal
 - [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors).
 - [For wallets and apps](/use-cases/for-wallets-and-apps).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # Tutorial: yield analytics with the vaults.fyi SDK
@@ -11068,7 +11073,7 @@ Output (2026-10-23):
 - [Paginate all vaults](/recipes/paginate-all-vaults), [vault history vs benchmark](/recipes/vault-history-vs-benchmark), [display APY correctly](/recipes/display-apy-correctly), [estimate credit cost](/recipes/estimate-credit-cost).
 - [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-_Last updated: 2026-10-23. Every code block on this page was executed on that date (results: `recipes-tests/RESULTS.md`)._
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._
 
 
 # API plans, pricing and rate limits
@@ -11103,7 +11108,7 @@ Who each plan is for:
 
 ## Rate limits
 
-Rate limits are set per API key as a number of requests per minute, enforced over a 60-second window, with bursts smoothed in 10-second buckets (about one sixth of the per-minute limit per 10 seconds). Requests without a key, including keyless x402 requests, are limited to 10 per minute per IP; that default is the "10 requests per minute" in the v2 spec. Limits per plan:
+Rate limits are set per API key as a number of requests per minute, enforced over a 60-second window, with bursts smoothed in 10-second buckets (about one sixth of the per-minute limit per 10 seconds). Limits per plan:
 
 | Plan | Requests per minute | Average per second |
 | - | - | - |
@@ -11112,7 +11117,6 @@ Rate limits are set per API key as a number of requests per minute, enforced ove
 | Growth | 1,200 | 20 |
 | Builder | 3,000 | 50 |
 | Enterprise | Custom | Custom |
-| No API key (including x402) | 10 per IP | — |
 
 Limits can be raised for an individual key on request. The `x-ratelimit-limit` header shows the limit applied to your key: rely on it rather than on the plan name.
 
@@ -11140,7 +11144,7 @@ Pay-as-you-go keys have no spending cap: usage is billed per credit with no uppe
 
 AI agents and other autonomous clients can call v2 REST endpoints without an API key by paying per request in USDC on Base with [x402](/ai-agents/x402). A v2 request sent without `x-api-key` returns HTTP 402 with the price. The price is the endpoint's credit cost × $0.002 (see [Credits → Credits and x402 prices](/plans/credits#credits-and-x402-prices)). x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints and the MCP server need a key.
 
-x402 payments don't draw on account credits. They are not exempt from rate limits: keyless traffic is limited to 10 requests per minute per IP.
+x402 payments don't draw on account credits.
 
 ## Get a key or change plan
 
@@ -11389,9 +11393,9 @@ Requests sent **without** an API key to a v2 endpoint get an HTTP 402 [x402](/ai
 | `GET /v2/historical/base/{vaultId}/apy?perPage=1` | 4000 (scheme `upto`, a maximum) | $0.004 | 1 + 1 × 1 = 2 |
 | `GET /v2/historical/base/{vaultId}/apy?perPage=10` | 22000 (scheme `upto`, a maximum) | $0.022 | 1 + 10 × 1 = 11 |
 
-The x402 price is defined as the credit cost × $0.002 (2000 USDC base units per credit), with list and historical endpoints priced for the full `perPage` you request. Historical endpoints use the `upto` scheme and settle only for the data points actually returned; other endpoints, including `/v2/detailed-vaults`, charge the quoted amount even if fewer items come back. x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints need an API key. Always pay the amount in `accepts[].amount` rather than hard-coding it.
+The x402 price is defined as the credit cost × $0.002 (2000 USDC base units per credit), with endpoints that charge per returned item (detailed vaults, best deposit options, historical, the beta lists) priced for the full `perPage` you request; flat-priced endpoints such as `/v2/vaults` don't change with `perPage`. Historical endpoints use the `upto` scheme and settle only for the data points actually returned; other endpoints, including `/v2/detailed-vaults`, charge the quoted amount even if fewer items come back. x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints need an API key. Always pay the amount in `accepts[].amount` rather than hard-coding it.
 
-x402 payments don't draw on account credits. Keyless (x402) traffic is limited to 10 requests per minute per IP.
+x402 payments don't draw on account credits.
 
 ## When credits run out
 
@@ -11783,7 +11787,7 @@ _Last updated: 2026-10-23. Facts on this page were checked against the live API 
 # vaults.fyi for protocols and curators: get listed, check your vault data, track attribution
 Source: https://docs.vaults.fyi/use-cases/for-protocols
 
-> How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/{network}/{vaultId}, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi.
+> How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/:network/:vaultId, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi.
 
 This page explains how a protocol or curator gets vaults into vaults.fyi, how to check what integrators see about a vault, and how to measure the capital partners route to it. Use it when you want wallets, apps, analysts and agents building on vaults.fyi to surface your vaults.
 

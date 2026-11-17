@@ -31,7 +31,7 @@ Who each plan is for:
 
 ## Rate limits
 
-Rate limits are set per API key as a number of requests per minute, enforced over a 60-second window, with bursts smoothed in 10-second buckets (about one sixth of the per-minute limit per 10 seconds). Requests without a key, including keyless x402 requests, are limited to 10 per minute per IP; that default is the "10 requests per minute" in the v2 spec. Limits per plan:
+Rate limits are set per API key as a number of requests per minute, enforced over a 60-second window, with bursts smoothed in 10-second buckets (about one sixth of the per-minute limit per 10 seconds). Limits per plan:
 
 | Plan | Requests per minute | Average per second |
 | - | - | - |
@@ -40,7 +40,6 @@ Rate limits are set per API key as a number of requests per minute, enforced ove
 | Growth | 1,200 | 20 |
 | Builder | 3,000 | 50 |
 | Enterprise | Custom | Custom |
-| No API key (including x402) | 10 per IP | — |
 
 Limits can be raised for an individual key on request. The `x-ratelimit-limit` header shows the limit applied to your key: rely on it rather than on the plan name.
 
@@ -68,7 +67,7 @@ Pay-as-you-go keys have no spending cap: usage is billed per credit with no uppe
 
 AI agents and other autonomous clients can call v2 REST endpoints without an API key by paying per request in USDC on Base with [x402](/ai-agents/x402). A v2 request sent without `x-api-key` returns HTTP 402 with the price. The price is the endpoint's credit cost × $0.002 (see [Credits → Credits and x402 prices](/plans/credits#credits-and-x402-prices)). x402 is available on `/v2/*` data endpoints and `POST /beta/advanced-analytics`; NRT, other beta and alpha endpoints and the MCP server need a key.
 
-x402 payments don't draw on account credits. They are not exempt from rate limits: keyless traffic is limited to 10 requests per minute per IP.
+x402 payments don't draw on account credits.
 
 ## Get a key or change plan
 
