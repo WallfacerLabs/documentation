@@ -1,105 +1,84 @@
 ---
-title: "Get Your Vaults Discovered and Integrated"
-description: "List your DeFi vaults on Vaults.fyi to reach wallets, apps, and analysts. Earn attribution, monitor integration performance, and improve discovery."
+title: "vaults.fyi for protocols and curators: get listed, check your vault data, track attribution"
 sidebarTitle: "For Protocols"
+description: "How protocols and curators get vaults listed on vaults.fyi (protocol request form, onchain data requirements), check how a vault appears (GET /v2/detailed-vaults/:network/:vaultId, score, warnings), read holders and flows, and see partner-attributed TVL in portal.vaults.fyi."
 ---
 
-Vaults.fyi is the distribution layer that connects DeFi protocols to the wallets and apps their users already trust. When your vaults are indexed by Vaults.fyi, they become accessible to every integration built on the API — including ecosystem surfaces like [Arbitrum Earn](/resources/case-studies/arbitrum), wallets like Kraken Wallet, aggregators like Jumper Earn, and analytics tools used by researchers and asset managers.
+This page explains how a protocol or curator gets vaults into vaults.fyi, how to check what integrators see about a vault, and how to measure the capital partners route to it. Use it when you want wallets, apps, analysts and agents building on vaults.fyi to surface your vaults.
+
+REST requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. APY values are decimal fractions net of fees.
 
 ## Why it matters
 
-Protocols need distribution, but partners need more than a vault address. They need APY methodology, risk context, transaction support, and a way to measure the capital they drive. Vaults.fyi packages that information in one integration.
-
-Use Vaults.fyi to:
-
-- Make vaults discoverable through wallets, apps, analytics tools, and agent workflows.
-- Give integrators standardized APY, TVL, fees, rewards, curator, and risk fields.
-- Show performance relative to market benchmark rates.
-- Measure attributed deposits, withdrawals, and retained TVL from partner surfaces.
-
-## How your vaults get discovered
-
-Vaults.fyi indexes yield strategies directly from onchain contracts. Once your vault meets the inclusion criteria, it appears in API responses for any application querying for vaults by asset, network, or protocol.
-
-<CardGroup cols={2}>
-  <Card title="API exposure" icon="code" href="/api-reference/detailed-vaults">
-    Your vaults appear in `GET /v2/detailed-vaults` responses. Any developer building on the API can filter, rank, and surface your vaults to their users.
-  </Card>
-
-  <Card title="Wallet integrations" icon="wallet" href="/use-cases/for-wallets-and-apps">
-    Wallets and consumer apps that use Vaults.fyi for yield discovery automatically include your vaults in their product — no separate partnership required.
-  </Card>
-
-  <Card title="Analytics coverage" icon="chart-bar" href="/use-cases/for-analysts">
-    Researchers and analysts querying DeFi yield data will see your vaults alongside competitors, with standardized metrics that make comparison straightforward.
-  </Card>
-
-  <Card title="Attribution tracking" icon="bullseye-arrow" href="/concepts/tvl-attribution">
-    Track how much volume flows into your vaults through Vaults.fyi integrations. Understand which wallets and apps are driving deposits.
-  </Card>
-</CardGroup>
-
-## Vault inclusion criteria
-
-Vaults.fyi indexes vaults that meet a baseline quality threshold. Factors considered include:
-
-- **Audit status** — vaults should have a public audit by a recognized security firm
-- **Minimum TVL** — a meaningful TVL floor filters out inactive or test deployments
-- **Contract verification** — onchain contract code must be verified and readable
-- **Asset support** — the underlying asset must be a recognized stablecoin, ETH, or major ERC-20
-
-<Note>
-  Inclusion is not guaranteed and Vaults.fyi reserves the right to exclude vaults that pose material risk to users. If your vault has been excluded and you believe it meets the criteria, [contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to discuss.
-</Note>
-
-## Reputation scores
-
-Every indexed vault receives a reputation score that signals its relative safety and reliability to integrators and users. The score is calculated from:
-
-- **Longevity** — how long the vault has been live onchain
-- **TVL trajectory** — whether TVL has been stable, growing, or declining
-- **Yield volatility** — how much APY fluctuates over time
-- **Underlying asset health** — the risk profile of the assets held in the vault
-
-A higher reputation score means your vault is more likely to be surfaced in filtered discovery flows (for example, when a wallet only shows vaults above a certain score). Improving vault stability and longevity over time naturally improves the score.
-
-<Tip>
-  You can query your own vault's reputation score at any time using `GET /v2/detailed-vaults` filtered by your vault address. Use this to monitor how your score changes as your vault matures.
-</Tip>
-
-## Position data and portfolio intelligence
-
-Vaults.fyi tracks wallet-level positions inside your vaults. This means users who deposit through any Vaults.fyi-powered integration can see their position, accrued returns, and estimated APY in the portfolio view — with your vault correctly attributed.
-
-Protocols can use the same portfolio endpoints to:
-
-- Understand the distribution of user positions in their vaults
-- Identify large depositors across integrated wallets
-- Measure user retention and redemption patterns
-
-## Benchmark performance context
-
-Your vault's yield is displayed alongside the [Vaults.fyi USD benchmark rate](/methodology/benchmark-rates) — the risk-adjusted reference rate for DeFi stablecoin strategies. This gives users and analysts immediate context for whether your vault is outperforming or underperforming the market.
-
-Performing above the benchmark is a signal that surfaces well in discovery flows and analyst workflows. Methodology for APY calculation is [fully documented](/methodology/calculating-apy) so you can verify how your vault's yield is represented.
+Every integration built on the API (wallets, Earn surfaces, aggregators, analytics tools, agents) queries the same normalized dataset. A listed vault appears in their results when it matches their filters: asset, network, TVL, Reputation Score, warnings and APY. Teams using vaults.fyi include [Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper Earn](/resources/case-studies/jumper-earn), [Kraken Wallet](/resources/case-studies/kraken-wallet), [Gauntlet](/resources/case-studies/gauntlet), [Maple Finance](/resources/case-studies/maple-finance) and [KPK](/resources/case-studies/kpk).
 
 ## Getting listed
 
-<Steps>
-  <Step title="Check inclusion criteria">
-    Review the vault requirements above and confirm your vault is audited, verified onchain, and has meaningful TVL.
-  </Step>
-  <Step title="Contact the team">
-    [Sign up](https://portal.vaults.fyi/signup) and submit your vault addresses, networks, and audit links. The team will confirm eligibility and expected timeline.
-  </Step>
-  <Step title="Verify indexing">
-    Once indexed, query `GET /v2/detailed-vaults` with your vault address to confirm it appears with correct APY, TVL, and metadata.
-  </Step>
-  <Step title="Monitor attribution">
-    Use the analytics endpoints to track deposit volume, position counts, and which integrations are driving activity to your vaults.
-  </Step>
-</Steps>
+1. **Check the data requirements.** vaults.fyi indexes vaults from onchain data: TVL, share supply, price per share, deposit limit, available liquidity, the underlying token, the share token and reward emissions must be readable from the vault's contracts (ERC-4626 vaults expose most of this). The full list is in the [FAQ](/resources/faq#what-does-a-vault-need-to-be-listed). Priority goes to protocols with significant traction and customer demand.
+2. **Submit the protocol.** Use the [protocol request form](https://listings.vaults.fyi/), or contact [@vaultsfyi](https://twitter.com/vaultsfyi) on X or Farcaster. The team reviews each protocol before integrating it.
+3. **Verify indexing.** Once listed, check the vault with the call below.
 
-<Info>
-  If you are a protocol or product team and want to discuss a deeper integration — including co-marketing with wallet partners — [contact us](https://vaultsfyi.fillout.com/t/tLA9t6HyAFus) to collaborate.
-</Info>
+Once a protocol and network are supported, its vaults are listed automatically when the deposit asset is on the reviewed asset list, the vault holds non-trivial TVL, and it has produced fresh hourly data in the last 60 days. Audit status is not a listing input. Earlier versions of this page listed an audit requirement and a minimum TVL; those were wrong.
+
+## Check how your vault appears
+
+Look the vault up directly by network and `vaultId` (3 credits). There is no "filter by vault address" on the list endpoint: unknown query parameters are ignored and you would get the default list.
+
+```bash
+# Check how your vault appears in the API: one vault by network + vaultId (3 credits).
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+| jq '{name, protocol: .protocol.name, isTransactional, apy7d: .apy["7day"].total, tvlUsd: .tvl.usd,
+       vaultScore: .score.vaultScore, warnings: [.warnings[]?], holders: .holdersData.totalCount}'
+```
+
+Output (2026-10-23, Steakhouse High Yield USDC on Base):
+
+```json
+{
+  "name": "Steakhouse High Yield USDC Edition",
+  "protocol": "morpho",
+  "isTransactional": true,
+  "apy7d": 0.0315,
+  "tvlUsd": "468440351",
+  "vaultScore": 81.7485752746402,
+  "warnings": [],
+  "holders": 45152
+}
+```
+
+What integrators filter on, and where it comes from:
+
+| Field | Meaning |
+| - | - |
+| `apy.<window>.total` | Realized yield (share price + rewards), net of fees ([calculating APY](/methodology/calculating-apy)) |
+| `tvl.usd` | TVL in USD |
+| `score.vaultScore` | Reputation Score (0 to 100; observed 27.5–99.1): protocol TVL history 45 %, vault TVL history 25 %, holder distribution 15 %, asset 15 %, minus penalties ([Reputation Score](/methodology/reputation-score)) |
+| `warnings[]`, `flags[]` | Risk signals; many integrators hide vaults with warnings (`allowVaultsWithWarnings=false`) |
+| `isTransactional` | Whether the Transactions API can build deposits for the vault |
+
+## Benchmark context
+
+Each network has a USD and an ETH benchmark: the TVL-weighted APY of the five largest vaults of that denomination with at least $1M TVL ([benchmark rates](/methodology/benchmark-rates)). Integrators and analysts compare vaults against it; the [vault history vs benchmark](/recipes/vault-history-vs-benchmark) recipe shows the call.
+
+## Holders and flows
+
+The portfolio endpoints are per wallet: they show one user's positions, not your vault's depositor base. For vault-level data:
+
+- `holdersData.totalCount` and `holdersData.topHolders[]` on `GET /v2/detailed-vaults/{network}/{vaultId}`,
+- `GET /alpha/{network}/{vaultId}/holders`: holder list with balances (Alpha),
+- `GET /alpha/historical/{network}/{vaultId}/daily-flows`: daily inflows and outflows (Alpha).
+
+Alpha endpoints may change without notice ([versioning](/api-reference/versioning)).
+
+## Attribution of partner flows
+
+Deposits built through the Transactions API, or tagged with the attribution suffix, are attributed to the integrating account. Attributed TVL is shown in [portal.vaults.fyi](https://portal.vaults.fyi) by protocol, curator, vault and user; it is not available through the API (large partners can ask the team about API access). See [TVL attribution](/concepts/tvl-attribution).
+
+## Related pages
+
+- [Supported protocols and networks](/concepts/supported-protocols) and [FAQ](/resources/faq).
+- [Reputation Score](/methodology/reputation-score), [calculating APY](/methodology/calculating-apy).
+- [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
+
+_Last updated: 2026-10-23. Facts on this page were checked against the live API on that date; any code shown was executed then._

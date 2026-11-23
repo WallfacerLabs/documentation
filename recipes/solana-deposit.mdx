@@ -1,0 +1,156 @@
+---
+title: "Recipe: Solana (SVM) vault deposit payload (Beta)"
+sidebarTitle: "Solana deposit"
+description: "Executed recipe: build an unsigned Solana deposit with the Beta /beta/svm/transactions/:action/:userAddress/:vaultAddress endpoints (no network segment, base58 addresses, SPL mint as assetAddress, base-unit amount) and decode the base64 transaction, in curl, Python and TypeScript."
+---
+
+This recipe answers "how do I deposit into a Solana vault?" Solana is not a v2 network: it has its own **Beta** endpoints under `/beta/svm/*`, with base58 addresses and no network path segment. The recipe reads the context, builds an unsigned deposit for 1 USDC, and decodes the returned base64 transaction for signing. Use it to add Solana vaults next to EVM ones. Beta endpoints may change; monitor them ([versioning](/api-reference/versioning)).
+
+Requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Beta endpoints need an API key. All code on this page was run on 2026-10-23; outputs are real. Nothing was signed.
+
+## Benchmark tasks covered
+
+T24 (Solana (SVM) deposit). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- A Solana wallet public key and a vault address from `GET /beta/svm/detailed-vaults`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+. To sign: `solders`/`solana-py` (Python) or `@solana/web3.js` (TypeScript), not shown executing.
+
+## Credit cost
+
+Context 3 + payload 5 = **8 credits** ([credits](/plans/credits)).
+
+## EVM vs SVM paths
+
+| | EVM (v2) | Solana (Beta) |
+| - | - | - |
+| Context | `/v2/transactions/context/{userAddress}/{network}/{vaultId}` | `/beta/svm/transactions/context/{userAddress}/{vaultAddress}` |
+| Payload | `/v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | `/beta/svm/transactions/{action}/{userAddress}/{vaultAddress}` |
+| Actions | deposit, redeem, request-redeem, claim-redeem, … | deposit, redeem, request-redeem, confirm-redeem, complete-redeem |
+| `tx` | `{ to, chainId, data, value? }` | `{ type: "solana", transaction: <base64> }` |
+
+`assetAddress` is the SPL mint (USDC: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`, taken from the context response). `amount` is base units: 1 USDC = `1000000`, 50 USDC = `50000000`.
+
+## curl
+
+```bash
+# Solana (SVM) deposit, BETA: no network segment, base58 addresses, base64 transaction. Read-only.
+USER=9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM          # Solana wallet (public key)
+VAULT=2vVYHYM8VYnvZqQWpTJSj8o8DBf1wM8pVs3bsTgYZiqJ         # JupLend USDC
+USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+curl -sS --fail-with-body "https://api.vaults.fyi/beta/svm/transactions/context/$USER/$VAULT" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" | jq '{currentDepositStep, asset: .asset | {address, symbol, decimals, balanceNative}}'
+# 1 USDC = 1000000 base units (50 USDC would be 50000000)
+curl -sS --fail-with-body -G "https://api.vaults.fyi/beta/svm/transactions/deposit/$USER/$VAULT" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "assetAddress=$USDC_MINT" --data-urlencode "amount=1000000" \
+| jq '{currentActionIndex, actions: [.actions[] | {name, type: .tx.type, base64Bytes: (.tx.transaction | length)}]}'
+```
+
+Output (2026-10-23):
+
+```json
+{
+  "currentDepositStep": "deposit",
+  "asset": {
+    "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "symbol": "USDC",
+    "decimals": 6,
+    "balanceNative": "1108086785"
+  }
+}
+{
+  "currentActionIndex": 0,
+  "actions": [
+    {
+      "name": "deposit",
+      "type": "solana",
+      "base64Bytes": 1036
+    }
+  ]
+}
+```
+
+`base64Bytes` is the length of the base64 string; decoded, the transaction is 777 bytes.
+
+## Python
+
+```python
+"""Solana (SVM, Beta) deposit payload: base58 addresses, no network segment, base64 transaction. Read-only."""
+import base64
+import os
+from decimal import Decimal
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"   # Solana wallet public key
+VAULT = "2vVYHYM8VYnvZqQWpTJSj8o8DBf1wM8pVs3bsTgYZiqJ"  # JupLend USDC (from /beta/svm/detailed-vaults)
+
+ctx = requests.get(f"{API}/beta/svm/transactions/context/{USER}/{VAULT}", headers=HEADERS, timeout=60).json()
+asset = ctx["asset"]  # asset.address is the SPL mint
+amount = int(Decimal("1") * 10 ** asset["decimals"])  # 1 USDC -> 1000000 (50 USDC -> 50000000)
+print(f"next step {ctx['currentDepositStep']}, mint {asset['address']}, balance {asset['balanceNative']} base units")
+
+r = requests.get(f"{API}/beta/svm/transactions/deposit/{USER}/{VAULT}", headers=HEADERS, timeout=60,
+                 params={"assetAddress": asset["address"], "amount": str(amount)})
+r.raise_for_status()
+for a in r.json()["actions"]:
+    raw = base64.b64decode(a["tx"]["transaction"])  # serialized Solana transaction, unsigned
+    print(f"action {a['name']}: type={a['tx']['type']}, {len(raw)} bytes -> deserialize with solders/solana-py, sign, send")
+```
+
+Output:
+
+```text
+next step deposit, mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, balance 1108086785 base units
+action deposit: type=solana, 777 bytes -> deserialize with solders/solana-py, sign, send
+```
+
+## TypeScript
+
+```typescript
+// Solana (SVM, Beta) deposit payload: base58 addresses, no network segment, base64 transaction. Read-only.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM'; // Solana wallet public key
+const VAULT = '2vVYHYM8VYnvZqQWpTJSj8o8DBf1wM8pVs3bsTgYZiqJ'; // JupLend USDC
+
+const get = async (p: string) => { const r = await fetch(`${API}${p}`, { headers }); if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`); return r.json(); };
+
+const ctx = await get(`/beta/svm/transactions/context/${USER}/${VAULT}`);
+const amount = 10n ** BigInt(ctx.asset.decimals); // 1 USDC in base units
+const qs = new URLSearchParams({ assetAddress: ctx.asset.address, amount: amount.toString() });
+const payload = await get(`/beta/svm/transactions/deposit/${USER}/${VAULT}?${qs}`);
+for (const a of payload.actions) {
+  const bytes = Buffer.from(a.tx.transaction, 'base64');
+  // With @solana/web3.js: VersionedTransaction.deserialize(bytes), then sign with the user's wallet.
+  console.log(`action ${a.name}: type=${a.tx.type}, ${bytes.length} bytes (unsigned)`);
+}
+```
+
+Output:
+
+```text
+action deposit: type=solana, 777 bytes (unsigned)
+```
+
+## Pitfalls
+
+- **`/v2/transactions/deposit/...` with `network=solana`.** There is no Solana v2 network.
+- **Human amounts.** `amount=50` is 0.00005 USDC.
+- **Stale transactions.** Solana transactions embed a recent blockhash and expire within minutes; build right before signing.
+- **Different action names.** SVM redemptions use `confirm-redeem` and `complete-redeem`, not `claim-redeem`.
+- **Beta stability.** Paths and shapes may change without notice; pin tests to these responses.
+
+## Related pages
+
+- [Beta API](/api-reference/beta) and [versioning](/api-reference/versioning).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
+- [Build an EVM deposit](/recipes/deposit-transaction).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

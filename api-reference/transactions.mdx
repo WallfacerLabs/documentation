@@ -1,49 +1,89 @@
 ---
-title: "Transactions"
-description: "Ready-to-sign transaction payloads for deposits, redemptions, and reward claims."
+title: "Transactions: unsigned deposit, redeem and reward-claim payloads"
+sidebarTitle: "Transactions"
+description: "Index of the v2 transaction endpoints: context first, then unsigned ordered actions for deposit, redeem and reward claims (amounts in base units, no simulation, no balance check), with credit costs and links to every endpoint page."
 ---
 
-Generates ready-to-sign transaction calldata for any supported vault action. Pass the output directly to your wallet provider — no ABI encoding required.
+This section lists the v2 endpoints that build **unsigned** EVM transactions for vault actions and reward claims. The API returns calldata only. It never signs, broadcasts, simulates or checks balances. Your app or agent must verify each payload and have the user sign it.
+
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key. Amounts are integer strings in the asset's base units: 1 USDC (6 decimals) is `amount=1000000`, and `amount=1.5` returns 400.
+
+## Endpoints
+
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-context) | Call first: which deposit/redeem steps apply, the next step, wallet balances (base units), pending requests and claimable rewards for one vault. | Path: `userAddress`, `network`, `vaultId` | 3 |
+| [`GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-payload) | Build **unsigned** ordered `actions[]` (e.g. approve then deposit). `amount` is a base-unit integer string; `all=true` redeems a full position. No balance check, no simulation. | Path: `action`, `userAddress`, `network`, `vaultId`; Query: `assetAddress` | 5 |
+| [`GET /v2/transactions/rewards/context/{userAddress}`](/api-reference/transactions/get-rewards-context) | List claimable rewards by network; each entry has the `claimId` you pass to the claim endpoint. | Path: `userAddress` | 3 |
+| [`GET /v2/transactions/rewards/claim/{userAddress}`](/api-reference/transactions/claim-rewards) | Build unsigned reward-claim transactions for `claimIds` (repeat the key per ID). | Path: `userAddress`; Query: `claimIds` | 5 |
+| [`GET /v2/transactions/suffix/{userAddress}/{vaultId}`](/api-reference/transactions/get-transaction-suffix) | Get the attribution suffix for your own calldata. v2 transaction payloads already end with it. | Path: `userAddress`, `vaultId` | 1 |
+
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit.
 
 ## Typical flow
 
-1. **Check what the user can do**
+1. `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`: read which steps apply (`depositSteps`, `redeemSteps`), the next step, the wallet's balances (base units), any pending requests, and claimable rewards.
+2. `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}?assetAddress=…&amount=…`: build the payload. Actions include `deposit`, `redeem`, `request-redeem`, `request-deposit`, `claim-redeem`, `claim-deposit`, `claim-rewards` and `start-redeem-cooldown`. `assetAddress` is required; use the vault's `asset.address`. Use `all=true` instead of `amount` to redeem a full position.
+3. Execute `actions[]` **in order** (for example, approve and then deposit), waiting for each to confirm. Before each signature, verify `tx.chainId` matches the network, `tx.to` is the asset (for approvals) or the vault, and the amount is what the user intended.
 
-   Call `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` to fetch the user's balances, limits, supported actions, required steps, and rewards context for that vault.
+Things to know:
 
-2. **Build the transaction payload**
+- Path order is user, then network, then vault. `/v2/transactions/context/{network}/{userAddress}/{vaultId}` returns 400.
+- `tx.value` is omitted on ERC-20 flows. Treat a missing `value` as `0`.
+- `simulate` is deprecated and ignored. No `simulation` object is returned. Simulate client-side (for example with `eth_call`) if you need guarantees.
+- There is no balance check: a deposit larger than the wallet balance still returns a payload. Compare with the context's balance first.
+- Every payload's `data` already ends with your attribution suffix. Call the suffix endpoint only if you build calldata yourself. See [TVL attribution](/concepts/tvl-attribution).
+- Rewards are two calls: get `claimId`s from the rewards context, then pass them as repeated `claimIds` keys to the claim endpoint.
 
-   Call `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` with the action you want to prepare. Include `assetAddress` and either `amount` for a specific amount or `all=true` for a full redeem-style action.
-
-3. **Send the returned transaction with the user's wallet**
-
-   The response includes the target address, calldata, and value. You do not need to encode the vault contract call yourself.
+## Example
 
 ```bash
-curl "https://api.vaults.fyi/v2/transactions/deposit/0xUSER/base/0xVAULT?assetAddress=0xASSET&amount=1000000" \
-  -H "x-api-key: $VAULTS_FYI_API_KEY"
+# 1 USDC (6 decimals) into Steakhouse High Yield USDC on Base, for a read-only example wallet
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/transactions/deposit/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845?assetAddress=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913&amount=1000000"
 ```
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Check available vault actions | [`GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-context) | Path: `userAddress`, `network`, `vaultId` |
-| Build deposit, redeem, request, or claim calldata | [`GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/transactions/get-transaction-payload) | Path: `action`, `userAddress`, `network`, `vaultId`. Query: `assetAddress`, plus `amount` or `all=true` when the action requires an amount |
-| Check claimable rewards | [`GET /v2/transactions/rewards/context/{userAddress}`](/api-reference/transactions/get-rewards-context) | Path: `userAddress` |
-| Build rewards claim calldata | [`GET /v2/transactions/rewards/claim/{userAddress}`](/api-reference/transactions/claim-rewards) | Path: `userAddress`. Query: `claimIds` |
-| Add transaction attribution | [`GET /v2/transactions/suffix/{userAddress}/{vaultId}`](/api-reference/transactions/get-transaction-suffix) | Path: `userAddress`, `vaultId` |
+Response, captured 2026-10-23 (complete; calldata unchanged):
 
-## Related Alpha and Beta endpoints
+```json
+{
+  "currentActionIndex": 0,
+  "actions": [
+    {
+      "name": "Approve USDC for Steakhouse High Yield USDC Edition vault",
+      "tx": {
+        "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "chainId": 8453,
+        "data": "0x095ea7b3000000000000000000000000beeff2490feffa212fac2f6553682c219e6a884500000000000000000000000000000000000000000000000000000000000f4240"
+      }
+    },
+    {
+      "name": "Deposit USDC to Steakhouse High Yield USDC Edition vault",
+      "tx": {
+        "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+        "chainId": 8453,
+        "data": "0x6e553f6500000000000000000000000000000000000000000000000000000000000f4240000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045232c5f404de80be3c7ef2001de2d09ce535a2a0fffc69deb"
+      }
+    }
+  ]
+}
+```
 
-Alpha and Beta transaction endpoints extend the same wallet-action pattern to newer surfaces. Use them when your product needs these flows before they are promoted to stable V2.
+Two actions: approve 1 USDC (`0xf4240` = 1000000) to the vault, then deposit. Neither has a `value` field. The deposit calldata ends with the attribution suffix. The full schema is on [Get transaction payload](/api-reference/transactions/get-transaction-payload). Safety checks for agents are on [Transaction safety](/ai-agents/transaction-safety).
 
-| Capability | How to call | Status |
-|------------|-------------|--------|
-| Build a ready-to-sign Solana/SVM transaction | [`GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| Check Solana/SVM balances and limits before building a transaction | [`GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}`](/api-reference/beta#solana-vaults) | Beta |
-| Build a ready-to-sign borrow market transaction | [`GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
-| Check borrow balances and limits before building a transaction | [`GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
-| Build a Deep deposit or withdrawal transaction | [`GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}`](/api-reference/beta#the-deep) | Beta |
-| Check balances and limits before building a fixed-term transaction | [`GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
-| Build a fixed-term transaction | [`GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/beta#fixed-term-pendle) | Beta |
-| Quote, execute, and track cross-chain transaction intents | [`POST /alpha/transactions/intent/getQuote`](/api-reference/alpha#cross-chain-intents) | Alpha |
-| Build and track CCTP bridge transactions | [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/alpha#cctp-bridge) | Alpha |
+## Related beta and alpha endpoints
+
+| Endpoint | Use it when | Status | Credits |
+| - | - | - | - |
+| [`GET /beta/svm/transactions/context/{userAddress}/{vaultAddress}`](/api-reference/svm/get-svm-transaction-context) | Balances and limits before building a Solana vault transaction. | Beta | 3 |
+| [`GET /beta/svm/transactions/{action}/{userAddress}/{vaultAddress}`](/api-reference/svm/create-svm-transaction) | Build an unsigned Solana transaction (base64 in `actions[].tx.transaction`). `simulate=true` adds `actions[].simulation`. | Beta | 5 |
+| [`GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-transaction-context) | Steps, balances and limits before a supply, withdraw, borrow or repay. Use the returned `*Steps`; don't hard-code a sequence. | Beta | 3 |
+| [`GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/create-borrow-market-transaction) | Build unsigned `supply`, `withdraw`, `borrow` or `repay` transactions (vault actions such as `deposit` return 400). | Beta | 5 |
+| [`GET /beta/amm/deep/deposit/{userAddress}/{network}/{vaultId}`](/api-reference/the-deep/create-deep-deposit-transaction) | Build a Deep deposit (`assetAddress0`, `amount0` required). | Beta | 5 |
+| [`GET /beta/amm/deep/withdraw/{userAddress}/{network}/{vaultId}`](/api-reference/the-deep/create-deep-withdrawal-transaction) | Build a Deep withdrawal (`amount` in shares, or `all=true`). | Beta | 5 |
+| [`GET /beta/fixed-term/context/{userAddress}/{network}/{vaultId}`](/api-reference/fixed-term-pendle/get-fixed-term-transaction-context) | Balances and limits before a fixed-term swap. | Beta | 3 |
+| [`GET /beta/fixed-term/transactions/{action}/{userAddress}/{network}/{vaultId}`](/api-reference/fixed-term-pendle/create-fixed-term-transaction) | Build unsigned swap-in / swap-out transactions (`assetAddress`, `amount` in base units required). | Beta | 5 |
+| [`POST /alpha/transactions/intent/getQuote`](/api-reference/cross-chain/create-transaction-intent-quote) | Quote a cross-chain move into a vault (only deposits into vaults are supported). Returns a Permit2 payload to sign. | Alpha | 0 (free during early access) |
+| [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/cctp-bridge/create-cctp-transaction) | Build unsigned CCTP bridge or claim transactions. | Alpha | 0 (free during early access) |
+
+Related: [Transaction flows](/concepts/transaction-flows), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

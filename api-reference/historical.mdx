@@ -1,27 +1,68 @@
 ---
-title: "Historical"
-description: "Time-series APY, TVL, share price, and asset price data for any vault."
+title: "Historical: APY, TVL, share-price and asset-price time series"
+sidebarTitle: "Historical"
+description: "Index of the v2 historical endpoints (oldest-first time series, Unix-seconds windows, perPage up to 20000) for vault APY, TVL, share price and asset prices, with credit costs and links to every endpoint page."
 ---
 
-Time-series data for any vault over configurable date ranges and granularity. Use these endpoints to build performance charts, run backtests, or track share price over time.
+This section lists the v2 endpoints that return time series for one vault (APY, TVL, share price) or one asset (USD price). Use them for charts, backtests and realised-return calculations. For the current value, use [Detailed vaults](/api-reference/detailed-vaults) instead; it is cheaper.
 
-Historical APY values are net of performance and management fees, matching the current APY fields returned by detailed-vault responses.
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key. APY values are decimal fractions net of fees (`0.0315` = 3.15%); token amounts are integer strings in base units; timestamps are Unix seconds. See [Conventions](/api-reference/conventions).
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Fetch combined APY, TVL, and share-price history | [`GET /v2/historical/{network}/{vaultId}`](/api-reference/historical/get-vault-historical-data) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
-| Fetch APY history only | [`GET /v2/historical/{network}/{vaultId}/apy`](/api-reference/historical/get-historical-apy) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
-| Fetch TVL history only | [`GET /v2/historical/{network}/{vaultId}/tvl`](/api-reference/historical/get-historical-tvl) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |
-| Fetch share-price history only | [`GET /v2/historical/{network}/{vaultId}/sharePrice`](/api-reference/historical/get-historical-share-price) | Path: `network`, `vaultId`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `apyInterval`, `page`, `perPage` |
-| Fetch historical underlying asset prices | [`GET /v2/historical/asset-prices/{network}/{assetAddress}`](/api-reference/historical/get-historical-asset-prices) | Path: `network`, `assetAddress`. Optional query: `fromTimestamp`, `toTimestamp`, `granularity`, `page`, `perPage` |
+## Endpoints
 
-## Related Alpha and Beta endpoints
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/historical/{network}/{vaultId}`](/api-reference/historical/get-vault-historical-data) | Get APY, TVL and share price together for one vault over time. Use a single-series endpoint if you need only one (cheaper). | Path: `network`, `vaultId` | 3 + 3 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/apy`](/api-reference/historical/get-historical-apy) | APY series for one vault, `apy.{base,reward,total}` over the trailing `apyInterval`, sampled every `granularity`. | Path: `network`, `vaultId` | 1 + 1 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/tvl`](/api-reference/historical/get-historical-tvl) | TVL series for one vault (`tvl.usd`, `tvl.native`). | Path: `network`, `vaultId` | 1 + 1 per data point |
+| [`GET /v2/historical/{network}/{vaultId}/sharePrice`](/api-reference/historical/get-historical-share-price) | Share-price series for one vault; use it to compute realised returns between two dates. | Path: `network`, `vaultId` | 1 + 1 per data point |
+| [`GET /v2/historical/asset-prices/{network}/{assetAddress}`](/api-reference/historical/get-historical-asset-prices) | USD price series for one token address on one network. | Path: `network`, `assetAddress` | 1 + 1 per data point |
 
-Use these endpoints for historical data that is still being validated outside the stable V2 surface.
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit. A "data point" is one element of `data[]`. Example: 30 days at the default `granularity=1hour` is 720 points, so `/v2/historical/{network}/{vaultId}` costs 3 + 3 × 720 = 2,163 credits. With `granularity=1day` it is 30 points, or 93 credits.
 
-| Capability | How to call | Status |
-|------------|-------------|--------|
-| Fetch historical borrow market rates and liquidity | [`GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}`](/api-reference/beta#borrow-markets) | Beta |
-| Fetch historical daily vault inflows and outflows | [`GET /alpha/historical/{network}/{vaultId}/daily-flows`](/api-reference/alpha#historical-flows) | Alpha |
-| List historical positions for a wallet | [`GET /alpha/historical-positions/{userAddress}`](/api-reference/alpha#historical-positions) | Alpha |
-| Reconstruct wallet balances at a point in time | [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/alpha#historical-balances) | Alpha |
+## Query parameters and defaults
+
+| Parameter | Default | Notes |
+| - | - | - |
+| `fromTimestamp` | `0` | Unix **seconds**. The default starts at the beginning of history (USDC asset prices start in 2022). Milliseconds return 400. |
+| `toTimestamp` | now | Unix seconds. `fromTimestamp > toTimestamp` returns 200 with no data. |
+| `granularity` | `1hour` | `1hour`, `1day`, `1week`. |
+| `apyInterval` | `7day` | Trailing window each APY point is computed over: `1day`, `7day`, `30day`, `90day`. |
+| `page`, `perPage` | `0`, `50` | `perPage` up to 20000. |
+
+- Results are ordered **oldest first**. To get the most recent points, set `fromTimestamp` close to now instead of reading page 0.
+- `nextPage` is omitted on the last page. There is no total count.
+- APY points are `{base, reward, total}` decimal fractions, net of fees. `tvl.usd` is a USD string, `tvl.native` is base units, and `sharePrice` is a number (underlying assets per one whole share).
+
+## Example
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/v2/historical/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/apy?fromTimestamp=1792540800&toTimestamp=1792713600&granularity=1day&apyInterval=7day&perPage=5"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{
+  "itemsOnPage": 3,
+  "data": [
+    { "timestamp": 1792540800, "blockNumber": "52875727", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } },
+    { "timestamp": 1792627200, "blockNumber": "52918927", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } },
+    { "timestamp": 1792713600, "blockNumber": "52962127", "apy": { "base": 0.0315, "reward": 0, "total": 0.0315 } }
+  ]
+}
+```
+
+`nextPage` is absent, so this is the last page.
+
+## Related beta and alpha endpoints
+
+| Endpoint | Use it when | Status | Credits |
+| - | - | - | - |
+| [`GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}`](/api-reference/borrow-markets/get-borrow-market-historical-data) | Historical rates and liquidity for one asset in a market. | Beta | 3 + 3 per data point |
+| [`GET /alpha/historical/{network}/{vaultId}/daily-flows`](/api-reference/historical/get-historical-daily-vault-flows) | Daily inflows and outflows for one vault. `fromDate` / `toDate` are `YYYY-MM-DD` strings; flows are base-unit strings. | Alpha | 0 (free during early access) |
+| [`GET /alpha/historical-positions/{userAddress}`](/api-reference/historical-positions/list-user-historical-positions) | A wallet's past vault positions (latency around 40 s). | Alpha | 0 (free during early access) |
+| [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/historical-positions/list-user-historical-balances) | A wallet's vault balances at one Unix-seconds `timestamp`. Default 4-network scope. | Alpha | 0 (free during early access) |
+
+Related: [Benchmarks](/api-reference/benchmarks), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

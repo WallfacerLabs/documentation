@@ -1,0 +1,298 @@
+---
+title: "Recipe: find and rank vaults (top USDC vaults by 7-day APY)"
+sidebarTitle: "Find and rank vaults"
+description: "Executed recipe: query GET /v2/detailed-vaults for the top USDC vaults on chosen networks by 7-day APY with a TVL floor, no warnings and a minimum Reputation Score, in curl, Python, TypeScript and both SDKs."
+---
+
+This recipe answers "which vaults should I show for asset X on network Y, ranked by yield?" It returns the top 5 USDC vaults on Base and Arbitrum by 7-day APY with at least $10M TVL and no warnings, then narrows to established vaults by Reputation Score. Use it for an Earn screen, an allowlist, or an agent answering "best USDC yield on Base".
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. APY values are decimal fractions (`0.0578` = 5.78 %), already net of fees. All code on this page was run on 2026-10-23; outputs are real and trimmed.
+
+## Benchmark tasks covered
+
+T01 (top USDC vaults on Base by 7-day APY, TVL > $10M) and T10 (only established vaults: score, warnings, corrupted data). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key from [portal.vaults.fyi](https://portal.vaults.fyi/signup), exported as `VAULTSFYI_API_KEY`.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+ (TypeScript run with `tsx`).
+- For the SDK variants: `@vaultsfyi/sdk@2.3.14` or `vaultsfyi==1.3.0` (see [SDK quickstart](/sdk/quickstart)).
+
+## Credit cost
+
+`GET /v2/detailed-vaults` costs **1 credit per call + 3 per vault returned** ([credits](/plans/credits)). With `perPage=5` and 5 results: 1 + 5 × 3 = **16 credits**. The established-vault query below (`perPage=3`) costs 10. Keep `perPage` small: every returned vault costs 3.
+
+## Step 1: rank by 7-day APY with a TVL floor
+
+The query needs five non-default settings:
+
+| Parameter | Value | Why |
+| - | - | - |
+| `allowedNetworks` | `base`, `arbitrum` (repeat the key) | Default is 4 networks: base, mainnet, arbitrum, optimism. A comma list (`base,arbitrum`) is treated as one unknown network. |
+| `minTvl` | `10000000` | Integer USD. Default is `100000`. |
+| `sortBy` / `sortOrder` | `apy7day` / `desc` | `sortOrder` defaults to `asc`, which returns the **lowest** APYs first. `sortBy=apy` is a 400; valid values are `tvl`, `apy1day`, `apy7day`, `apy30day`, `apy90day`. |
+| `allowVaultsWithWarnings` | `false` | Defaults to `true` on this endpoint. |
+| `onlyTransactional` | `true` | Only vaults the Transactions API can build deposits for. Drop it for data-only screens. |
+
+### curl
+
+```bash
+# Top 5 USDC vaults on Base and Arbitrum by 7-day APY, TVL >= $10M, no warnings.
+# Array params are REPEATED keys (allowedNetworks=base&allowedNetworks=arbitrum).
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/detailed-vaults" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "allowedAssets=USDC" \
+  --data-urlencode "allowedNetworks=base" \
+  --data-urlencode "allowedNetworks=arbitrum" \
+  --data-urlencode "minTvl=10000000" \
+  --data-urlencode "allowVaultsWithWarnings=false" \
+  --data-urlencode "onlyTransactional=true" \
+  --data-urlencode "sortBy=apy7day" \
+  --data-urlencode "sortOrder=desc" \
+  --data-urlencode "perPage=5" \
+| jq '{itemsOnPage, nextPage, errors, top: [.data[] | {vaultId, network: .network.name, name,
+       apy7d_pct: ((.apy["7day"].total * 10000 | round) / 100), tvlUsd: .tvl.usd, score: .score.vaultScore}]}'
+```
+
+### Python
+
+```python
+"""Top 5 USDC vaults on Base + Arbitrum by 7-day APY, TVL >= $10M, no warnings."""
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+
+params = [  # list of tuples -> repeated keys for array params
+    ("allowedAssets", "USDC"),
+    ("allowedNetworks", "base"),
+    ("allowedNetworks", "arbitrum"),
+    ("minTvl", 10_000_000),          # integer USD (default is 100000)
+    ("allowVaultsWithWarnings", "false"),  # default is true on this endpoint
+    ("onlyTransactional", "true"),
+    ("sortBy", "apy7day"),
+    ("sortOrder", "desc"),           # default is asc -> lowest APY first
+    ("perPage", 5),
+]
+r = requests.get(f"{API}/v2/detailed-vaults", headers=HEADERS, params=params, timeout=30)
+r.raise_for_status()
+body = r.json()
+
+# Soft errors: unknown filter values return 200 + errors.unsupported*, not 400.
+bad = {k: v for k, v in (body.get("errors") or {}).items() if v}
+if bad:
+    raise SystemExit(f"Filter values were rejected: {bad}")
+
+for v in body["data"]:
+    apy7 = v["apy"]["7day"]["total"]  # decimal fraction: 0.0412 means 4.12 %
+    print(f'{v["network"]["name"]:9} {v["name"][:40]:40} '
+          f'7d APY {apy7 * 100:6.2f} %  TVL ${int(v["tvl"]["usd"]):>13,}  '
+          f'score {v["score"]["vaultScore"]:.1f}  vaultId {v["vaultId"]}')
+print("itemsOnPage:", body["itemsOnPage"], "| nextPage:", body.get("nextPage", "absent (last page)"))
+```
+
+### TypeScript
+
+```typescript
+// Top 5 USDC vaults on Base + Arbitrum by 7-day APY, TVL >= $10M, no warnings.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+
+const qs = new URLSearchParams();
+qs.append('allowedAssets', 'USDC');
+qs.append('allowedNetworks', 'base');      // repeated key, NOT "base,arbitrum"
+qs.append('allowedNetworks', 'arbitrum');
+qs.set('minTvl', '10000000');              // integer USD
+qs.set('allowVaultsWithWarnings', 'false'); // default is true here
+qs.set('onlyTransactional', 'true');
+qs.set('sortBy', 'apy7day');
+qs.set('sortOrder', 'desc');               // default is asc
+qs.set('perPage', '5');
+
+const res = await fetch(`${API}/v2/detailed-vaults?${qs}`, { headers });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const body = await res.json();
+
+const rejected = Object.entries(body.errors ?? {}).filter(([, v]) => (v as unknown[]).length);
+if (rejected.length) throw new Error(`Filter values were rejected: ${JSON.stringify(rejected)}`);
+
+for (const v of body.data) {
+  const apy7 = v.apy['7day'].total; // decimal fraction: 0.0412 = 4.12 %
+  console.log(
+    `${v.network.name.padEnd(9)} ${v.name.slice(0, 40).padEnd(40)} ` +
+      `7d APY ${(apy7 * 100).toFixed(2).padStart(6)} %  TVL $${Number(v.tvl.usd).toLocaleString('en-US')}  ` +
+      `score ${v.score.vaultScore.toFixed(1)}  vaultId ${v.vaultId}`,
+  );
+}
+console.log('itemsOnPage:', body.itemsOnPage, '| nextPage:', body.nextPage ?? 'absent (last page)');
+```
+
+### Output (2026-10-23)
+
+curl, trimmed to the first two vaults:
+
+```text
+{
+  "itemsOnPage": 5,
+  "nextPage": 1,
+  "errors": {
+    "unsupportedNetworks": [],
+    "unsupportedAssets": [],
+    "unsupportedProtocols": []
+  },
+  "top": [
+    {
+      "vaultId": "0x1A996cb54bb95462040408C06122D45D6Cdb6096",
+      "network": "arbitrum",
+      "name": "Fluid USDC",
+      "apy7d_pct": 5.78,
+      "tvlUsd": "57837237",
+      "score": 76.91948814294108
+    },
+    {
+      "vaultId": "0xbeeff7aE5E00Aae3Db302e4B0d8C883810a58100",
+      "network": "base",
+      "name": "Steakhouse High Yield Instant",
+      "apy7d_pct": 5.51,
+      "tvlUsd": "31356752",
+      "score": 76.01771995673997
+    },
+```
+
+Python (TypeScript prints the same rows):
+
+```text
+arbitrum  Fluid USDC                               7d APY   5.78 %  TVL $   57,837,237  score 76.9  vaultId 0x1A996cb54bb95462040408C06122D45D6Cdb6096
+base      Steakhouse High Yield Instant            7d APY   5.51 %  TVL $   31,356,752  score 76.0  vaultId 0xbeeff7aE5E00Aae3Db302e4B0d8C883810a58100
+arbitrum  Noon Symphony Yield Vault                7d APY   4.94 %  TVL $   13,303,563  score 53.4  vaultId 0x9fe29A3feC55414F70454E2dBe6522f48cEd3E85
+base      Gauntlet USD Alpha                       7d APY   4.73 %  TVL $   45,335,171  score 70.9  vaultId 0x000000000001CdB57E58Fa75Fe420a0f4D6640D5
+base      Gauntlet USDC Prime                      7d APY   4.70 %  TVL $  410,262,301  score 83.6  vaultId 0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61
+itemsOnPage: 5 | nextPage: 1
+```
+
+`nextPage: 1` means more results exist; it is absent on the last page. `errors.unsupported*` lists filter values the API did not recognise; the snippets stop if any are non-empty, because the API answers 200 with fewer (or zero) results instead of a 400.
+
+## Step 2: only established vaults
+
+To keep only vaults with a track record, add `minVaultScore` (Reputation Score, 0 to 100; observed 27.5–99.1) and exclude warnings. Corrupted data is already excluded: `allowCorrupted` defaults to `false`. If you need a strict threshold, check `score.vaultScore`, `warnings[]` and `isCorrupted` on each result client-side before you show it.
+
+```bash
+# Only established USDC vaults on Base: score >= 70, no warnings, no corrupted data (allowCorrupted defaults to false).
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/detailed-vaults" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "allowedAssets=USDC" --data-urlencode "allowedNetworks=base" \
+  --data-urlencode "minVaultScore=70" --data-urlencode "allowVaultsWithWarnings=false" \
+  --data-urlencode "sortBy=tvl" --data-urlencode "sortOrder=desc" --data-urlencode "perPage=3" \
+| jq '[.data[] | {name, score: .score.vaultScore, warnings, isCorrupted, tvlUsd: .tvl.usd}]'
+```
+
+Output (2026-10-23):
+
+```json
+[
+  {
+    "name": "Steakhouse High Yield USDC Edition",
+    "score": 81.7485752746402,
+    "warnings": [],
+    "isCorrupted": false,
+    "tvlUsd": "468440351"
+  },
+  {
+    "name": "Spark USDC Vault",
+    "score": 82.80610344245103,
+    "warnings": [],
+    "isCorrupted": false,
+    "tvlUsd": "420115253"
+  },
+  {
+    "name": "Gauntlet USDC Prime",
+    "score": 83.55423613634444,
+    "warnings": [],
+    "isCorrupted": false,
+    "tvlUsd": "410262301"
+  }
+]
+```
+
+The score threshold is a product decision; 70 is an example, not a vaults.fyi recommendation. See [Reputation Score](/methodology/reputation-score) for what the score measures.
+
+## The same query with the SDKs
+
+The SDKs send array parameters as repeated keys and return the same envelope `{ itemsOnPage, nextPage?, data, errors }`; the result is **not** an array.
+
+TypeScript, `@vaultsfyi/sdk` 2.3.14:
+
+```typescript
+// Same query with the published TypeScript SDK (@vaultsfyi/sdk 2.3.14).
+// getAllVaults wraps GET /v2/detailed-vaults; arrays are sent as repeated keys.
+import { VaultsSdk } from '@vaultsfyi/sdk';
+
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! });
+
+const page = await sdk.getAllVaults({
+  query: {
+    allowedAssets: ['USDC'],
+    allowedNetworks: ['base', 'arbitrum'],
+    minTvl: 10_000_000,
+    allowVaultsWithWarnings: false,
+    onlyTransactional: true,
+    sortBy: 'apy7day',
+    sortOrder: 'desc',
+    perPage: 5,
+  },
+});
+// page = { itemsOnPage, nextPage?, data: DetailedVault[], errors? } — not an array
+for (const v of page.data) {
+  console.log(v.network.name, v.name, `${(v.apy['7day'].total * 100).toFixed(2)} %`, v.vaultId);
+}
+```
+
+Python, `vaultsfyi` 1.3.0:
+
+```python
+"""Same query with the published Python SDK (vaultsfyi 1.3.0)."""
+import os
+
+from vaultsfyi import VaultsSdk
+
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])
+
+page = client.get_detailed_vaults(  # get_all_vaults is a deprecated alias
+    allowed_assets=["USDC"],
+    allowed_networks=["base", "arbitrum"],  # sent as repeated keys
+    min_tvl=10_000_000,
+    allow_vaults_with_warnings=False,
+    only_transactional=True,
+    sort_by="apy7day",
+    sort_order="desc",
+    per_page=5,
+)
+for v in page["data"]:
+    print(v["network"]["name"], v["name"], f'{v["apy"]["7day"]["total"] * 100:.2f} %', v["vaultId"])
+```
+
+Both printed the same five vaults as the REST call above.
+
+## Pitfalls
+
+- **Missing `sortOrder=desc`.** The default is ascending: you get the worst yields.
+- **Comma-joined arrays.** `allowedNetworks=base,arbitrum` returns 200, `itemsOnPage: 0` and `errors.unsupportedNetworks: ["base,arbitrum"]`. Repeat the key.
+- **Default network scope.** Without `allowedNetworks`, only base, mainnet, arbitrum and optimism are searched.
+- **`minTvl` units.** Integer USD (`10000000` for $10M), not millions, not a float.
+- **APY display.** Multiply by 100 for percent. Don't subtract fees: APY is already net. Values are not clamped: on 2026-10-23 a small Base vault reported a 7-day APY of 152,563 %; filter by `minTvl` and score before showing them.
+- **`/v2/vaults` is not for ranking.** It returns identity fields only (no APY or TVL).
+- **Trusting `minVaultScore` alone.** Check `score.vaultScore` client-side if you need a strict threshold ([Reputation Score](/methodology/reputation-score)).
+- **`network=8453` or `network=ethereum`** are rejected; use `base` / `mainnet` or CAIP-2 (`eip155:8453`). See [network and vault IDs](/recipes/network-and-vault-ids).
+
+## Related pages
+
+- [API conventions](/api-reference/conventions): default network scope, array params, pagination, soft errors.
+- [Errors](/api-reference/errors): 400 validation body, 402 without a key.
+- [Transaction safety](/ai-agents/transaction-safety): before you build a deposit for a ranked vault.
+- [List detailed vaults](/api-reference/detailed-vaults/list-detailed-vaults): every filter and its default.
+- [Vault discovery](/concepts/vault-discovery) and [Calculating APY](/methodology/calculating-apy).
+- Next recipes: [paginate all vaults](/recipes/paginate-all-vaults), [display APY correctly](/recipes/display-apy-correctly), [build a deposit](/recipes/deposit-transaction).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

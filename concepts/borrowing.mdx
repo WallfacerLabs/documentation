@@ -1,95 +1,121 @@
 ---
-title: "Borrowing"
-description: "Add borrow market discovery, user position tracking, and ready-to-sign supply, withdraw, borrow, and repay flows to your app."
+title: "Borrowing (Beta)"
 sidebarTitle: "Borrowing"
+description: "Beta borrow-market API: list markets, read a wallet's supplied/borrowed positions and health factor, and build unsigned supply, withdraw, borrow and repay transactions with base-unit amounts."
 ---
 
-The Vaults.fyi borrowing API gives wallets and apps one integration for borrow market data, user-level lending and borrowing positions, market history, and ready-to-sign transaction payloads.
+This page explains the vaults.fyi borrow-market API: how to list lending markets, read a wallet's supplied and borrowed positions, and build unsigned `supply`, `withdraw`, `borrow` and `repay` transactions. Use it to add borrowing to a wallet or app. These endpoints are **Beta** (`/beta/borrow/...`): they work but may change before general availability ([Versioning](/api-reference/versioning)). Auth is the same as v2: `x-api-key` header on `https://api.vaults.fyi`.
 
-Instead of building separate integrations for each lending protocol, you can use a normalized borrow market model across supported networks and protocols. This lets you show users what they have supplied, what they have borrowed, their risk metrics, and which actions are available before you build a transaction.
+## Endpoints
 
-<Note>
-  Borrowing is currently a Beta API surface. The endpoints are functional and tested, but may still change before general availability. Check the [Beta](/api-reference/beta#borrow-markets) API Reference section before integrating.
-</Note>
+| Need | Endpoint |
+| - | - |
+| List markets (all networks) | `GET /beta/borrow/markets/` |
+| List markets on one network | `GET /beta/borrow/markets/{network}` |
+| One market | `GET /beta/borrow/markets/{network}/{marketId}` |
+| Market asset history | `GET /beta/borrow/markets/historical/{network}/{marketId}/{assetId}` |
+| Market asset current state | `GET /beta/borrow/markets/nrt/{network}/{marketId}/{assetId}` |
+| Wallet positions with debt | `GET /beta/borrow/portfolio/positions/{userAddress}` |
+| Wallet position in one market | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}` |
+| Wallet position for one asset | `GET /beta/borrow/portfolio/positions/{userAddress}/{network}/{marketId}/{assetId}` |
+| Wallet events for one asset | `GET /beta/borrow/portfolio/events/{userAddress}/{network}/{marketId}/{assetId}` |
+| Transaction context | `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}` |
+| Transaction payload | `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}?amount=<base units>` or `?all=true` |
 
-## What you can build
+Credit costs: see [Credits](/plans/credits).
 
-<CardGroup cols={2}>
-  <Card title="Borrow market discovery" icon="magnifying-glass" href="#borrow-market-data">
-    List supported borrow markets, filter by network, and inspect supplied assets, borrowed assets, rates, utilization, and collateral configuration.
-  </Card>
-  <Card title="User borrow positions" icon="wallet" href="#positions-and-events">
-    Show a wallet's supplied and borrowed balances across supported markets, including position value and market-specific asset balances.
-  </Card>
-  <Card title="Risk metrics" icon="gauge" href="#positions-and-events">
-    Surface LTV, liquidation thresholds, health factor, and collateral data so users understand the state of their borrow positions.
-  </Card>
-  <Card title="Borrow transactions" icon="arrow-right-arrow-left" href="#transaction-support">
-    Generate ready-to-sign supply, withdraw, borrow, and repay payloads after checking balances, limits, and available actions.
-  </Card>
-</CardGroup>
+## Identifiers
 
-## Integration flow
+| Id | Where to get it | Format |
+| - | - | - |
+| `network` | — | Network slug (`base`, `mainnet`, ...). The borrow endpoints document slugs only. |
+| `marketId` | `data[].marketId` from `GET /beta/borrow/markets/` | Morpho: `<marketRootAddress>-<market hash>`, for example `0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb-0x3b82e29f...4bc10` |
+| `assetId` | `data[].assetsData[].marketAssetId` from the markets list | Usually the token address |
+| `positionId` | `data[].assets[].positionId` in positions | `eip155:<chainId>:<protocolId>:<marketId>:<assetId>` |
 
-<Steps>
-  <Step title="Discover markets">
-    List supported borrow markets, optionally scoped to one network. Use market details to render assets, rates, utilization, and collateral parameters in your product.
-  </Step>
-  <Step title="Fetch the user's positions">
-    Retrieve the wallet's borrow portfolio to show supplied assets, borrowed assets, position value, and risk metrics across markets.
-  </Step>
-  <Step title="Check transaction context">
-    Before rendering action buttons, fetch transaction context for the user, market, and asset. The response tells you which actions are available and which inputs are required.
-  </Step>
-  <Step title="Generate the transaction">
-    Build a ready-to-sign payload for the selected action: `supply`, `withdraw`, `borrow`, or `repay`. Pass the payload to the user's wallet for signing.
-  </Step>
-</Steps>
+## Market data
 
-## Borrow market data
+Each market in `data[]` has `marketId`, `name`, `network`, `protocol`, `marketRootAddress` and `assetsData[]`. Per asset:
 
-Borrow markets expose the normalized data needed to build market screens and position pages:
+| Field | Meaning | Unit |
+| - | - | - |
+| `supplyRate`, `borrowRate` | Current supply and borrow rates | Decimal fraction (`0.0654` = 6.54%) |
+| `utilizationRate` | Borrowed ÷ supplied | Decimal fraction |
+| `totalSupplied`, `totalBorrowed`, `availableLiquidity`, `availableToBorrow` | Market amounts | `{usd, native}`; `native` in asset base units |
+| `isCollateralEnabled` | Asset can be used as collateral | boolean |
+| `assetConfig.isBorrowEnabled` | Asset can be borrowed | boolean |
+| `defaultRiskParameters.maxLtv`, `.liquidationThreshold` | Risk limits | Decimal fraction |
+| `defaultRiskParameters.borrowRateMultiplier` | Optional multiplier some protocols apply to the base borrow rate for this collateral | number |
+| `interestRateModel` | Rate curve (for example `single-kink` with `optimalUtilization`, `slope1`, `slope2`) | decimal fractions |
+| `lastUpdateTimestamp` | Last hourly snapshot | Unix seconds |
 
-- Market identity: network, market ID, protocol, and supported assets
-- Rates and utilization
-- Supplied and borrowed asset data
-- Collateral and liquidation parameters
-- An optional `borrowRateMultiplier` where the protocol applies a collateral risk multiplier to the base borrow rate
-- Historical market data where available
+Real response (2026-10-23, `GET /beta/borrow/markets/?allowedNetworks=base&perPage=3`, trimmed to the USDC asset of one market):
 
-Use this data for borrow dashboards, market comparison views, and account-specific borrow screens.
+```json
+{
+  "marketId": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb-0x3b82e29f0890186d7a66059699e522930c4cbe78ffbccb468c577daa5bc4bc10",
+  "name": "Morpho cbZEC/USDC",
+  "assetsData": [{
+    "marketAssetId": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "asset": { "symbol": "USDC", "decimals": 6 },
+    "supplyRate": 0.05889636471885011, "borrowRate": 0.065439929251584, "utilizationRate": 0.9000065463460828,
+    "totalSupplied": { "usd": "21687.86178610278", "native": "21690970536" },
+    "availableToBorrow": { "usd": "2168.644202361231", "native": "2168955057" },
+    "assetConfig": { "isBorrowEnabled": true, "borrowInterestFeeRate": 0 }
+  }]
+}
+```
 
-Aave V4 Standard Spoke markets on Ethereum use this normalized model for discovery, positions, and transaction construction alongside the other supported lending protocols.
+List endpoints are paginated (`page`, `perPage`, `nextPage` absent on the last page). Filters: `allowedNetworks`, `allowedCollateralAssets`, `allowedBorrowAssets`, `allowedProtocols`, `minTvl`, `maxTvl` and their `disallowed*` counterparts; repeat the key for multiple values.
 
-## Positions and events
+## Positions
 
-Borrow portfolio endpoints let you inspect a user's current positions and market-level history:
+`GET /beta/borrow/portfolio/positions/{userAddress}` returns `data[]` per market with `ltv`, `healthFactor` and `assets[]` (`suppliedNative`/`suppliedUsd`, `borrowedNative`/`borrowedUsd`, `collateralEnabled`, `positionId`; native amounts in asset base units).
 
-- Supplied assets and balances
-- Borrowed assets and balances
-- LTV, health factor, and other risk metrics where available
-- Asset-level position views for a specific market
-- User events for a market and asset
+- The wallet-wide list includes **only markets with outstanding debt**. Supply-only and collateral-only positions are omitted; read them with the single-market or single-asset endpoints.
+- Asset filters and `minUsdAssetValueThreshold` (default 1 USD) can also drop a market.
+- When combining results across markets, de-duplicate by `assets[].positionId`: the same economic position can appear in more than one market.
+- `assets[].balanceNative` / `balanceUsd` are the wallet's idle token balance (on 2026-10-23 the USDC entry showed `78995979`, the same as the wallet's idle USDC), not the supplied or borrowed amount. Use `suppliedNative` and `borrowedNative` for position size.
 
-The wallet-wide borrow position list includes only markets with outstanding debt. Supply-only and collateral-only markets are omitted. Asset filters and the USD-value threshold can also exclude a market if no borrowed asset remains in the response. Use the single-market or asset-level position endpoint to inspect a known position without debt.
+## Transactions
 
-When combining results across markets, deduplicate balances by `assets[].positionId`. The same economic position can appear in more than one market.
+The flow matches vault transactions: context first, then one payload per action, then sign every returned action in order.
 
-## Transaction support
+1. `GET /beta/borrow/markets/transactions/context/{userAddress}/{network}/{marketId}/{assetId}`. The response has `currentSupplyStep`/`supplySteps`, `currentWithdrawStep`/`withdrawSteps`, `currentBorrowStep`/`borrowSteps` and `currentRepayStep`/`repaySteps`. Each step lists the transactions it produces, for example `["approve","supply"]`. Some protocols add `enableCollateral` or `enableController`; do not hard-code approve + supply.
+2. `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}` with `action` = `supply`, `withdraw`, `borrow` or `repay`, and either:
+   - `amount`: integer string in the asset's **base units** (1 USDC = `1000000`), or
+   - `all=true`: withdraw or repay the full amount.
+3. The response is `{currentActionIndex, actions[]}` with `actions[].tx = {to, chainId, data, value?}`. Sign and send each action in order and wait for each receipt.
 
-Borrow transaction endpoints follow the same pattern as vault transaction flows:
+Vault actions (`deposit`, `redeem`) are rejected with HTTP 400 listing `supply`, `withdraw`, `borrow`, `repay`. Here `withdraw` means withdrawing supplied assets from a borrow market; for vaults the equivalent action is `redeem`.
 
-1. Fetch context for the user, market, asset, and network.
-2. Confirm which action is available.
-3. Generate the action payload with `amount` or `all=true` where required.
-4. Pass the returned transaction to the user's wallet.
+Real response (2026-10-23, `supply` with `amount=1000000`, data trimmed):
 
-Supported actions depend on the market and user state, but the model covers supply, withdraw, borrow, and repay flows. Read the action lists from transaction context: some protocols also require `enableCollateral` or `enableController`. Do not assume every supply flow consists only of approval and supply.
+```json
+{ "currentActionIndex": 0,
+  "actions": [
+    { "name": "Approve USDC for Morpho cbZEC/USDC borrow market",
+      "tx": { "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "chainId": 8453, "data": "0x095ea7b3...000f4240" } },
+    { "name": "Supply USDC to Morpho cbZEC/USDC borrow market",
+      "tx": { "to": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb", "chainId": 8453, "data": "0xa99aad89...fffc69deb" } } ] }
+```
 
-<Warning>
-  Always fetch transaction context before generating a borrow transaction. Borrow actions depend on collateral, balances, market limits, and protocol-specific constraints.
-</Warning>
+### Safety before signing a borrow or withdraw
 
-## API reference
+- Recompute the health factor the action would produce from the positions response and refuse actions that would push it below your threshold.
+- Check `chainId`, `to`, and that the amount does not exceed the wallet balance (supply, repay) or the available amount (borrow, withdraw).
+- Require explicit user confirmation for borrows. Liquidation risk is the user's.
 
-See the current endpoint guide in [Beta](/api-reference/beta#borrow-markets).
+See [Transaction safety](/ai-agents/transaction-safety).
+
+## Errors
+
+| Situation | Result |
+| - | - |
+| Unknown market | 404 `{"error":"Not Found","message":"Borrow market ... not found"}` (no `statusCode` field) |
+| Vault action such as `deposit` | 400 listing the four borrow actions |
+| No `x-api-key` | Borrow endpoints need an API key (they are not sold over x402) |
+
+See [Errors](/api-reference/errors).
+
+Related: [Transaction flows](/concepts/transaction-flows), [Beta API reference](/api-reference/beta), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).

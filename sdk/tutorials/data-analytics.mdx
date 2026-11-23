@@ -1,274 +1,189 @@
 ---
-title: "Build DeFi Yield Analytics with Vaults.fyi"
-description: "Learn how to fetch vault data, retrieve historical APY and TVL, compare against benchmarks, and build charts or reports using the Vaults.fyi SDK."
+title: "Tutorial: yield analytics with the vaults.fyi SDK"
 sidebarTitle: "Data analytics"
+description: "Tested SDK walkthrough for analysts: page through /v2/detailed-vaults with the 4-network and minTvl defaults overridden, pull 90 days of daily APY, compare a vault with the USD benchmark, and budget credits, in TypeScript and Python."
 ---
 
-This tutorial shows you how to use the Vaults.fyi SDK to power a data analytics workflow: fetching and filtering vault listings, pulling historical time-series data, comparing APY against benchmark rates, and assembling the results into a report or chart.
+This tutorial builds a small analytics pipeline with the vaults.fyi SDK: a complete vault list across chosen networks, a 90-day daily APY series for one vault, and a one-vault report against the network's USD benchmark. Use it for dashboards, research notes and allocator reports. REST versions are in the recipes [paginate all vaults](/recipes/paginate-all-vaults) and [vault history vs benchmark](/recipes/vault-history-vs-benchmark).
 
-This pattern is useful for dashboards, research tools, protocol monitoring, and any application that needs standardized DeFi yield data across multiple protocols.
+Tested on 2026-10-23 with **`@vaultsfyi/sdk` 2.3.14** and **`vaultsfyi` 1.3.0** against the live API. The SDKs send the key as `x-api-key`. APY values are decimal fractions (`0.0315` = 3.15 %); timestamps are Unix seconds.
 
-<Note>
-  All code examples use the TypeScript SDK (`@vaultsfyi/sdk`). The Python SDK exposes the same functionality using snake_case method names. See the [SDK Reference](/sdk/reference) for both.
-</Note>
+## Prerequisites
 
-## Initialize the client
+- An API key in `VAULTSFYI_API_KEY` ([SDK quickstart](/sdk/quickstart)).
+- TypeScript: Node.js 18+, `@vaultsfyi/sdk@2.3.14`, ESM. Python: Python 3.8+, `vaultsfyi==1.3.0`.
 
-```javascript analytics.js
-import pkg from '@vaultsfyi/sdk';
-const { VaultsSdk } = pkg;
+## Credit cost of this run
 
-const sdk = new VaultsSdk({
-  apiKey: process.env.VAULTS_FYI_API_KEY,
-});
-```
+| Step | Method | Credits |
+| - | - | - |
+| Vault list, 51 vaults in 6 pages | `getAllVaults` / `get_detailed_vaults` | 6 + 3 × 51 = 159 |
+| 90 daily APY points | `getVaultHistoricalApy` / `get_vault_historical_apy` | 1 + 90 = 91 |
+| Vault detail | `getVault` / `get_vault` | 3 |
+| Current benchmark | `getBenchmarks` / `get_benchmarks` | 3 |
+| Benchmark history, 3 points (TypeScript only) | `getHistoricalBenchmarks` | 3 + 9 = 12 |
 
----
+([credits](/plans/credits)). For a full-market pull, every vault costs 3 credits on `/v2/detailed-vaults`; list identities with `getVaults` (1 credit per call) and fetch detail only where needed. Respect `x-ratelimit-remaining` (the SDKs don't expose headers; space out calls).
 
-## Step 1: Fetch and filter vault listings
+## TypeScript
 
-Use `getAllVaults` to retrieve available vaults. Apply filters to narrow results by network, protocol, asset, or TVL range. Use `page` and `perPage` to paginate through large result sets.
+```typescript
+// Data analytics with @vaultsfyi/sdk 2.3.14: page through a vault list, pull 90 days of daily APY,
+// compare with the USD benchmark, and print a one-vault report. Node >= 18, ESM.
+import { VaultsSdk } from '@vaultsfyi/sdk';
 
-```javascript analytics.js
-async function fetchVaults() {
-  const vaults = await sdk.getAllVaults({
-    query: {
-      page: 0,
-      perPage: 100,
-      allowedNetworks: ['mainnet', 'polygon', 'arbitrum'],
-      allowedAssets: ['USDC', 'USDT', 'DAI'],
-      minTvl: 5000000,       // at least $5M TVL
-      onlyTransactional: false
-    }
+const sdk = new VaultsSdk({ apiKey: process.env.VAULTSFYI_API_KEY! }); // sent as x-api-key
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+const pct = (x: number) => `${(x * 100).toFixed(2)} %`; // APY fields are decimal fractions
+
+// 1) Every USDT0 vault on Plasma and Ethereum, page by page. getAllVaults wraps GET /v2/detailed-vaults
+//    and returns { itemsOnPage, nextPage?, data }, NOT an array. nextPage is absent on the last page.
+//    Override the defaults: 4 networks (base, mainnet, arbitrum, optimism) and minTvl 100000.
+const vaults = [];
+let page = 0;
+let calls = 0;
+while (true) {
+  const res = await sdk.getAllVaults({
+    query: { allowedNetworks: ['plasma', 'mainnet'], allowedAssets: ['USDT0'], minTvl: 0, perPage: 10, page },
   });
-
-  return vaults;
+  calls += 1;
+  vaults.push(...res.data);
+  if (res.nextPage === undefined) break;
+  page = res.nextPage;
 }
+console.log(`${vaults.length} vaults in ${calls} pages, ~${calls + 3 * vaults.length} credits (1 per call + 3 per vault)`);
+
+// 2) 90 days of daily 7-day APY. granularity defaults to 1hour and perPage to 50: set both.
+const toTimestamp = Math.floor(Date.now() / 1000 / 86400) * 86400; // Unix SECONDS, midnight UTC
+const fromTimestamp = toTimestamp - 90 * 86400;
+const history = await sdk.getVaultHistoricalApy({
+  path: { network: NETWORK, vaultId: VAULT_ID },
+  query: { granularity: '1day', apyInterval: '7day', fromTimestamp, toTimestamp, perPage: 100 },
+}); // oldest first; ~91 credits (1 + 1 per point)
+const series = history.data.map((p) => p.apy.total);
+const mean = series.reduce((a, b) => a + b, 0) / series.length;
+console.log(`${series.length} daily points, mean 7d APY ${pct(mean)}, min ${pct(Math.min(...series))}, max ${pct(Math.max(...series))}`);
+
+// 3) Report: current vault data and the network's USD benchmark, same 7-day window.
+const [vault, bench, benchHist] = await Promise.all([
+  sdk.getVault({ path: { network: NETWORK, vaultId: VAULT_ID } }),                  // 3 credits
+  sdk.getBenchmarks({ path: { network: NETWORK }, query: { code: 'usd' } }),         // 3 credits; code required
+  sdk.getHistoricalBenchmarks({                                                      // 3 + 3 per point
+    path: { network: NETWORK },
+    query: { code: 'usd', fromTimestamp: toTimestamp - 3 * 86400, toTimestamp, perPage: 10 },
+  }),
+]);
+if (!bench.apy) throw new Error('no benchmark for this network'); // typed nullable
+const report = {
+  name: vault.name,
+  apy7d: pct(vault.apy['7day'].total),
+  tvlUsd: Number(vault.tvl.usd),
+  vaultScore: Math.round((vault.score?.vaultScore ?? 0) * 10) / 10,
+  benchmark7d: pct(bench.apy['7day'].total),
+  spreadBp: Math.round((vault.apy['7day'].total - bench.apy['7day'].total) * 10_000),
+  benchmarkHistoryPoints: benchHist.itemsOnPage, // historical benchmarks are short; check before charting
+};
+console.log(JSON.stringify(report));
 ```
 
-Each vault in the response includes its protocol name, asset, network, current APY, TVL, and whether transactional support is available. Use these fields to build filters, sort orders, or summary tables.
+Output (2026-10-23):
 
-<Tip>
-  Set `minTvl` to exclude low-liquidity vaults from analytics. Vaults with very low TVL often have volatile APY data that can skew aggregated metrics.
-</Tip>
-
----
-
-## Step 2: Fetch historical APY and TVL data
-
-Once you have a vault of interest, use the historical data methods to pull time-series metrics. Choose between the combined endpoint or the lighter focused endpoints depending on what you need.
-
-### Fetch combined APY and TVL history
-
-```javascript analytics.js
-async function fetchVaultHistory(network, vaultAddress) {
-  // Unix timestamps for a 90-day window
-  const toTimestamp = Math.floor(Date.now() / 1000);
-  const fromTimestamp = toTimestamp - 90 * 24 * 60 * 60;
-
-  const history = await sdk.getVaultHistoricalData({
-    path: { network, vaultAddress },
-    query: {
-      page: 0,
-      perPage: 365,
-      apyInterval: '7day',   // 7-day rolling average APY
-      fromTimestamp,
-      toTimestamp
-    }
-  });
-
-  return history;
-}
+```text
+51 vaults in 6 pages, ~159 credits (1 per call + 3 per vault)
+90 daily points, mean 7d APY 2.88 %, min 2.54 %, max 3.17 %
+{"name":"Steakhouse High Yield USDC Edition","apy7d":"3.15 %","tvlUsd":468440351,"vaultScore":81.7,"benchmark7d":"4.07 %","spreadBp":-92,"benchmarkHistoryPoints":3}
 ```
 
-The `apyInterval` parameter controls the smoothing window for APY values. Use `'1day'` for precise daily readings, `'7day'` for a weekly moving average, or `'30day'` for a longer-term trend line.
+## Python
 
-### Fetch APY-only history
+```python
+"""Data analytics with the vaultsfyi Python SDK 1.3.0: page through a vault list, pull 90 days of daily
+APY, compare with the USD benchmark, and print a one-vault report."""
+import os
+import statistics
+import time
 
-Use `getVaultHistoricalApy` when you only need APY data and want a lighter API response.
+from vaultsfyi import VaultsSdk
 
-```javascript analytics.js
-async function fetchApyHistory(network, vaultAddress) {
-  const toTimestamp = Math.floor(Date.now() / 1000);
-  const fromTimestamp = toTimestamp - 30 * 24 * 60 * 60; // last 30 days
+client = VaultsSdk(api_key=os.environ["VAULTSFYI_API_KEY"])  # sent as x-api-key
+NETWORK = "base"
+VAULT_ID = "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC (passed as vault_address)
 
-  const apyHistory = await sdk.getVaultHistoricalApy({
-    path: { network, vaultAddress },
-    query: {
-      page: 0,
-      perPage: 100,
-      fromTimestamp,
-      toTimestamp
-    }
-  });
 
-  return apyHistory;
-}
+def pct(x):
+    return f"{x * 100:.2f} %"  # APY fields are decimal fractions
+
+
+# 1) Every USDT0 vault on Plasma and Ethereum. Returns a dict {itemsOnPage, nextPage?, data}; nextPage is
+#    absent on the last page. Override the 4-network default and minTvl=100000.
+vaults, page, calls = [], 0, 0
+while True:
+    res = client.get_detailed_vaults(allowed_networks=["plasma", "mainnet"], allowed_assets=["USDT0"],
+                                     min_tvl=0, per_page=10, page=page)
+    calls += 1
+    vaults += res["data"]
+    if "nextPage" not in res:
+        break
+    page = res["nextPage"]
+print(f"{len(vaults)} vaults in {calls} pages, ~{calls + 3 * len(vaults)} credits (1 per call + 3 per vault)")
+
+# 2) 90 days of daily 7-day APY (granularity defaults to 1hour, perPage to 50: set both).
+to_ts = int(time.time()) // 86400 * 86400  # Unix SECONDS, midnight UTC
+history = client.get_vault_historical_apy(NETWORK, VAULT_ID, granularity="1day", apy_interval="7day",
+                                          from_timestamp=to_ts - 90 * 86400, to_timestamp=to_ts, per_page=100)
+series = [p["apy"]["total"] for p in history["data"]]  # oldest first
+print(f"{len(series)} daily points, mean 7d APY {pct(statistics.mean(series))}, "
+      f"min {pct(min(series))}, max {pct(max(series))}")
+
+# 3) Report: vault vs the network's USD benchmark, same 7-day window.
+vault = client.get_vault(NETWORK, VAULT_ID)
+bench = client.get_benchmarks(NETWORK, "usd")  # code is required: "usd" or "eth"
+v7, b7 = vault["apy"]["7day"]["total"], bench["apy"]["7day"]["total"]
+print({"name": vault["name"], "apy7d": pct(v7), "tvlUsd": int(vault["tvl"]["usd"]),
+       "vaultScore": round(vault["score"]["vaultScore"], 1), "benchmark7d": pct(b7),
+       "spreadBp": round((v7 - b7) * 10_000)})
 ```
 
-### Fetch TVL-only history
+Output (2026-10-23):
 
-Use `getVaultHistoricalTvl` to track capital flow into and out of a vault over time.
-
-```javascript analytics.js
-async function fetchTvlHistory(network, vaultAddress) {
-  const toTimestamp = Math.floor(Date.now() / 1000);
-  const fromTimestamp = toTimestamp - 30 * 24 * 60 * 60;
-
-  const tvlHistory = await sdk.getVaultHistoricalTvl({
-    path: { network, vaultAddress },
-    query: {
-      page: 0,
-      perPage: 100,
-      fromTimestamp,
-      toTimestamp
-    }
-  });
-
-  return tvlHistory;
-}
+```text
+51 vaults in 6 pages, ~159 credits (1 per call + 3 per vault)
+90 daily points, mean 7d APY 2.88 %, min 2.54 %, max 3.17 %
+{'name': 'Steakhouse High Yield USDC Edition', 'apy7d': '3.15 %', 'tvlUsd': 468440351, 'vaultScore': 81.7, 'benchmark7d': '4.07 %', 'spreadBp': -92}
 ```
 
----
+## Step notes
 
-## Step 3: Compare against benchmark rates
+### Vault lists are envelopes
 
-Benchmark rates let you put vault APY in context. Use `getBenchmarks` to retrieve the current reference rate, and `getHistoricalBenchmarks` to overlay it on your APY chart.
+`getAllVaults` returns `{ itemsOnPage, nextPage?, data, errors }`. Loop on `nextPage` and stop when it is absent (never `null`). There is no total count. Defaults hide data: only base, mainnet, arbitrum and optimism, only TVL ≥ $100,000, ascending sort. For a full-market dataset, pass every network as repeated `allowedNetworks` values and `minTvl: 0`.
 
-### Fetch current benchmarks
+### History parameters
 
-```javascript analytics.js
-async function fetchBenchmarks(network) {
-  const benchmarks = await sdk.getBenchmarks({
-    path: { network },
-    query: { code: 'usd' }   // 'usd' or 'eth'
-  });
+`granularity` (spacing: `1hour`, `1day`, `1week`; default `1hour`) and `apyInterval` (smoothing window: `1day`, `7day`, `30day`, `90day`; default `7day`) are different things. With the defaults and `perPage` 50 you get about two days of hourly points. 90 days at `1day` is 90 points, one call with `perPage: 100`.
 
-  return benchmarks;
-}
-```
+### Benchmarks
 
-### Fetch historical benchmarks
+`code` is required (`usd` or `eth`). The benchmark is the TVL-weighted APY of the five largest vaults of that denomination on the network ([benchmark rates](/methodology/benchmark-rates)). Compare windows like for like (`apy['7day'].total` on both sides).
 
-```javascript analytics.js
-async function fetchHistoricalBenchmarks(network) {
-  const toTimestamp = Math.floor(Date.now() / 1000);
-  const fromTimestamp = toTimestamp - 90 * 24 * 60 * 60;
+### Parallel requests
 
-  const historicalBenchmarks = await sdk.getHistoricalBenchmarks({
-    path: { network },
-    query: {
-      code: 'usd',
-      page: 0,
-      perPage: 365,
-      fromTimestamp,
-      toTimestamp
-    }
-  });
+`Promise.all` over three requests is fine. For large backfills, run sequentially or with a small concurrency limit and back off on errors: the TypeScript SDK does not retry, the Python SDK retries 429/5xx three times.
 
-  return historicalBenchmarks;
-}
-```
+## Pitfalls fixed from earlier versions of this tutorial
 
-Use the benchmark series as a baseline series in your chart alongside vault APY, making it easy to see when a vault outperforms or underperforms the reference rate.
+- The pagination loop treated `getAllVaults()` as an array (`push(...result)`, `result.length`) → use `res.data` and stop when `res.nextPage` is absent.
+- `path: { network, vaultAddress }` → `path: { network, vaultId }` in every TypeScript call.
+- `import { HttpResponseError }` → not exported; catch `Error` and read `message` ([SDK errors](/sdk/reference#errors-and-retries)).
+- 90-day history at the default hourly granularity returned only the oldest points → `granularity: '1day'`.
+- `currentApy: vault.apy` (an object of windows) → `vault.apy['7day'].total` (decimal).
+- TypeScript-only → every step also in Python.
 
----
+## Related pages
 
-## Step 4: Assemble a vault report
+- [For analysts](/use-cases/for-analysts).
+- [Paginate all vaults](/recipes/paginate-all-vaults), [vault history vs benchmark](/recipes/vault-history-vs-benchmark), [display APY correctly](/recipes/display-apy-correctly), [estimate credit cost](/recipes/estimate-credit-cost).
+- [SDK reference](/sdk/reference), [API conventions](/api-reference/conventions), [errors](/api-reference/errors), [transaction safety](/ai-agents/transaction-safety).
 
-Combine the methods above to build a complete snapshot for a single vault. The example below fetches current data, 30-day APY history, and the benchmark comparison in parallel.
-
-```javascript analytics.js
-async function buildVaultReport(network, vaultAddress) {
-  const [vault, apyHistory, benchmarks] = await Promise.all([
-    sdk.getVault({ path: { network, vaultAddress } }),
-    sdk.getVaultHistoricalApy({
-      path: { network, vaultAddress },
-      query: {
-        page: 0,
-        perPage: 100,
-        fromTimestamp: Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60,
-        toTimestamp: Math.floor(Date.now() / 1000)
-      }
-    }),
-    sdk.getBenchmarks({
-      path: { network },
-      query: { code: 'usd' }
-    })
-  ]);
-
-  return {
-    name: vault.name,
-    protocol: vault.protocol,
-    asset: vault.asset,
-    currentApy: vault.apy,
-    tvl: vault.tvl,
-    apyHistory: apyHistory,
-    benchmarkRate: benchmarks
-  };
-}
-```
-
-<Tip>
-  Use `Promise.all` to fetch independent data in parallel. Fetching vault details, APY history, and benchmarks concurrently cuts total latency by up to two-thirds compared to sequential calls.
-</Tip>
-
----
-
-## Step 5: Handle errors and pagination
-
-Wrap API calls in error handling and iterate over pages for large data sets.
-
-### Error handling
-
-```javascript analytics.js
-import { VaultsSdk, HttpResponseError } from '@vaultsfyi/sdk';
-
-try {
-  const vaults = await sdk.getAllVaults({ query: { page: 0, perPage: 100 } });
-} catch (error) {
-  if (error instanceof HttpResponseError) {
-    console.error(`API error ${error.message}`);
-  } else {
-    throw error;
-  }
-}
-```
-
-### Paginating through all vaults
-
-```javascript analytics.js
-async function fetchAllVaults() {
-  const allVaults = [];
-  let page = 0;
-  const perPage = 100;
-
-  while (true) {
-    const result = await sdk.getAllVaults({
-      query: { page, perPage, minTvl: 1000000 }
-    });
-
-    allVaults.push(...result);
-
-    // Stop when a page returns fewer results than requested
-    if (result.length < perPage) break;
-
-    page += 1;
-  }
-
-  return allVaults;
-}
-```
-
----
-
-## What to build next
-
-With vault listings, historical data, and benchmarks in hand, you can:
-
-- **Render an APY chart** — plot `apyHistory` as a line series with `historicalBenchmarks` as a reference line using any charting library (Recharts, Chart.js, Observable Plot).
-- **Build a protocol leaderboard** — sort vaults by 30-day average APY or by TVL growth to identify top-performing strategies.
-- **Track historical share price** — use `getVaultHistoricalSharePrice` to calculate compounded returns over any period for a more accurate performance metric than raw APY.
-- **Export to CSV or JSON** — serialize the assembled report into a flat file for use in spreadsheets, notebooks, or downstream data pipelines.
-
-See the [SDK Reference](/sdk/reference) for the full parameter and response documentation for every method used in this tutorial.
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

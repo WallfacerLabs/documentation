@@ -1,0 +1,210 @@
+---
+title: "Recipe: 90 days of daily APY and comparison with the USD benchmark"
+sidebarTitle: "Vault history vs benchmark"
+description: "Executed recipe: fetch daily 7-day APY for the last 90 days with granularity=1day and Unix-second timestamps, then compare a vault with the network's USD benchmark (code=usd), in curl, Python and TypeScript."
+---
+
+This recipe answers "how has this vault's yield moved over the last 90 days, and is it beating the market?" It pulls one daily 7-day-APY point per day from the historical API, then compares the vault's current 7-day APY with the network's USD benchmark on the same window. Use it for charts, allocator reports and "above/below market" badges.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. APY values are decimal fractions; timestamps are **Unix seconds**. All code on this page was run on 2026-10-23; outputs are real and trimmed.
+
+## Benchmark tasks covered
+
+T07 (daily historical APY for 90 days) and T18 (compare a vault with the USD benchmark). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`. Historical endpoints are also payable via x402 without a key, but these examples use the key.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+.
+
+## Credit cost
+
+| Call | Cost | This run |
+| - | - | - |
+| `GET /v2/historical/{network}/{vaultId}/apy` | 1 per call + 1 per point | 90 points = **91 credits** |
+| `GET /v2/detailed-vaults/{network}/{vaultId}` | 3 | 3 |
+| `GET /v2/benchmarks/{network}?code=usd` | 3 | 3 |
+
+The combined endpoint `/v2/historical/{network}/{vaultId}` (APY + TVL + share price) costs 3 + 3 per point: 273 credits for the same 90 days ([credits](/plans/credits)).
+
+## Parameters that matter
+
+| Parameter | Value here | Default | Note |
+| - | - | - | - |
+| `granularity` | `1day` | `1hour` | Spacing of points: `1hour`, `1day`, `1week`. |
+| `apyInterval` | `7day` | `7day` | Smoothing window of each point: `1day`, `7day`, `30day`, `90day`. Not the same as `granularity`. |
+| `fromTimestamp` / `toTimestamp` | now − 90 days / now | — | Unix **seconds**. Milliseconds are a 400. |
+| `perPage` | `100` | `50` | With the defaults you get 50 hourly points (about 2 days). |
+| `code` (benchmarks) | `usd` | required | `usd` or `eth`. Missing → 400. |
+
+## curl
+
+```bash
+# Daily 7-day APY for the last 90 days, then the current USD benchmark on the same network.
+TO=$(( $(date +%s) / 86400 * 86400 ))     # Unix SECONDS, aligned to midnight UTC
+FROM=$(( TO - 90 * 86400 ))
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/historical/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/apy" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "granularity=1day" --data-urlencode "apyInterval=7day" \
+  --data-urlencode "fromTimestamp=$FROM" --data-urlencode "toTimestamp=$TO" \
+  --data-urlencode "perPage=100" \
+| jq '{itemsOnPage, nextPage, first: .data[0], last: .data[-1]}'
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/benchmarks/base?code=usd" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" | jq '{benchmark7d: .apy["7day"].total, timestamp}'
+```
+
+Output (2026-10-23):
+
+```json
+{
+  "itemsOnPage": 90,
+  "nextPage": null,
+  "first": {
+    "timestamp": 1784937600,
+    "blockNumber": "49074127",
+    "apy": {
+      "base": 0.0254,
+      "reward": 0,
+      "total": 0.0254
+    }
+  },
+  "last": {
+    "timestamp": 1792713600,
+    "blockNumber": "52962127",
+    "apy": {
+      "base": 0.0315,
+      "reward": 0,
+      "total": 0.0315
+    }
+  }
+}
+{
+  "benchmark7d": 0.0407,
+  "timestamp": 1792713600
+}
+```
+
+Points are oldest first. In this response `nextPage` is `null` because the jq filter reads a key that is absent; the API itself omitted `nextPage` (last page).
+
+## Python
+
+```python
+"""90 days of daily APY for one vault, compared with the network's USD benchmark."""
+import os
+import time
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+NETWORK, VAULT_ID = "base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845"  # Steakhouse High Yield USDC
+
+to_ts = int(time.time()) // 86400 * 86400  # Unix SECONDS (milliseconds -> 400)
+from_ts = to_ts - 90 * 86400
+
+# 1) History. granularity defaults to 1hour and perPage to 50: set both or you get 50 hourly points.
+points, page = [], 0
+while True:
+    r = requests.get(
+        f"{API}/v2/historical/{NETWORK}/{VAULT_ID}/apy",
+        headers=HEADERS,
+        params={"granularity": "1day", "apyInterval": "7day", "fromTimestamp": from_ts,
+                "toTimestamp": to_ts, "perPage": 100, "page": page},
+        timeout=30,
+    )
+    r.raise_for_status()
+    body = r.json()
+    points += body["data"]  # oldest first
+    if "nextPage" not in body:
+        break
+    page = body["nextPage"]
+print(f"{len(points)} daily points, cost ~{1 + len(points)} credits (1 per call + 1 per point)")
+print("first", time.strftime("%Y-%m-%d", time.gmtime(points[0]["timestamp"])), f'{points[0]["apy"]["total"] * 100:.2f} %')
+print("last ", time.strftime("%Y-%m-%d", time.gmtime(points[-1]["timestamp"])), f'{points[-1]["apy"]["total"] * 100:.2f} %')
+
+# 2) Current vault APY and the benchmark, SAME window (7day). code is required: usd or eth.
+vault = requests.get(f"{API}/v2/detailed-vaults/{NETWORK}/{VAULT_ID}", headers=HEADERS, timeout=30).json()
+bench = requests.get(f"{API}/v2/benchmarks/{NETWORK}", headers=HEADERS, params={"code": "usd"}, timeout=30).json()
+v7, b7 = vault["apy"]["7day"]["total"], bench["apy"]["7day"]["total"]
+spread_bp = round((v7 - b7) * 10_000)  # decimal fractions -> basis points
+print(f"vault 7d {v7 * 100:.2f} % vs USD benchmark 7d {b7 * 100:.2f} % -> {spread_bp:+d} bp "
+      f'({"beating" if v7 > b7 else "below"} benchmark)')
+```
+
+## TypeScript
+
+```typescript
+// 90 days of daily APY for one vault, compared with the network's USD benchmark.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const NETWORK = 'base';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // Steakhouse High Yield USDC
+
+async function get(path: string, params: Record<string, string | number> = {}) {
+  const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  const res = await fetch(`${API}${path}${qs.size ? `?${qs}` : ''}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+const toTs = Math.floor(Date.now() / 1000 / 86400) * 86400; // Unix SECONDS, midnight UTC
+const fromTs = toTs - 90 * 86400;
+
+type Point = { timestamp: number; apy: { base: number; reward: number; total: number } };
+const points: Point[] = [];
+let page = 0;
+while (true) {
+  // granularity defaults to 1hour and perPage to 50 -- set both explicitly.
+  const body = await get(`/v2/historical/${NETWORK}/${VAULT_ID}/apy`, {
+    granularity: '1day', apyInterval: '7day', fromTimestamp: fromTs, toTimestamp: toTs, perPage: 100, page,
+  });
+  points.push(...body.data); // oldest first
+  if (body.nextPage === undefined) break;
+  page = body.nextPage;
+}
+const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+console.log(`${points.length} daily points, cost ~${1 + points.length} credits`);
+console.log('first', day(points[0].timestamp), `${(points[0].apy.total * 100).toFixed(2)} %`);
+console.log('last ', day(points.at(-1)!.timestamp), `${(points.at(-1)!.apy.total * 100).toFixed(2)} %`);
+
+const vault = await get(`/v2/detailed-vaults/${NETWORK}/${VAULT_ID}`);
+const bench = await get(`/v2/benchmarks/${NETWORK}`, { code: 'usd' }); // code is required
+const v7: number = vault.apy['7day'].total;
+const b7: number = bench.apy['7day'].total;
+const spreadBp = Math.round((v7 - b7) * 10_000);
+console.log(`vault 7d ${(v7 * 100).toFixed(2)} % vs USD benchmark 7d ${(b7 * 100).toFixed(2)} % -> ${spreadBp >= 0 ? '+' : ''}${spreadBp} bp (${v7 > b7 ? 'beating' : 'below'} benchmark)`);
+```
+
+### Output (2026-10-23)
+
+Python and TypeScript printed the same comparison:
+
+```text
+90 daily points, cost ~91 credits (1 per call + 1 per point)
+first 2026-07-25 2.54 %
+last  2026-10-23 3.15 %
+vault 7d 3.15 % vs USD benchmark 7d 4.07 % -> -92 bp (below benchmark)
+```
+
+## Historical benchmarks
+
+`GET /v2/historical-benchmarks/{network}?code=usd` returns the benchmark over time (3 credits + 3 per point). Benchmarks are computed once per UTC day.
+
+## Pitfalls
+
+- **Default `granularity=1hour` with default `perPage=50`.** You silently get 50 hourly points, not 90 days.
+- **Millisecond timestamps** (`Date.now()`): 400. Divide by 1000.
+- **Confusing `apyInterval` with `granularity`.** One is the smoothing window, the other the spacing.
+- **Comparing different windows.** Compare the vault's `apy.7day.total` with the benchmark's `apy.7day.total`.
+- **Calling benchmarks without `code`.** It is required; it selects one benchmark (`usd` or `eth`).
+- **Reading `nextPage` as null.** It is absent on the last page.
+
+## Related pages
+
+- [Benchmark rates](/methodology/benchmark-rates): TVL-weighted APY of the five largest vaults per network.
+- [API conventions: timestamps](/api-reference/conventions#timestamps-and-dates) and [pagination](/api-reference/conventions#pagination).
+- [Errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Display APY correctly](/recipes/display-apy-correctly).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

@@ -1,74 +1,107 @@
 ---
-title: "Vaults.fyi API Frequently Asked Questions"
-description: "Answers to common questions about yield calculations, data freshness, vault inclusion criteria, and how to request new protocols or features."
+title: "FAQ"
 sidebarTitle: "FAQ"
+description: "Short answers to common vaults.fyi questions: 402 vs 401, why results come from only 4 networks, last-page detection, units of APY and amounts, data freshness, APY differences, and how vaults get listed."
 ---
 
-Find answers to the most common questions about how vaults.fyi collects data, calculates yields, and decides which vaults to include.
+This page answers the questions developers and agents most often ask about the vaults.fyi API and data: errors, missing results, units, freshness, how yields are calculated and how vaults are listed. Each answer stands alone and links to the page with full detail. REST requests go to `https://api.vaults.fyi` with the key in the `x-api-key` header.
 
-## Why do yields on vaults.fyi look different from other sources?
+## Using the API
 
-While other applications calculate interest rates using varying assumptions and methodologies, vaults.fyi standardizes yield calculations across the entire platform.
+### Why do I get HTTP 402 instead of 401?
 
-Yields are calculated as 1-day, 7-day, and 30-day trailing averages by observing changes in vault share price over each time frame. This approach provides a more accurate representation of vault performance compared to more volatile interest rates measured over shorter timeframes (such as a single block).
+A request **without** an `x-api-key` header returns **402 Payment Required** with an x402 payment challenge (`x402Version: 2`, price in `accepts[].amount`, USDC base units on Base). This lets agents pay per request without a key. Send `x-api-key: <key>` to use your plan instead. A request with an **invalid** key returns **401** (message "An API key is required"). `GET /v2/health` needs no key. `Authorization: Bearer` works only for the MCP server, not for REST. See [Errors](/api-reference/errors) and [x402](/ai-agents/x402).
 
-Data for these calculations is fetched directly from the blockchain, minimizing assumptions and reliance on external APIs. For full details, see the [Methodology](/methodology/calculating-apy) page.
+### Why are results only from Base, Ethereum, Arbitrum and Optimism?
 
-## How often does data on vaults.fyi update?
+`GET /v2/detailed-vaults` and the `/v2/portfolio/*` list endpoints default to `allowedNetworks` = `base`, `mainnet`, `arbitrum`, `optimism`. Pass the networks you want, repeating the key: `allowedNetworks=base&allowedNetworks=plasma&allowedNetworks=bsc`. `GET /v2/vaults` and `GET /v2/assets` have no default scope. Network ids: [Supported protocols and networks](/concepts/supported-protocols).
 
-Data updates hourly. Onchain data is fetched once per hour.
+### Why is a vault I know about missing from the list?
 
-For use cases requiring more frequent data, the stable [near-real-time (NRT) endpoints](/api-reference/nrt) return current vault share price, total assets, total supply, and underlying asset price outside the hourly cycle.
+Common causes, in order: its network is outside the default four; its TVL is below the default `minTvl=100000` (USD; pass `minTvl=0`); it is marked `isCorrupted` (excluded unless `allowCorrupted=true`); you passed a comma-separated array (`allowedNetworks=base,arbitrum` returns 0 results; repeat the key instead); or a filter value was not recognised (check `errors.unsupportedNetworks`, `errors.unsupportedAssets`, `errors.unsupportedProtocols` in the 200 response). `allowedAssets` takes token symbols, not addresses.
 
-## How does vaults.fyi get its data?
+### How do I know I reached the last page?
 
-Vaults.fyi uses specialized smart contracts that fetch and transform onchain data in a single function call. These contracts are deployed as static calls — temporary reads that do not write to blockchain storage and therefore incur no gas costs.
+List responses are `{itemsOnPage, nextPage, data, errors?}`. On the last page `nextPage` is **absent** (the key is missing, not `null`). There is no total count. Loop while the key is present:
 
-This architecture allows data from one read to feed directly into the next calculation within the same call, which is not possible with standard multi-call approaches. RPC providers including Infura, Alchemy, and Ankr are used to execute these calls. Once retrieved, the data is stored in the vaults.fyi backend database.
+```python
+page = 0
+while True:
+    body = requests.get(url, headers=H, params={**params, "page": page}).json()
+    rows.extend(body["data"])
+    if "nextPage" not in body:
+        break
+    page = body["nextPage"]
+```
 
-Learn more in the [Indexing Onchain Data](/methodology/indexing-onchain-data) methodology doc.
+`/v2/portfolio/*` endpoints are not paginated. See [API conventions](/api-reference/conventions).
 
-## What causes significant fluctuations in APY?
+### Is APY a percentage?
 
-Some vaults update their earnings at irregular intervals rather than on every block. When a vault that has been accumulating yield for hours or days finally posts an update, the resulting share price jump creates a large but temporary spike in the calculated APY.
+No. APY is a decimal fraction: `0.0316` = 3.16%. It is in `apy.<window>.{base,reward,total}` with windows `1hour`, `1day`, `7day`, `30day`, `90day`, net of fees and not clamped (negative and very large values occur). See [Calculating APY](/methodology/calculating-apy).
 
-Understanding this behavior is essential for accurately interpreting APY figures on vaults.fyi. For a detailed explanation, see [Calculating APY](/methodology/calculating-apy).
+### Are amounts in wei?
 
-## How can I stay up to date with the latest activity?
+Token amounts are integer strings in the token's **base units** (the smallest unit, "wei" for 18-decimal tokens): 1 USDC (6 decimals) = `"1000000"`, 1 ETH = `"1000000000000000000"`. This applies to transaction `amount` parameters (a decimal such as `1.5` returns 400) and to response fields such as `tvl.native`, `balanceNative` and `positionValueInAsset`. USD values (`tvl.usd`, `balanceUsd`) are decimal strings. Timestamps are Unix seconds.
 
-Follow [@vaultsfyi](https://twitter.com/vaultsfyi) on X (formerly Twitter) for new product updates, newly added vaults, and insights on DeFi yield and TVL trends. The account also posts on Farcaster.
+### Why does my positions total look far too high?
 
-You can also check the [Changelog](/resources/changelog) page for a week-by-week log of API and app updates.
+In position objects, `asset.balanceNative` and `asset.balanceUsd` are the wallet's idle balance of the deposit token, repeated on every position with that token. Use `asset.positionValueInAsset` (asset base units) or `lpToken.balanceUsd` (USD) for position size. See [Portfolio tracking](/concepts/portfolio-tracking).
 
-## How do I request new vaults or features?
+### Does the API check balances or simulate transactions?
 
-Reach out to [@vaultsfyi](https://twitter.com/vaultsfyi) directly on X or Farcaster. The team actively monitors both channels for integration and feature requests.
+No. `GET /v2/transactions/{action}/...` returns a payload even for amounts far above the wallet's balance, and the `simulate` parameter is deprecated and ignored. Check `asset.balanceNative` from the context call and verify every action before signing. See [Transaction flows](/concepts/transaction-flows) and [Transaction safety](/ai-agents/transaction-safety).
 
-If you represent a protocol and want your vault added, submit the [protocol request form](https://listings.vaults.fyi/). The team reviews each protocol before integrating and welcomes direct communications from protocol teams.
+### How do I filter by Reputation Score?
 
-## How are new vaults added to vaults.fyi?
+Pass `minVaultScore` to narrow the list. Check `score.vaultScore` client-side if you need a strict threshold. See [Reputation Score](/methodology/reputation-score).
 
-New vaults are added based on customer requests, with priority given to protocols with significant traction. The team started with yield opportunities for stablecoins, ETH, and liquid staking tokens across established DeFi protocols — including Aave, Compound, MakerDAO, Yearn, Lido stETH, and Rocket Pool rETH — and has since expanded coverage through user demand.
+### What are the rate limits?
 
-If you represent a protocol, submit the [protocol request form](https://listings.vaults.fyi/). The team researches each protocol before integrating.
+Authenticated responses carry `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-reset` (seconds until reset). Read them instead of assuming a number; limits depend on your plan. See [Plans](/plans/overview) and [Errors](/api-reference/errors).
 
-## What are the requirements for vaults to be listed on vaults.fyi?
+## Data and methodology
 
-For a vault to be included, **all key data must be available onchain**. From a contract address (or set of addresses), the following fields must be extractable:
+### Why do yields on vaults.fyi differ from other sources?
 
-- `tvl` — total value locked in the vault, denominated in the underlying token
-- `totalSupply` — total supply of the LP token issued by the vault (if applicable)
-- `pricePerShare` — normally `tvl / totalSupply`, or an equivalent growth indicator if LP tokens are not used
-- `maxDeposit` — maximum amount of tokens any user can deposit
-- `liquidity` — amount of tokens directly available for withdrawal
-- `asset` — address of the underlying ERC-20 token
-- `name` — name of the vault
-- `lpTokenAddress` — address of the LP token issued by the vault
-- `rewardTokens` — addresses of reward tokens distributed by the vault
-- `rewardTokenEmissionsPerSecond` — emission rate of reward tokens
+vaults.fyi calculates every vault's APY the same way: realized yield from the change in onchain share price over trailing windows (`1hour`, `1day`, `7day`, `30day`, `90day`), net of fees. Protocol UIs often show forward-looking or instantaneous rates from their interest-rate model, which can differ, especially right after rates change. See [Calculating APY](/methodology/calculating-apy).
 
-Vaults that conform to the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) standard make this data straightforward to access. For vaults that require reading data from multiple contracts through a chain of calls, the team appreciates protocol teams reaching out with instructions on how to locate the fields above.
+### How often does data update?
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{__html: `{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why do yields on vaults.fyi look different from other sources?","acceptedAnswer":{"@type":"Answer","text":"Vaults.fyi standardizes yield calculations across the entire platform using 1-day, 7-day, and 30-day trailing averages derived from vault share price changes observed directly onchain. Other sources may use instantaneous rates or varying assumptions."}},{"@type":"Question","name":"How often does data on vaults.fyi update?","acceptedAnswer":{"@type":"Answer","text":"Data updates hourly. Onchain data is fetched once per hour. Near-real-time (NRT) alpha endpoints are available for use cases requiring more frequent updates."}},{"@type":"Question","name":"How does vaults.fyi get its data?","acceptedAnswer":{"@type":"Answer","text":"Vaults.fyi uses specialized smart contracts that fetch and transform onchain data in a single static function call, incurring no gas costs. RPC providers including Infura, Alchemy, and Ankr are used. Data is then stored in the vaults.fyi backend database."}},{"@type":"Question","name":"What causes significant fluctuations in APY?","acceptedAnswer":{"@type":"Answer","text":"Some vaults update their earnings at irregular intervals. When accumulated yield is finally posted, the resulting share price jump creates a large but temporary spike in calculated APY."}},{"@type":"Question","name":"How do I request new vaults or features?","acceptedAnswer":{"@type":"Answer","text":"Reach out to @vaultsfyi on X (formerly Twitter) or Farcaster. Protocol teams can submit the protocol request form to have their vault added."}},{"@type":"Question","name":"What are the requirements for vaults to be listed on vaults.fyi?","acceptedAnswer":{"@type":"Answer","text":"All key data must be available onchain from a contract address: tvl, totalSupply, pricePerShare, maxDeposit, liquidity, asset, name, lpTokenAddress, rewardTokens, and rewardTokenEmissionsPerSecond. Vaults conforming to the ERC-4626 standard are straightforward to integrate."}}]}`}} />
+Vault data is indexed from chain once per hour. Each vault's `lastUpdateTimestamp` (Unix seconds) shows the last index. For current chain state between updates, use the near-real-time endpoints (`GET /v2/nrt/vault/{network}/{vaultId}` and its `/sharePrice`, `/totalAssets`, `/totalSupply`, `/underlyingAssetPrice` variants). See [Indexing onchain data](/methodology/indexing-onchain-data).
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{__html: `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Docs","item":"https://docs.vaults.fyi"},{"@type":"ListItem","position":2,"name":"FAQ","item":"https://docs.vaults.fyi/resources/faq"}]}`}} />
+### How does vaults.fyi get its data?
+
+It runs purpose-built contracts as static calls (no gas, no onchain writes) through Infura, Alchemy and Ankr RPC providers. One call can read a value and feed it into the next calculation at a single block height. Results are stored and used for APY, TVL and scores. See [Indexing onchain data](/methodology/indexing-onchain-data).
+
+### What causes sudden APY spikes?
+
+Some vaults post earnings in batches rather than continuously. When a batch lands after hours or days, the share price jumps and short-window APY spikes temporarily. Use `apy["7day"]` or `apy["30day"]` for these vaults.
+
+## Listing and support
+
+### How are new vaults added?
+
+Based on customer requests, with priority for protocols with significant traction. Coverage started with stablecoin, ETH and liquid-staking vaults on established protocols (Aave, Compound, MakerDAO, Yearn, Lido stETH, Rocket Pool rETH) and has grown from there. Protocol teams can submit the [protocol request form](https://listings.vaults.fyi/); the team reviews each protocol before integrating.
+
+### What does a vault need to be listed?
+
+All key data must be readable onchain from the vault's contract address (or a set of addresses). The following are onchain values the vault must expose. They are **not** API field names.
+
+- TVL, denominated in the underlying token
+- Total supply of the vault's share (LP) token, if it has one
+- Price per share (normally TVL ÷ total supply, or an equivalent growth indicator)
+- Maximum amount any user can deposit
+- Liquidity directly available for withdrawal
+- Address of the underlying ERC-20 token
+- Vault name
+- Address of the share (LP) token
+- Addresses of reward tokens, and their emission rate per second
+
+ERC-4626 vaults expose most of this directly. If reading the data needs a chain of calls across contracts, contact the team with instructions.
+
+### How do I request a vault or feature, or follow updates?
+
+Contact [@vaultsfyi](https://twitter.com/vaultsfyi) on X or Farcaster, or submit the [protocol request form](https://listings.vaults.fyi/). Weekly API and app changes are in the [Changelog](/resources/changelog).
+
+Related: [Introduction](/introduction), [Glossary](/resources/glossary), [API conventions](/api-reference/conventions).

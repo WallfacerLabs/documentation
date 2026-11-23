@@ -1,45 +1,93 @@
 ---
-title: "AI Agents & LLMs: Onchain Yield with Vaults.fyi"
-description: "Use the Vaults.fyi API to build AI agents that discover, evaluate, execute, and manage DeFi yield strategies — no protocol-specific logic required."
+title: "AI agents: what you can build with vaults.fyi and which surface to use"
 sidebarTitle: "Overview"
+description: "What an AI agent can do with vaults.fyi (discover vaults, read positions, build unsigned transactions) and when to use the REST API, SDK, MCP server, x402 pay-per-request or llms.txt."
 ---
 
-Vaults.fyi gives AI agents and LLMs a single, structured interface to the onchain yield market. Instead of writing protocol-specific integrations for each of the 80+ supported protocols, including Solana protocols available through the Beta SVM API, you call one API that handles discovery, evaluation, transaction preparation, and portfolio management — and returns data in a consistent format your agent can reason over directly.
+This page answers two questions: what an AI agent can do with vaults.fyi, and which access surface to use for each job (REST API, SDK, API MCP server, x402 pay-per-request, Docs MCP, llms.txt). Read it before you wire vaults.fyi into an agent. Then read [Rules for agents](/ai-agents/rules-for-agents), a compact rule list to paste into the agent's context, and [Transaction safety](/ai-agents/transaction-safety) if the agent builds transactions.
 
-The full API reference optimized for LLM consumption is available at [llms.txt](https://api.vaults.fyi/llms.txt). This file contains endpoint specifications, SDK usage, and best practices for credit-efficient development.
+Facts every surface depends on:
 
-## What your agent can do
+- **REST API:** base URL `https://api.vaults.fyi`, paths start with `/v2`, `/beta` or `/alpha`. Send the key as **`x-api-key: <key>`**. Get a key at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup).
+- **MCP server:** `https://mcp.vaults.fyi/mcp`. It takes the same key, but as **`Authorization: Bearer <key>`**. A Bearer header sent to the REST API is ignored, so the request counts as keyless.
+- **No key on a v2 REST endpoint** returns **HTTP 402** with an x402 payment challenge, not 401. Pay per request ([x402](/ai-agents/x402)) or add `x-api-key`.
+- **Transactions are unsigned.** vaults.fyi returns calldata. It never signs, never broadcasts, never checks the wallet balance and does not simulate. Your agent verifies each transaction, a human confirms it, and the user's wallet signs it.
 
-- **Discover yield opportunities** — Query vaults filtered by network, asset, protocol, APY range, or TVL. Every result includes standardized market data sourced hourly from onchain contracts.
-- **Evaluate risk** — Use the Reputation Score and benchmark rates to compare vaults against money-market baselines and assess protocol risk without custom logic.
-- **Execute transactions** — Receive ready-to-sign deposit, redeem, and reward-claim payloads. No intermediary contracts, fully non-custodial.
-- **Handle advanced protocols** — The API abstracts deferred deposits, delayed withdrawals, and multi-step flows so your agent doesn't need to model each protocol's behavior.
-- **Claim rewards** — Merkl reward claiming is supported via `/v2/transactions/rewards/claim/{userAddress}`.
-- **Manage portfolios** — Track user positions, detect idle assets, and surface personalized opportunities matched to wallet holdings via portfolio endpoints.
+## What an agent can do
 
-## Key advantages
+| Job | REST endpoint (v2) | MCP tool | Notes |
+|---|---|---|---|
+| Find and rank vaults | `GET /v2/detailed-vaults` | `vaults_search` | Defaults to 4 networks (`base`, `mainnet`, `arbitrum`, `optimism`) and `minTvl` 100000 USD. Sort ascending by default: send `sortOrder=desc` to rank. |
+| One vault's APY, TVL, score, warnings | `GET /v2/detailed-vaults/{network}/{vaultId}` | `vault_details` | APY is a decimal fraction: `0.0551` = 5.51%, net of fees. |
+| Compare with a market rate | `GET /v2/benchmarks/{network}?code=usd` (or `eth`) | `benchmark_apy` | Read `apy.<window>.total`. |
+| History (APY, TVL, share price) | `GET /v2/historical/{network}/{vaultId}` and `/apy`, `/tvl`, `/sharePrice` | `vault_history`, `vault_apy_history`, … | REST takes Unix seconds; MCP takes ISO 8601 strings. Oldest point first. |
+| A wallet's vault positions | `GET /v2/portfolio/positions/{userAddress}` | `positions` | Position size is `asset.positionValueInAsset` or `lpToken.balanceUsd`. `asset.balanceNative`/`balanceUsd` is the wallet's **idle** balance of the underlying token. |
+| A wallet's idle tokens and deposit ideas | `GET /v2/portfolio/idle-assets/{userAddress}`, `GET /v2/portfolio/best-deposit-options/{userAddress}` | `wallet_balances`, `best_deposit_options` | Results include non-transactional options. Filter them out. |
+| Deposit or withdraw | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`, then `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | `transaction_context`, then `build_vault_tx` | `userAddress` comes **before** `network`. Amounts are base-unit integer strings (`1000000` = 1 USDC). |
+| Queued (async) withdrawals | same two endpoints with `action` `request-redeem`, later `claim-redeem` | same tools | Read `currentRedeemStep` and `pendingRequests` from the context to know the next action. The API does not abstract the waiting. |
+| Claim Merkl rewards | `GET /v2/transactions/rewards/context/{userAddress}`, then `GET /v2/transactions/rewards/claim/{userAddress}?claimIds=<id>&claimIds=<id>` | `rewards`, then `build_claim_rewards` (one call per network) | Take `claimId` values from `claimable.<network>[]`. |
+| Solana vaults | `/beta/svm/*` (Beta) | none | Not on MCP and not on x402. |
 
-**Single API, no protocol-specific logic.** One integration covers 1,000+ vaults across 80+ protocols, including Solana/SVM vault coverage in Beta. You don't need to maintain separate adapters or ABIs per protocol.
+What vaults.fyi does **not** do for the agent:
 
-**Ready-to-sign transaction payloads.** Deposit and redeem endpoints return fully formed, signable transaction objects. Your agent submits them directly — no transaction construction required.
+- **It does not assess risk for you.** The Reputation Score is `score.vaultScore` (0 to 100; observed 27.5–99.1 in live data on 2026-10-23). It is not a risk rating, and there are no risk tiers. If you need a strict score threshold, check `score.vaultScore` client-side, and drop vaults with non-empty `warnings` or `flags`, `isCorrupted: true` or `isTransactional: false`.
+- **It does not check whether the transaction will succeed.** A deposit payload is returned even if the wallet's balance is too low. Check both yourself and simulate before signing ([Transaction safety](/ai-agents/transaction-safety)).
+- **It does not choose for the user.** Recommendation endpoints (`best-vault`, `best-deposit-options`) are suggestions. `best-vault` picks, per asset the wallet holds, the vault with the highest total APY for `apyInterval` (default `7day`) among featured vaults without warnings, then returns the asset/vault pair with the highest projected annual earnings. It does not filter on `isTransactional`; pass `onlyTransactional=true` if you will build a deposit.
 
-**Reputation scores and benchmarks for risk assessment.** Every vault exposes a reputation score and is benchmarked against reference rates. Your agent can filter by risk tier without custom scoring logic.
+## Which surface to use
 
-**Advanced protocol handling is abstracted.** Deferred deposits, delayed withdrawals, and queued redemptions are handled by the API layer. Your agent sees a consistent interface regardless of the underlying protocol's mechanics.
+| Surface | Use it when | Auth | Entry point |
+|---|---|---|---|
+| **REST API** | You write code (backend, script, agent tool) and want every endpoint, including Beta and Alpha | `x-api-key: <key>` | [API overview](/api-reference/overview), [Conventions](/api-reference/conventions), OpenAPI: `https://api.vaults.fyi/v2/documentation/json` (also `/beta/documentation/json`, `/alpha/documentation/json`) |
+| **SDK** | You write TypeScript or Python and want typed wrappers over the REST API | API key | `npm install @vaultsfyi/sdk`, `pip install vaultsfyi`. See [SDK quickstart](/sdk/quickstart) |
+| **API MCP server** | An MCP client (Claude Code, Claude Desktop, Cursor) should query live data or build unsigned transactions in conversation | `Authorization: Bearer <key>` | `https://mcp.vaults.fyi/mcp`. See [MCP server](/ai-agents/mcp-server) |
+| **x402 pay-per-request** | An autonomous agent has a Base wallet with USDC and no API key | None. It pays USDC on Base per request | Any v2 REST endpoint without `x-api-key`. See [x402](/ai-agents/x402) |
+| **Docs MCP** | An MCP client should search and read these docs and the OpenAPI specs | None | `https://docs.vaults.fyi/mcp` (tools `search_vaults_fyi`, `query_docs_filesystem_vaults_fyi`) |
+| **llms.txt / Markdown pages** | An LLM should read the docs directly | None | `https://docs.vaults.fyi/llms.txt` (index), `https://docs.vaults.fyi/llms-full.txt` (everything). Every page is also available as Markdown at `<page URL>.md` |
 
-**Reward claiming via Merkl.** The API integrates Merkl reward data and generates ready-to-submit claim transactions, so agents can manage the full yield lifecycle including harvesting.
+How to choose:
 
-**Portfolio management endpoints.** Endpoints like `/v2/portfolio/positions/{userAddress}`, `/v2/portfolio/idle-assets/{userAddress}`, and `/v2/portfolio/best-vault/{userAddress}` give agents the full context they need to make allocation decisions for a given wallet.
+- **The agent writes integration code** → REST API (or SDK) for the code, plus the Docs MCP or `llms.txt` to read docs. Copy endpoint paths from the OpenAPI spec, not from memory.
+- **The agent answers questions or prepares transactions in chat** → API MCP server. Its tools return JSON inside `result.content[0].text`; parse it.
+- **The agent has no API key and pays its own way** → x402 on the REST API. MCP needs a key and has no x402 option.
+- **You need Solana, Beta or Alpha endpoints** → REST API with a key. Beta, Alpha and NRT (`/v2/nrt/*`) endpoints need an API key: they are not offered over x402. The MCP server has no tools for them.
 
-## Integration options
+### The two `llms.txt` files
 
-Choose the integration method that fits your workflow:
+Use `https://docs.vaults.fyi/llms.txt`, the index of this site, rather than other copies such as `https://api.vaults.fyi/llms.txt`.
 
-<CardGroup cols={2}>
-  <Card title="MCP server" icon="hammer" href="/ai-agents/mcp-server">
-    Connect Claude Desktop, Claude Code, Cursor, or any streamable-HTTP MCP client to the full Vaults.fyi tool surface. 38 tools for discovery, history, recommendations, position tracking, and onchain transaction building.
-  </Card>
-  <Card title="x402 pay-per-request" icon="credit-card" href="/ai-agents/x402">
-    Access the API without an API key using the x402 payment protocol. Your agent pays per request in USDC on Base — ideal for autonomous systems with their own onchain wallets.
-  </Card>
-</CardGroup>
+## Start small: three first calls
+
+Costs are in credits (CU). Pay-as-you-go is $0.002 per credit ([Credits](/plans/credits)).
+
+1. **Data only** (1 + 3 CU per vault returned):
+
+   ```bash
+   curl -sS "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&minTvl=10000000&sortBy=apy7day&sortOrder=desc&perPage=5" \
+     -H "x-api-key: $VAULTSFYI_API_KEY"
+   ```
+
+2. **Transaction context, then payload** (3 CU + 5 CU). The path order is `{userAddress}/{network}/{vaultId}`:
+
+   ```bash
+   curl -sS "https://api.vaults.fyi/v2/transactions/context/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+     -H "x-api-key: $VAULTSFYI_API_KEY"
+   curl -sS "https://api.vaults.fyi/v2/transactions/deposit/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845?assetAddress=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913&amount=1000000" \
+     -H "x-api-key: $VAULTSFYI_API_KEY"
+   ```
+
+   The response is `{currentActionIndex, actions[]}`, each action being `{name, tx: {to, chainId, data, value?}}`. Verify, confirm and sign in order ([Transaction safety](/ai-agents/transaction-safety)).
+
+3. **Keyless:** the same `GET /v2/networks` without `x-api-key` returns 402 with a price of `"2000"` ($0.002 in USDC base units) ([x402](/ai-agents/x402)).
+
+## Related pages
+
+- [Rules for agents](/ai-agents/rules-for-agents): rules that prevent the mistakes agents actually make
+- [Transaction safety](/ai-agents/transaction-safety): what to verify before anyone signs
+- [MCP server](/ai-agents/mcp-server): setup and tools
+- [x402 pay-per-request](/ai-agents/x402): keyless access with USDC on Base
+- [Conventions](/api-reference/conventions): units, identifiers, default network scope, array parameters, pagination
+- [Errors](/api-reference/errors): status codes, 402 body, retry policy
+- [Transaction flows](/concepts/transaction-flows): deposit, redeem, queued withdrawals and rewards end to end
+
+_Last updated: 2026-10-23. Facts on this page were checked against the live API and MCP server on that date._

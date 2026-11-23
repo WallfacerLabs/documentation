@@ -1,75 +1,125 @@
 ---
-title: "Portfolio Tracking"
-description: "Track user positions across protocols, detect idle assets, surface personalized deposit options, and report PnL — all from one API."
+title: "Portfolio tracking"
 sidebarTitle: "Portfolio Tracking"
+description: "Read a wallet's vault positions, idle tokens, returns, events and deposit suggestions from /v2/portfolio/*; position size is asset.positionValueInAsset or lpToken.balanceUsd, never asset.balanceNative/balanceUsd (wallet balance, repeated per position)."
 ---
 
-The Vaults.fyi portfolio API gives you a unified view of a user's DeFi yield activity across all supported protocols and networks. Instead of querying each protocol separately and normalizing the results yourself, you get aggregated position data, transaction history, and deposit options for any wallet address in a single integration.
+This page shows how to read a wallet's DeFi vault activity with the `/v2/portfolio/*` endpoints: current positions, idle tokens, lifetime returns, deposit/withdrawal history and personalized deposit suggestions. Use it to build a positions screen, an "earn on your idle balance" prompt, or a returns report. All endpoints take a wallet `userAddress` (`0x` + 40 hex; ENS is not resolved) and need the `x-api-key` header on `https://api.vaults.fyi`. The most common mistake is in the balance fields: in position objects, `asset.balanceNative` and `asset.balanceUsd` are the **wallet's idle balance** of the deposit token, not the position.
 
-If you want a packaged position view instead of building the UI yourself, the [embeddable widget](/use-cases/embeddable-widget) can combine discovery, user positions, and transaction-ready flows in a branded Earn surface.
+## Endpoints
 
-## Position tracking
+| Need | Endpoint | Returns | Cost |
+| - | - | - | - |
+| All positions | `GET /v2/portfolio/positions/{userAddress}` | `{data[], errors}`, one entry per vault position | 5 |
+| One position | `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}` | One position object | 1 |
+| Idle tokens (not in a vault) | `GET /v2/portfolio/idle-assets/{userAddress}` | `{data[], errors}`, one entry per token and network | 5 |
+| Lifetime returns in one vault | `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}` | Asset info + `returnsNative` | 1 |
+| Deposit/withdrawal history in one vault | `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}` | `{asset, lpToken, data[], items}` | 3 |
+| Best single vault for the wallet | `GET /v2/portfolio/best-vault/{userAddress}` | `{requestedAddress, asset, vault}` | 2 |
+| Ranked vaults per held token | `GET /v2/portfolio/best-deposit-options/{userAddress}` | `{requestedAddress, userBalances[]}` | 1 + 2 per item |
+| Returns over a time window | `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}?fromTimestamp=<s>` | Beta | see [Credits](/plans/credits) |
 
-Call `GET /v2/portfolio/positions/{userAddress}` to retrieve a complete picture of a user's onchain yield activity.
+Portfolio endpoints are **not paginated**: there is no `page`, `nextPage` or `itemsOnPage`. Events return all items with a total in `items`.
 
-The response includes:
+Returns and events require `userEventsIndexed: true` on the vault (a field of the detailed-vault response).
 
-- **Balances.** Current token balances across all supported networks, including idle assets not currently earning yield.
-- **Active positions.** Each vault position with its current balance in native token and USD, unclaimed rewards, and estimated returns since deposit.
-- **Transaction history.** A chronological record of past deposit, redeem, and claim transactions for the address.
+## Default scope: four networks
 
-<Note>
-One integration covers positions across hundreds of vaults. You don't need to write per-protocol logic to aggregate this data.
-</Note>
+`positions`, `idle-assets`, `best-vault` and `best-deposit-options` cover only `base`, `mainnet`, `arbitrum` and `optimism` unless you pass `allowedNetworks`. Repeat the key per network: `allowedNetworks=base&allowedNetworks=polygon&allowedNetworks=bsc`. A comma list returns no results and echoes the value in `errors.unsupportedNetworks`. Other defaults:
 
-## Idle asset detection
+| Endpoint | Defaults that hide results |
+| - | - |
+| `positions/{userAddress}` | `minTvl=100000` (vault TVL in USD), `minUsdAssetValueThreshold=1`, `apyInterval=7day`, `allowVaultsWithWarnings=true` |
+| `idle-assets` | `minUsdAssetValueThreshold=0.5` |
+| `best-vault` | `onlyAppFeatured=true`, `allowVaultsWithWarnings=false`, `minTvl=100000`, `minUsdAssetValueThreshold=1`, `apyInterval=7day` |
+| `best-deposit-options` | Same as best-vault, plus `maxVaultsPerAsset=3` |
 
-The portfolio endpoint surfaces tokens sitting in a user's wallet that are not currently earning yield. You can use this signal to prompt users with relevant deposit opportunities — for example, showing a banner when a user holds USDC on Base with no active position.
+## Position fields: what each balance means
 
-This is the same data that powers the personalized deposit options described below.
+| Field | Meaning | Unit |
+| - | - | - |
+| `asset.positionValueInAsset` | **Position size**: the wallet's holding in this vault, expressed in the deposit asset | Integer string, asset base units (÷ 10^`asset.decimals`) |
+| `lpToken.balanceNative` | Vault share (LP) tokens the wallet holds | Integer string, LP base units (÷ 10^`lpToken.decimals`) |
+| `lpToken.balanceUsd` | USD value of those shares: **use this for USD position value and totals** | Decimal string, USD |
+| `asset.balanceNative` | **The wallet's idle balance of the deposit token**, not the position. Repeated identically on every position with the same asset | Integer string, asset base units |
+| `asset.balanceUsd` | USD value of that idle wallet balance. Repeated per position. **Never sum it** | Decimal string, USD |
+| `asset.unclaimedNative`, `asset.unclaimedUsd` | Underlying held in the protocol's withdrawal queue for this wallet (requested, pending or ready to claim). **Not rewards**, despite the spec wording "Unclaimed balance"; rewards are under `/v2/transactions/rewards/context/{userAddress}` | Integer string, asset base units / USD |
+| `apy.base`, `apy.reward`, `apy.total` | The vault's current APY for `apyInterval` (default `7day`) | Decimal fraction |
+| `childrenVaults[]` | Nested positions (for example stETH → wstETH), each with its own `asset` and `lpToken` | — |
 
-## Personalized deposit options
+To rank positions by size, sort client-side on `lpToken.balanceUsd`.
 
-<CardGroup cols={2}>
-  <Card title="Best deposit options" icon="list-check" href="/api-reference/portfolio">
-    `GET /v2/portfolio/best-deposit-options/{userAddress}` returns ranked yield opportunities that match the user's idle token holdings. Filter by network, minimum TVL, and preferred protocols.
-  </Card>
-  <Card title="Best single vault" icon="trophy" href="/api-reference/portfolio">
-    `GET /v2/portfolio/best-vault/{userAddress}` returns the single best-fit vault for the user's current parameters — useful for a one-tap "earn" action.
-  </Card>
-</CardGroup>
+Real response (2026-10-23, `GET /v2/portfolio/positions/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`, trimmed to three positions and selected fields):
 
-Deposit options are computed from the user's actual wallet holdings, so you surface only relevant opportunities. A user holding WETH on Arbitrum won't see USDC vaults on mainnet.
+```json
+{
+  "data": [
+    { "name": "Lido stETH", "network": { "name": "mainnet" },
+      "asset":   { "symbol": "ETH", "decimals": 18, "balanceNative": "5773252986299759339", "balanceUsd": "13889.92107116", "positionValueInAsset": "10424207939987" },
+      "lpToken": { "symbol": "stETH", "balanceNative": "10424207939987", "balanceUsd": "0.02507969525317493631935809" },
+      "apy": { "base": 0.0225, "reward": 0, "total": 0.0225 } },
+    { "name": "ether.fi eETH", "network": { "name": "mainnet" },
+      "asset":   { "symbol": "ETH", "balanceNative": "5773252986299759339", "balanceUsd": "13889.92107116", "positionValueInAsset": "0" },
+      "lpToken": { "balanceUsd": "0" } },
+    { "name": "Savings USDS", "network": { "name": "mainnet" },
+      "asset":   { "symbol": "USDS", "decimals": 18, "balanceNative": "0", "positionValueInAsset": "47994839804228584011" },
+      "lpToken": { "balanceUsd": "47.9786511447626177096130897" } }
+  ],
+  "errors": { "unsupportedNetworks": [], "unsupportedAssets": [] }
+}
+```
 
-<Tip>
-Use filters such as `minTvl` and `allowedProtocols` on the best-deposit-options endpoint to enforce your own quality bar before showing deposit options to users.
-</Tip>
+Read it correctly: the stETH position is worth about $0.025 (`lpToken.balanceUsd`), not $13,889. The $13,889 is the wallet's idle ETH, and it appears again on the eETH entry. The USDS position is 47.99 USDS ($47.98). Across these three entries the positions total ≈ $48.00; summing `asset.balanceUsd` instead would give $27,779.84.
 
-## PnL and returns tracking
+```python
+total_usd = sum(float(p["lpToken"].get("balanceUsd") or 0) for p in body["data"])
+for p in body["data"]:
+    size = int(p["asset"]["positionValueInAsset"]) / 10 ** p["asset"]["decimals"]
+    print(p["name"], size, p["asset"]["symbol"])
+```
 
-Active position data includes estimated returns since the user entered the vault. You can use this to display:
+```typescript
+const totalUsd = body.data.reduce((s: number, p: any) => s + Number(p.lpToken.balanceUsd ?? 0), 0);
+```
 
-- **Yield earned to date** — show how much a user has earned in USD or native token terms.
-- **Current vs. entry APY** — highlight whether the vault's rate has changed since deposit.
-- **Unclaimed rewards** — surface pending reward balances so users know when to claim.
+## Idle tokens
+
+`GET /v2/portfolio/idle-assets/{userAddress}` lists tokens in the wallet (on the default four networks unless `allowedNetworks` is set) with `balanceNative` (base units), `balanceUsd` and `network`. Sort with `sortBy=balanceUsd&sortDirection=desc` (this endpoint uses `sortDirection`, not `sortOrder`).
+
+Real response (2026-10-23, trimmed to one item):
+
+```json
+{ "data": [{ "symbol": "ETH", "decimals": 18, "balanceNative": "5773252986299759339", "balanceUsd": "13889.921071169716",
+             "network": { "name": "mainnet", "chainId": 1, "networkCaip": "eip155:1" } }],
+  "errors": { "unsupportedNetworks": [], "unsupportedAssets": [] } }
+```
+
+Use it for prompts such as "You hold 78.99 USDC on Base with no position".
+
+## Deposit suggestions
+
+- `GET /v2/portfolio/best-deposit-options/{userAddress}` returns `userBalances[]`: for each token the wallet holds, `asset` (the wallet balance) and `depositOptions[]` (vaults with `apy` and `projectedUsdAnnualEarnings`). Only vaults for tokens the wallet actually holds are suggested.
+- `GET /v2/portfolio/best-vault/{userAddress}` returns one `vault` for the wallet's best-matching holding.
+
+**`best-vault` can return a vault that cannot be transacted** (`isTransactional: false`; observed 2026-10-23). Pass `onlyTransactional=true` on both endpoints if you will build a deposit. Also apply your own quality bar with `minTvl`, `allowedProtocols` and a client-side `score` check (see [Reputation Score](/methodology/reputation-score)).
+
+## Returns and history
+
+- `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}` → `returnsNative`: lifetime yield earned in this vault, integer string in asset base units. Example: `"returnsNative": "0"` for a wallet with no history in the vault.
+- `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}` → `data[]` of events, oldest first, each with `eventType` (`deposit` or `withdrawal`), `timestamp` (Unix seconds), `blockNumber`, `assetAmountNative` (asset base units), `lpTokenAmount` (LP base units), `sharePrice` (number), `transactionHash`, `logIndex`. `items` is the total count.
+- For a time window, use the Beta `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}?fromTimestamp=<s>`.
+
+There is no "entry APY" field. To compare current APY with history, use `GET /v2/historical/{network}/{vaultId}` at the deposit timestamps.
 
 ## Example use cases
 
-<AccordionGroup>
-  <Accordion title="Yield aggregator dashboard">
-    Display a user's full DeFi yield portfolio in one view — positions across Aave, Morpho, Spark, and more — without building separate integrations for each protocol.
-  </Accordion>
-  <Accordion title="Wallet app yield surface">
-    Detect idle assets in a user's wallet and recommend the best single vault for each token. Kraken Wallet uses this pattern to surface yield opportunities directly in the app.
-  </Accordion>
-  <Accordion title="Earnings reporting">
-    Pull transaction history and returns data to generate a monthly yield report for a user, showing deposits made, yield earned, and current position value.
-  </Accordion>
-  <Accordion title="Rewards notification">
-    Periodically check unclaimed reward balances across a user's positions and trigger a notification when rewards exceed a threshold worth claiming.
-  </Accordion>
-</AccordionGroup>
+| Use case | Calls |
+| - | - |
+| Yield dashboard | `positions/{userAddress}` with `allowedNetworks` for every network you support; sum `lpToken.balanceUsd` |
+| Idle-balance prompt | `idle-assets/{userAddress}` → `best-deposit-options/{userAddress}?onlyTransactional=true` |
+| Monthly earnings report | For each position with `userEventsIndexed`: `total-returns` and `events` |
+| Rewards notification | `GET /v2/transactions/rewards/context/{userAddress}` (3 credits) → sum `claimable.<network>[].asset.claimableAmountInUsd` |
 
-## API reference
+For a packaged UI, see the [embeddable widget](/use-cases/embeddable-widget).
 
-See the full endpoint reference at [/api/portfolio](/api-reference/portfolio), or explore the live spec at `https://api.vaults.fyi/v2/documentation/`.
+Related: [Transaction flows](/concepts/transaction-flows), [API conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Glossary](/resources/glossary). Endpoint reference: [List portfolio positions](/api-reference/portfolio/list-portfolio-positions), [List idle assets](/api-reference/portfolio/list-idle-assets).

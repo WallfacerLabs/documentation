@@ -1,11 +1,49 @@
 ---
-title: "Benchmarks"
-description: "DeFi benchmark APY rates for USD and ETH strategies, including historical time-series."
+title: "Benchmarks: USD and ETH benchmark APY"
+sidebarTitle: "Benchmarks"
+description: "Index of the v2 benchmark endpoints: current and historical vaults.fyi benchmark APY for USD (code=usd) or ETH (code=eth) strategies on a network, 3 credits per call, with links to both endpoint pages."
 ---
 
-Reference rates representing baseline DeFi yield for USD and ETH strategies. Use these to compare vault performance against the broader market.
+This section lists the v2 endpoints for the vaults.fyi benchmark rates: a reference APY for USD and ETH strategies on a network. Use them to tell whether a vault's yield beats the market baseline. The methodology is on [Benchmark rates](/methodology/benchmark-rates).
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Fetch the current benchmark rate for a network | [`GET /v2/benchmarks/{network}`](/api-reference/benchmarks/get-benchmark-rate) | Path: `network`. Query: `code` |
-| Fetch historical benchmark rates for a network | [`GET /v2/historical-benchmarks/{network}`](/api-reference/benchmarks/get-historical-benchmarks) | Path: `network`. Query: `code`. Optional query: `fromTimestamp`, `toTimestamp`, `page`, `perPage` |
+All requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Without a key, v2 endpoints return 402 (an [x402](/ai-agents/x402) payment challenge); beta, alpha and NRT endpoints need an API key. APY values are decimal fractions net of fees (`0.0315` = 3.15%); token amounts are integer strings in base units; timestamps are Unix seconds. See [Conventions](/api-reference/conventions).
+
+## Endpoints
+
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /v2/benchmarks/{network}`](/api-reference/benchmarks/get-benchmark-rate) | Current vaults.fyi benchmark APY for USD (`code=usd`) or ETH (`code=eth`) strategies on a network. `code` is required. | Path: `network`; Query: `code` | 3 |
+| [`GET /v2/historical-benchmarks/{network}`](/api-reference/benchmarks/get-historical-benchmarks) | Benchmark APY history for `code=usd` or `code=eth`. | Path: `network`; Query: `code` | 3 + 3 per data point |
+
+Credits are from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit.
+
+## Things to know
+
+- `code` is **required** and must be `usd` or `eth`. `code=btc` or a missing `code` returns 400.
+- The response `apy` has windows `1day`, `7day`, `30day`, `90day`, each `{base, reward, total}` as a decimal fraction. The spec marks `apy` as nullable.
+- `timestamp` is Unix seconds.
+- Historical benchmarks are oldest first, `fromTimestamp` defaults to 0, and `perPage` goes up to 20000. Windows before the first data point return empty pages.
+
+## Example
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" "https://api.vaults.fyi/v2/benchmarks/base?code=usd"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{
+  "apy": {
+    "1day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "7day":  { "base": 0.0407, "reward": 0, "total": 0.0407 },
+    "30day": { "base": 0.0395, "reward": 0, "total": 0.0395 },
+    "90day": { "base": 0.0382, "reward": 0, "total": 0.0382 }
+  },
+  "timestamp": 1792713600
+}
+```
+
+The 7-day USD benchmark on Base was 4.07%.
+
+Related: [Historical](/api-reference/historical), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors).

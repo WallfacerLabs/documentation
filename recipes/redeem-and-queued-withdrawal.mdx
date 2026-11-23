@@ -1,0 +1,273 @@
+---
+title: "Recipe: withdraw from instant and queued vaults (redeem, request-redeem, claim-redeem)"
+sidebarTitle: "Redeem and queued withdrawal"
+description: "Executed recipe: read currentRedeemStep from the transaction context, build redeem with all=true for instant vaults or request-redeem then claim-redeem for queued vaults, track pendingRequests, and sign in order with viem (shown, not executed)."
+---
+
+This recipe answers "how do I withdraw a user's position, including from vaults with a withdrawal queue?" It reads the transaction context to learn which redeem step comes next, builds the right payload, and shows how to sign it. Instant vaults need one `redeem`; queued vaults need `request-redeem`, a waiting period, then `claim-redeem`. Use it in any withdraw flow.
+
+Every request goes to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Amounts are base-unit integer strings. Original live outputs were recorded on 2026-10-23 against the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`; outputs are real. Unit/sender edits were checked offline on 2026-10-30 (the unit check uses synthetic distinct asset/share balances). **No transaction was signed or sent.**
+
+## Benchmark tasks covered
+
+T13 (withdraw from a queued-redemption vault). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY`.
+- The vault's `network` and `vaultId`, and the user's 0x address.
+- curl and jq, Python 3.9+ with `requests`, or Node.js 18+ with `viem` for signing.
+
+## Credit cost
+
+Context 3 + payload 5 = **8 credits per step**. A queued withdrawal has two steps (request, later claim) plus polling the context (3 credits per poll) ([credits](/plans/credits)).
+
+## Redeem steps
+
+| `currentRedeemStep` | Meaning | Next call |
+| - | - | - |
+| `redeem` | Instant vault | `GET /v2/transactions/redeem/...` with `all=true` or an `amount` |
+| `request-redeem` | Queued vault, nothing requested yet | `GET /v2/transactions/request-redeem/...` with `all=true` (full position; observed accepted, 200) or an `amount`, plus `assetAddress` |
+| `claim-redeem` | A request is ready to claim | `GET /v2/transactions/claim-redeem/...` |
+
+`redeemSteps[]` lists the full sequence for the vault; `pendingRequests.redeems[]` lists open requests with `status` (`pending` or `ready`) and `estimatedResolution`. Other steps exist on some vaults (for example `start-redeem-cooldown`); handle them explicitly rather than guessing.
+
+## Partial withdrawals: convert assets to shares
+
+`redeem` / `request-redeem` take **share base units** for ERC-4626, ERC-7540, Ethena, Veda/BoringVault and Compound v2 (cTokens). Aave v3/v4, Compound v3 and borrow-market aliases take **underlying-asset base units** instead. Lido requests take **stETH vault-token base units**, not an assumed exact ETH conversion. For a full exit, prefer `all=true`.
+
+For a share-unit protocol, `shares = assets / sharePrice`; submit `amount = floor((assetBaseUnits / 10^asset.decimals) / sharePrice * 10^lpToken.decimals)`. Get `sharePrice` (asset tokens per share, already decimals-adjusted) from `GET /v2/nrt/vault/{network}/{vaultId}` or the detailed-vault record; read `asset.decimals` and `lpToken.decimals` from the detailed vault/context. Use decimal or integer-rational arithmetic, never JavaScript `Number` for base-unit integers. Worked preview using the cached Base Steakhouse price `1.01395919150542`, 6 asset decimals and 18 share decimals: 100 USDC is `100000000` asset base units; `floor(100 / 1.01395919150542 * 10^18) = 98623298489489023703` share base units. Pass that integer as the redeem `amount`, **not** `100000000`.
+
+This is a rounded-down estimate, not a guarantee of exactly 100 USDC: indexed/NRT prices have finite precision and can move. For an exact asset-target exit, use the vault's on-chain `previewWithdraw` / conversion method and verify rounding, share balance and decoded calldata before signing; never silently cap the requested exit to available holdings.
+
+## curl
+
+```bash
+# Withdrawals, read-only. Read the context first: it tells you which redeem step is next.
+USER=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+# Queued vault (Lido stETH on mainnet): currentRedeemStep is request-redeem, then claim-redeem later.
+curl -sS --fail-with-body "https://api.vaults.fyi/v2/transactions/context/$USER/mainnet/0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+| jq '{currentRedeemStep, redeemSteps: [.redeemSteps[] | {name, actions}], pendingRequests,
+       positionValueInAsset: .asset.positionValueInAsset, lpBalance: .lpToken.balanceNative}'
+# Instant vault (Steakhouse USDC on Base): one redeem call; all=true redeems the whole position.
+curl -sS --fail-with-body -G "https://api.vaults.fyi/v2/transactions/redeem/$USER/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" \
+  -H "x-api-key: $VAULTSFYI_API_KEY" \
+  --data-urlencode "assetAddress=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" \
+  --data-urlencode "all=true" \
+| jq '[.actions[] | {name, to: .tx.to, chainId: .tx.chainId}]'
+```
+
+Output (2026-10-23):
+
+```json
+{
+  "currentRedeemStep": "request-redeem",
+  "redeemSteps": [
+    {
+      "name": "request-redeem",
+      "actions": [
+        "approve",
+        "request"
+      ]
+    },
+    {
+      "name": "claim-redeem",
+      "actions": [
+        "claim"
+      ]
+    }
+  ],
+  "pendingRequests": null,
+  "positionValueInAsset": "10424842274072",
+  "lpBalance": "10424842274072"
+}
+[
+  {
+    "name": "Redeem all USDC from Steakhouse High Yield USDC Edition vault",
+    "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845",
+    "chainId": 8453
+  }
+]
+```
+
+Lido stETH is a queued vault: `request-redeem` (approve + request) now, `claim-redeem` once the request is ready.
+
+## Python
+
+```python
+"""Withdraw from instant and queued (request -> wait -> claim) vaults. Read-only: builds payloads only."""
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+USER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+
+
+def get(path, params=None):
+    r = requests.get(f"{API}{path}", headers=HEADERS, params=params, timeout=30)
+    if not r.ok:
+        raise SystemExit(f"HTTP {r.status_code}: {r.text}")
+    return r.json()
+
+
+def plan_withdrawal(network, vault_id):
+    ctx = get(f"/v2/transactions/context/{USER}/{network}/{vault_id}")
+    step = ctx["currentRedeemStep"]  # what to build NEXT: redeem | request-redeem | claim-redeem | ...
+    steps = [s["name"] for s in ctx["redeemSteps"]]
+    asset = ctx["asset"]
+    print(f"{network}/{vault_id}: steps {steps}, next = {step}, position {asset['positionValueInAsset']} base units")
+
+    if step == "redeem":  # instant vault: one call, all=true takes the full position
+        p = get(f"/v2/transactions/redeem/{USER}/{network}/{vault_id}",
+                {"assetAddress": asset["address"], "all": "true"})
+    elif step == "request-redeem":  # queued vault: enter the withdrawal queue
+        # This example is Lido: request stETH vault-token base units, not ETH asset units.
+        p = get(f"/v2/transactions/request-redeem/{USER}/{network}/{vault_id}",
+                {"assetAddress": asset["address"], "amount": ctx["lpToken"]["balanceNative"]})
+    elif step == "claim-redeem":  # request fulfilled: claim the assets
+        p = get(f"/v2/transactions/claim-redeem/{USER}/{network}/{vault_id}", {"assetAddress": asset["address"]})
+    else:
+        print(f"  step {step!r}: handle explicitly (see the context's redeemSteps)")
+        return
+    for a in p["actions"]:
+        print(f"  build {step}: {a['name']}  to={a['tx']['to']}  chainId={a['tx']['chainId']}")
+
+    # Queued requests are listed in pendingRequests.redeems[] (key absent when there are none).
+    for req in (ctx.get("pendingRequests") or {}).get("redeems", []):
+        print(f"  pending: status={req.get('status')} estimatedResolution={req.get('estimatedResolution')}")
+        # Build claim-redeem only once status == "ready" (and currentRedeemStep == "claim-redeem").
+    if not (ctx.get("pendingRequests") or {}).get("redeems"):
+        print("  no pending redeem requests")
+
+
+plan_withdrawal("base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845")     # instant (ERC-4626)
+plan_withdrawal("mainnet", "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84")  # queued (Lido stETH)
+```
+
+## TypeScript
+
+```typescript
+// Withdraw from instant and queued (request -> wait -> claim) vaults. Read-only: builds payloads only.
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+
+async function get(path: string, params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params);
+  const res = await fetch(`${API}${path}${qs.size ? `?${qs}` : ''}`, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function planWithdrawal(network: string, vaultId: string) {
+  const ctx = await get(`/v2/transactions/context/${USER}/${network}/${vaultId}`);
+  const step: string = ctx.currentRedeemStep; // redeem | request-redeem | claim-redeem | ...
+  const { address: assetAddress, positionValueInAsset } = ctx.asset;
+  console.log(`${network}/${vaultId}: steps ${ctx.redeemSteps.map((s: any) => s.name).join(' -> ')}, next = ${step}`);
+
+  let query: Record<string, string>;
+  if (step === 'redeem') query = { assetAddress, all: 'true' }; // instant: full position
+  // This example is Lido: request stETH vault-token base units, not ETH asset units.
+  else if (step === 'request-redeem') query = { assetAddress, amount: ctx.lpToken.balanceNative };
+  else if (step === 'claim-redeem') query = { assetAddress };
+  else { console.log(`  step ${step}: handle explicitly`); return; }
+
+  const p = await get(`/v2/transactions/${step}/${USER}/${network}/${vaultId}`, query);
+  for (const a of p.actions) console.log(`  build ${step}: ${a.name}  to=${a.tx.to}  chainId=${a.tx.chainId}`);
+
+  const pending = ctx.pendingRequests?.redeems ?? []; // key absent when nothing is queued
+  for (const r of pending) console.log(`  pending: status=${r.status} estimatedResolution=${r.estimatedResolution}`);
+  if (!pending.length) console.log('  no pending redeem requests');
+}
+
+await planWithdrawal('base', '0xbeeff2490FEffa212faC2f6553682C219E6a8845'); // instant (ERC-4626)
+await planWithdrawal('mainnet', '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'); // queued (Lido stETH)
+```
+
+### Output (2026-10-23)
+
+Python (TypeScript prints the same plan):
+
+```text
+base/0xbeeff2490FEffa212faC2f6553682C219E6a8845: steps ['redeem'], next = redeem, position 0 base units
+  build redeem: Redeem all USDC from Steakhouse High Yield USDC Edition vault  to=0xbeeff2490FEffa212faC2f6553682C219E6a8845  chainId=8453
+  no pending redeem requests
+mainnet/0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84: steps ['request-redeem', 'claim-redeem'], next = request-redeem, position 10424842274072 base units
+  build request-redeem: Approve stETH to the Lido stETH  to=0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84  chainId=1
+  build request-redeem: Request redeem ETH from Lido stETH vault  to=0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1  chainId=1
+  no pending redeem requests
+```
+
+The test wallet has no position in the Base vault (position 0), so the redeem payload is valid but would redeem nothing; a real UI should skip it.
+
+## Signing with viem (not executed)
+
+Same pattern for every redeem step: verify chain and target, then send `actions[currentActionIndex:]` in order, waiting for each receipt. The branch runs only with `SEND=1`.
+
+```typescript
+// Sign and send a redeem payload with viem, IN ORDER, only when SEND=1. Tests never set SEND.
+import { createPublicClient, createWalletClient, getAddress, http, type Hex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base } from 'viem/chains';
+
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+const USER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+const VAULT_ID = '0xbeeff2490FEffa212faC2f6553682C219E6a8845'; // instant ERC-4626 vault on Base
+const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+const qs = new URLSearchParams({ assetAddress: USDC, all: 'true' }); // all=true: the whole position
+const res = await fetch(`${API}/v2/transactions/redeem/${USER}/base/${VAULT_ID}?${qs}`, { headers });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const payload = await res.json();
+
+type Action = { name: string; tx: { to: Hex; chainId: number; data?: Hex; value?: string } };
+const actions: Action[] = payload.actions.slice(payload.currentActionIndex);
+for (const a of actions) { // verify before anything is signed
+  if (a.tx.chainId !== base.id) throw new Error(`wrong chain ${a.tx.chainId}`);
+  if (getAddress(a.tx.to) !== getAddress(VAULT_ID)) throw new Error(`unexpected target ${a.tx.to}`);
+  console.log(`verified: ${a.name}`);
+}
+
+if (process.env.SEND === '1') {
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex); // USER's key; never hard-code it
+  const wallet = createWalletClient({ account, chain: base, transport: http() });
+  const pub = createPublicClient({ chain: base, transport: http() });
+  for (const a of actions) {
+    const hash = await wallet.sendTransaction({ to: a.tx.to, ...(a.tx.data !== undefined ? { data: a.tx.data } : {}), value: BigInt(a.tx.value ?? 0) });
+    const receipt = await pub.waitForTransactionReceipt({ hash }); // wait before the next action
+    if (receipt.status !== 'success') throw new Error(`${a.name} reverted: ${hash}`);
+  }
+} else {
+  console.log('SEND!=1: not signing (dry run)');
+}
+```
+
+Output (2026-10-23, dry run):
+
+```text
+verified: Redeem all USDC from Steakhouse High Yield USDC Edition vault
+SEND!=1: not signing (dry run)
+```
+
+## Pitfalls
+
+- **Calling `redeem` on a queued vault.** Read `currentRedeemStep` first; a single `redeem` is not enough for queued vaults.
+- **Claiming too early.** Build `claim-redeem` only when the context says `currentRedeemStep: "claim-redeem"` and the request's `status` is `ready`.
+- **`all=true` beyond `redeem`.** The spec documents it for `redeem`, but live it is also accepted on `request-redeem` and `claim-redeem` (observed 2026-10-23, 200 on a Lagoon queued vault). `assetAddress` is still required: `all=true` without it returns 400 `assetAddress Required`. For a full queued withdrawal, prefer `request-redeem` with `all=true` over computing an amount: on `redeem` and `request-redeem` it replaces `amount` and redeems the wallet's full share balance. On `claim-redeem` it is accepted and ignored.
+- **The amount unit for `request-redeem` and partial `redeem` depends on the protocol.** `amount` is passed to the vault contract unchanged: on most vaults (ERC-4626, ERC-7540, Ethena, Veda, Compound v2) it is in **vault-share base units** (`lpToken.decimals`); on asset-based lending markets such as Aave and Compound v3 it is in underlying-asset base units. Observed on 2026-10-23 on one ERC-4626 vault (Steakhouse High Yield USDC Edition on Base): `redeem` with `amount=1000000` produced calldata `redeem(0x0f4240, receiver, owner)`, i.e. shares, not USDC. Prefer `all=true` for full withdrawals; for partial ones, decode the calldata. The Lido example uses `lpToken.balanceNative` (stETH vault-token units); do not reuse an underlying-asset position amount for a share-unit protocol.
+- **`pendingRequests` may be `null`** (as above) or omit `redeems`. Treat both as "no requests".
+- **Timestamps in `pendingRequests`** (`estimatedResolution`, `requestTimestamp`) are Unix seconds. `pendingRequests` is filled only for some queue protocols; the signal every vault provides is `currentRedeemStep` becoming `claim-redeem`.
+
+## Related pages
+
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Transaction flows: withdrawals](/concepts/transaction-flows#withdrawals).
+- [Transactions API](/api-reference/transactions).
+- [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
+- [Build a deposit](/recipes/deposit-transaction) and [claim rewards](/recipes/claim-rewards).
+
+_Updated 2026-10-30. Code ran against the live API on 2026-10-23; the revised arithmetic/unit handling was checked offline, not live-rerun._

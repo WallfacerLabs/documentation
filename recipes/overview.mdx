@@ -1,0 +1,65 @@
+---
+title: "Recipes: executed end-to-end examples for the vaults.fyi API"
+sidebarTitle: "Overview"
+description: "Index of tested vaults.fyi recipes (ranking, pagination, APY display, history vs benchmark, positions, deposits, withdrawals, rewards, errors, credits, identifiers, attribution, Solana), each mapped to the task it solves."
+---
+
+This page lists the vaults.fyi recipes: complete, runnable examples that solve one integration task end to end, each in curl, Python and TypeScript. Pick the recipe that matches your task; each page stands alone with prerequisites, credit cost, steps, real output and pitfalls.
+
+Every snippet on these pages was executed against the live API on 2026-10-23, read-only, with the public address `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`. Transaction recipes build and verify unsigned payloads and show how to sign with viem; **no transaction was signed or broadcast**. All REST calls use `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`.
+
+## Recipe index
+
+| Recipe | Solves | Main endpoints | Credits (example run) | Task IDs |
+| - | - | - | - | - |
+| [Find and rank vaults](/recipes/find-and-rank-vaults) | Top vaults for an asset/network by 7-day APY, TVL floor, no warnings, minimum score | `GET /v2/detailed-vaults` | 16 | T01, T10 |
+| [Paginate all vaults](/recipes/paginate-all-vaults) | Every vault, every page, every network | `GET /v2/vaults`, `GET /v2/detailed-vaults` | 1 + 224 | T02 |
+| [Display APY correctly](/recipes/display-apy-correctly) | `total` vs `base` vs `reward`, windows, `apyComposite` | `GET /v2/detailed-vaults/{network}/{vaultId}` | 3 per vault | T03 |
+| [Vault history vs benchmark](/recipes/vault-history-vs-benchmark) | 90 days of daily APY; vault vs USD benchmark | `GET /v2/historical/{network}/{vaultId}/apy`, `GET /v2/benchmarks/{network}` | 97 | T07, T18 |
+| [Positions and balances](/recipes/positions-and-balances) | Position size in human units, without double counting | `GET /v2/portfolio/positions/{userAddress}` | 5 | T09 |
+| [Build a deposit](/recipes/deposit-transaction) | Context → payload → verify → sign in order | `GET /v2/transactions/context/...`, `GET /v2/transactions/deposit/...` | 8 | T04, T22 |
+| [Redeem and queued withdrawals](/recipes/redeem-and-queued-withdrawal) | Instant `redeem`; `request-redeem` → `claim-redeem` | `GET /v2/transactions/{action}/...` | 8 per step | T13 |
+| [Claim rewards](/recipes/claim-rewards) | Claim all rewards, per network | `GET /v2/transactions/rewards/context/...`, `GET /v2/transactions/rewards/claim/...` | 8 | T12 |
+| [Near-real-time share price](/recipes/near-real-time-share-price) | Fresh share price for a deposit preview | `GET /v2/nrt/vault/{network}/{vaultId}` | not documented | T17 |
+| [Handle errors and retries](/recipes/handle-errors-and-retries) | 402 vs 401 vs 403, 400 issues, soft errors, rate limits, backoff | any | — | T05, T15, T16 |
+| [Estimate credit cost](/recipes/estimate-credit-cost) | Monthly credits and plan for a workload | `GET /v2/detailed-vaults` | 10 | T14 |
+| [Network and vault IDs](/recipes/network-and-vault-ids) | "Ethereum" / "chain 8453" → API value; where `vaultId` comes from | `GET /v2/networks`, `GET /v2/vaults` | 2 | T19, T21 |
+| [TVL attribution suffix](/recipes/tvl-attribution-suffix) | Attribution for self-built calldata | `GET /v2/transactions/suffix/{userAddress}/{vaultId}` | 1 | T20 |
+| [Solana deposit (Beta)](/recipes/solana-deposit) | Unsigned Solana deposit | `GET /beta/svm/transactions/...` | 8 | T24 |
+
+## Tasks not covered by a recipe
+
+These benchmark tasks are answered by reference pages rather than code recipes:
+
+| Task | Where |
+| - | - |
+| T06: connect the MCP server to Claude Code | [MCP server](/ai-agents/mcp-server) |
+| T08: keyless x402 call and its price | [x402](/ai-agents/x402) |
+| T11: idle tokens → deposit options | [Portfolio tracking](/concepts/portfolio-tracking) |
+| T22: what to verify before signing (also in the deposit recipe) | [Transaction safety](/ai-agents/transaction-safety) |
+| T23: is beta/alpha production-safe? | [Versioning](/api-reference/versioning) |
+| T25: which MCP tool and arguments for a filtered search | [MCP server](/ai-agents/mcp-server) |
+
+## Rules every recipe follows
+
+- **Auth:** `x-api-key` header on REST. Without it, v2 endpoints return 402 (x402 payment challenge), not 401.
+- **Units:** APY is a decimal fraction, net of fees. Token amounts are base-unit integer strings. Timestamps are Unix seconds.
+- **Defaults:** list and portfolio endpoints search only base, mainnet, arbitrum and optimism unless you pass `allowedNetworks`; `/v2/detailed-vaults` also defaults to `minTvl=100000` and `sortOrder=asc`.
+- **Arrays:** repeat the query key (`allowedNetworks=base&allowedNetworks=arbitrum`).
+- **Pagination:** `nextPage` is absent on the last page.
+- **Soft errors:** a 200 can carry `errors.unsupported*`; treat non-empty lists as errors.
+- **Transactions:** context first, verify every action, send in order, never let an API or agent hold a private key.
+
+## SDK equivalents
+
+The [SDK quickstart](/sdk/quickstart) and [SDK reference](/sdk/reference) cover `@vaultsfyi/sdk` 2.3.14 (TypeScript) and `vaultsfyi` 1.3.0 (Python) with the same tested approach; the [wallet integration](/sdk/tutorials/wallet-integration) and [data analytics](/sdk/tutorials/data-analytics) tutorials are SDK versions of several recipes.
+
+## Related pages
+
+- [API conventions](/api-reference/conventions)
+- [Errors](/api-reference/errors)
+- [Transaction safety](/ai-agents/transaction-safety)
+- [Rules for agents](/ai-agents/rules-for-agents)
+- [Credits](/plans/credits)
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

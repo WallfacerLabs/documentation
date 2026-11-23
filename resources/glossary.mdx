@@ -1,0 +1,118 @@
+---
+title: "Glossary"
+sidebarTitle: "Glossary"
+description: "Every vaults.fyi term with a one-line definition, the exact response field or parameter, the endpoint that returns it, and its unit: APY windows, base units, vaultId, score.vaultScore, positions, transactions, x402."
+---
+
+This page defines the terms used across the vaults.fyi docs and API. For each term it gives a one-line definition, the exact field or parameter name, the endpoint that returns or accepts it, and the unit. Use it to map a word in a question ("reward APY", "position size", "queued withdrawal") to the field you must read. All REST endpoints live at `https://api.vaults.fyi` and need the `x-api-key` header. Units follow three rules everywhere: APY and rates are **decimal fractions** (`0.0316` = 3.16%), token amounts are **integer strings in base units** (1 USDC = `"1000000"`), and timestamps are **Unix seconds**. Full rules are in [API conventions](/api-reference/conventions); status codes are in [Errors](/api-reference/errors).
+
+Field paths use dots for nesting and `[]` for arrays. `<window>` is one of `1hour`, `1day`, `7day`, `30day`, `90day`.
+
+## Vaults and identifiers
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Vault | A yield-bearing product users deposit into and withdraw from (ERC-4626 vault, lending market, staking token, RWA token). | `data[]` items | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | — |
+| vaultId | The identifier used in every `{vaultId}` path parameter. Usually the contract address; can be a non-address id (for example `0x5597...378c-25`). Copy it, never construct it. | `vaultId` | `GET /v2/detailed-vaults`, `GET /v2/vaults` | string |
+| Vault address | The vault contract address. Not always equal to `vaultId`. | `address` | same as above | `0x` address |
+| Network | The chain a vault is on. Send the slug or the CAIP-2 id; a bare chain id or `ethereum` is rejected (use `mainnet`). | `network.name`, `network.networkCaip`, `network.chainId`; params `network`, `allowedNetworks` | `GET /v2/networks` | slug (`base`) or CAIP-2 (`eip155:8453`) |
+| Default network scope | The four networks searched when `allowedNetworks` is omitted: `base`, `mainnet`, `arbitrum`, `optimism`. Applies to detailed-vaults and portfolio list endpoints, not to `GET /v2/vaults`. | `allowedNetworks` (repeat the key per value) | `GET /v2/detailed-vaults`, `GET /v2/portfolio/positions/{userAddress}` and other portfolio lists | — |
+| Asset (deposit asset, underlying) | The token users deposit and withdraw. TVL and balances are denominated in it. | `asset.address`, `asset.symbol`, `asset.decimals`, `asset.assetCaip` | detailed-vault, portfolio and transaction responses | `assetCaip` is CAIP-19 |
+| Asset group | Denomination class of an asset; picks the benchmark (`USD` → `code=usd`, `ETH` → `code=eth`). | `asset.assetGroup` | detailed-vault responses | `USD`, `ETH`, `BTC`, `EURO`, `OTHER` |
+| LP token (share token) | The token a depositor receives for a vault position. | `lpToken.address`, `lpToken.symbol`, `lpToken.decimals` | detailed-vault and portfolio responses | `lpToken.decimals` can differ from `asset.decimals` (18 vs 6) |
+| Protocol | The DeFi protocol behind a vault. `name` matches every product; `protocolId` matches one product and may contain spaces (URL-encode). | `protocol.name`, `protocol.protocolId`, `protocol.displayName`; params `allowedProtocols`, `disallowedProtocols` | `GET /v2/protocols` | string |
+| Curator | The risk manager that allocates a curated vault's funds. | `curator.name`, `curator.displayName`; param `curators` | `GET /v2/curators` | string |
+| Tag | Category of yield mechanism (for example `Liquid Staking`, `RWA`). | `tags[]`; param `tags` | `GET /v2/tags` | Title-Case string |
+| Nested vault | A vault whose deposit asset is another tracked vault's share token (for example an Aave market for weETH). | `apyComposite`, `childrenVaults[]` | detailed-vault responses | — |
+| Transactional vault | A vault for which the Transactions API can build calls. | `isTransactional`; param `onlyTransactional=true` | detailed-vault responses, `GET /v2/vaults` | boolean |
+| App-featured vault | A vault shown on app.vaults.fyi. `best-vault` and `best-deposit-options` default to featured vaults only. | `isAppFeatured`; param `onlyAppFeatured` | detailed-vault responses | boolean |
+| Corrupted vault | A vault whose indexed data is known to be unreliable. Excluded unless `allowCorrupted=true`. | `isCorrupted`; param `allowCorrupted` | detailed-vault responses | boolean |
+
+## Yield
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| APY | Realized annual yield from the vault's onchain share-price change over a trailing window, **net of fees**, not clamped (negative and >1 values occur). | `apy.<window>.total` | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | decimal fraction |
+| APY window | The trailing period an APY covers. Detailed-vault objects have five; the per-vault `/apy` endpoint and benchmarks have four (no `1hour`). | `<window>` key in `apy`; params `apyInterval` (`1day`, `7day`, `30day`, `90day`; default `7day`) and `sortBy` (`apy1day`, `apy7day`, `apy30day`, `apy90day`) | `GET /v2/detailed-vaults/{network}/{vaultId}/apy` returns `1day`–`90day` at the top level | `1hour`, `1day`, `7day`, `30day`, `90day` |
+| Base APY | Yield from share-price growth (interest, strategy returns, staking). | `apy.<window>.base` | detailed-vault responses | decimal fraction |
+| Reward APY | Yield from reward-token incentives, converted into the deposit asset. Already included in `total`. | `apy.<window>.reward`; per token `rewards[].apy.<window>` (a number, not an object) | detailed-vault responses | decimal fraction |
+| Total APY | `base + reward` for a window. Use this for display. | `apy.<window>.total` | detailed-vault responses | decimal fraction |
+| Single-window APY | Portfolio and historical endpoints return one window, chosen with `apyInterval`, without the window key. | `apy.base`, `apy.reward`, `apy.total` | `GET /v2/portfolio/positions/{userAddress}`, `GET /v2/historical/{network}/{vaultId}` | decimal fraction |
+| Composite APY (`apyComposite`) | Present only on nested vaults. `intrinsicApy` is the underlying vault's own yield; `totalApy` is this vault's APY compounded with it. | `apyComposite.intrinsicApy.<window>.{base,reward,total}`, `apyComposite.totalApy.<window>.{base,reward,total}`, `apyComposite.vault.vaultId`, `apyComposite.asset` | detailed-vault responses | decimal fraction |
+| Fees | Performance, management, deposit and withdrawal fees. Already reflected in APY; display only, never subtract. | `fees.performanceFee`, `fees.managementFee`, `fees.depositFee`, `fees.withdrawalFee` | detailed-vault responses | decimal fraction |
+| Share price | Assets per whole share. Not a field of the detailed-vault object. | `sharePrice` | `GET /v2/nrt/vault/{network}/{vaultId}/sharePrice`, `GET /v2/historical/{network}/{vaultId}/sharePrice`, portfolio events | number |
+| Benchmark | TVL-weighted average APY of the five largest qualifying vaults of one denomination on one network. `code` is required. | `apy.<window>.{base,reward,total}`, `timestamp`; param `code` = `usd` or `eth` | `GET /v2/benchmarks/{network}`, `GET /v2/historical-benchmarks/{network}` | decimal fraction; Unix seconds |
+
+## Size, risk and freshness
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| TVL | Total value locked in a vault. | `tvl.usd`, `tvl.native`; params `minTvl` (default `100000`), `maxTvl` | detailed-vault responses, `GET /v2/detailed-vaults/{network}/{vaultId}/tvl` | `usd`: whole-USD integer string; `native`: asset base units |
+| Base units | The smallest unit of a token (wei for 18-decimal tokens). Human amount = base units ÷ 10^`decimals`. | every `*Native` field, `tvl.native`, `positionValueInAsset`, transaction `amount` | all | integer string; parse with `BigInt` / `int` |
+| Capacity | Deposit cap and room left under it. 2^256−1 means uncapped. | `maxCapacity`, `remainingCapacity` | detailed-vault responses | asset base units |
+| Reputation Score | One number per vault: 0.45 × `protocolTvlScore` + 0.25 × `vaultTvlScore` + 0.15 × `holderScore` + 0.15 × `assetScore` − `totalScorePenalty`, floored at 0. Higher means a longer, larger track record. | `score.vaultScore`; param `minVaultScore` (check `score.vaultScore` client-side if you need a strict threshold) | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` | unrounded number from 0 to 100; observed 27.5–99.1 |
+| Score components | The four weighted inputs and the deprecated network score (0 weight). | `score.protocolTvlScore`, `score.vaultTvlScore`, `score.holderScore`, `score.assetScore`, `score.networkScore` | same | number |
+| Score penalty | Points deducted for active or decaying flags; only the largest penalty applies. | `score.totalScorePenalty`, `score.penaltyComponents[]` | same | points |
+| Flag | A vaults.fyi notice about an incident or risk, with severity and expiry. | `flags[].content`, `flags[].severity` (`info`, `warning`, `critical`), `flags[].endDate`, `flags[].resolution` | detailed-vault responses | `endDate` Unix seconds; `4946619450` = no expiry |
+| Warnings | Plain-text copies of active non-`info` flags. `allowVaultsWithWarnings` defaults to `true` on detailed-vaults and `false` on best-vault / best-deposit-options. | `warnings[]`; param `allowVaultsWithWarnings` | detailed-vault responses | string |
+| Holders | Holder count and balances of the vault's share token. | `holdersData.totalCount`, `holdersData.totalBalance`, `holdersData.topHolders[]` | detailed-vault responses | balances in LP base units |
+| Last update | When the hourly indexer last updated the vault. | `lastUpdateTimestamp` | detailed-vault responses | Unix seconds |
+| NRT (near-real-time) | Chain state read on request instead of from the hourly index. | `totalSupply` (LP base units), `totalAssets` (asset base units), `sharePrice` (number), `underlyingAssetPrice` (number, USD) | `GET /v2/nrt/vault/{network}/{vaultId}` | as listed |
+| Max drawdown (Beta) | Largest peak-to-trough drop in share price over 30, 90 or 365 days. | `maxDrawdown.mdd30days`, `maxDrawdown.mdd90days`, `maxDrawdown.mdd365days` | `POST /beta/advanced-analytics/{network}/{vaultId}` | decimal fraction |
+| Composition (Beta) | Where a vault's assets are allocated. | `composition[].name`, `composition[].allocation`, `composition[].vaultId`, `composition[].asset.positionValueInAsset` | `POST /beta/advanced-analytics/{network}/{vaultId}` | allocation: decimal fraction; amounts: base units |
+
+## Wallets and positions
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| userAddress | The wallet in every portfolio and transaction path. ENS names are rejected. | path param `userAddress` | `/v2/portfolio/*`, `/v2/transactions/*` | `0x` + 40 hex |
+| Position | A wallet's holding in one vault. Portfolio endpoints are not paginated. | `data[]` | `GET /v2/portfolio/positions/{userAddress}`, `GET /v2/portfolio/positions/{userAddress}/{network}/{vaultId}` | — |
+| Position size | How much the wallet holds in the vault. **Use these, not `asset.balanceNative`.** | `asset.positionValueInAsset` (asset base units), `lpToken.balanceUsd` (USD), `lpToken.balanceNative` (LP base units) | same | as listed |
+| Wallet idle balance (in a position object) | The wallet's balance of the deposit token **outside** the vault, repeated on every position with the same asset. Never sum it as position value. | `asset.balanceNative`, `asset.balanceUsd` | `GET /v2/portfolio/positions/{userAddress}` | base units; USD decimal string |
+| Idle asset | A token in the wallet that is not deposited in a vault. | `data[].balanceNative`, `data[].balanceUsd`; params `minUsdAssetValueThreshold` (default `0.5`), `sortDirection` | `GET /v2/portfolio/idle-assets/{userAddress}` | base units; USD |
+| Total returns | Lifetime yield earned by a wallet in one vault. Needs `userEventsIndexed: true` on the vault. | `returnsNative` | `GET /v2/portfolio/total-returns/{userAddress}/{network}/{vaultId}` | asset base units |
+| Partial returns (Beta) | Yield earned in a time window. | `returnsNative`, `fromTimestamp`, `toTimestamp` | `GET /beta/portfolio/partial-returns/{userAddress}/{network}/{vaultId}` | asset base units; Unix seconds |
+| Position event | A deposit or withdrawal by the wallet in one vault. | `data[].eventType` (`deposit` or `withdrawal`), `data[].assetAmountNative`, `data[].lpTokenAmount`, `data[].timestamp`, `items` (total count) | `GET /v2/portfolio/events/{userAddress}/{network}/{vaultId}` | base units; Unix seconds |
+| Best deposit options | Ranked vaults for each token the wallet holds. | `userBalances[].asset`, `userBalances[].depositOptions[]`, `depositOptions[].projectedUsdAnnualEarnings`; params `maxVaultsPerAsset` (default 3), `onlyTransactional` | `GET /v2/portfolio/best-deposit-options/{userAddress}` | USD decimal string |
+| Best vault | The single best vault for the wallet's best-matching holding. Can be non-transactional unless `onlyTransactional=true`. | `vault`, `asset` | `GET /v2/portfolio/best-vault/{userAddress}` | — |
+
+## Transactions
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Transaction context | Pre-flight state for one wallet and vault: next actions, balances, pending requests. Call it first. | `currentDepositStep`, `depositSteps[]`, `currentRedeemStep`, `redeemSteps[]`, `asset.balanceNative`, `pendingRequests`, `vaultSpecificData` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | — |
+| Action | The operation to build. | path param `action`: `deposit`, `request-deposit`, `claim-deposit`, `redeem`, `start-redeem-cooldown`, `request-redeem`, `claim-redeem`, `claim-rewards` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | — |
+| Redeem | The vault withdrawal action. MCP tools call it "withdraw"; in the Beta borrow API `withdraw` means removing supplied assets from a borrow market. | `redeem` | same | — |
+| Amount | How much to deposit or withdraw. A decimal such as `1.5` returns 400. `all=true` acts on the whole position. | query params `amount`, `all`; required `assetAddress` | same | integer string, base units. Deposits: asset units. `redeem` / `request-redeem`: vault-share (LP) units on most vaults; asset units on asset-based lending markets such as Aave and Compound v3 |
+| Payload (actions) | The unsigned transactions to sign and send **in order**, waiting for each receipt. `tx.value` is omitted for ERC-20 actions (treat as 0). | `currentActionIndex`, `actions[].name`, `actions[].tx.to`, `actions[].tx.chainId`, `actions[].tx.data`, `actions[].tx.value` | same | `chainId` number; `value` wei string when present |
+| Queued withdrawal | A withdrawal that must be requested, then claimed after the vault processes it: `request-redeem` → poll context until `pendingRequests.redeems[].status` is `ready` → `claim-redeem`. | `pendingRequests.redeems[].status` (`pending`, `ready`), `pendingRequests.redeems[].estimatedResolution` | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | — |
+| Cooldown | A waiting period some vaults require before redeem: `start-redeem-cooldown`, then `redeem` when ready. | `vaultSpecificData.cooldownData.status` | same | — |
+| Simulate (deprecated) | A query parameter that no longer does anything. The API does not simulate and does not check balances. | `simulate` | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | — |
+| Attribution suffix | Bytes appended to calldata that attribute a transaction to your API key. Payloads from `/v2/transactions/*` already include it. | `suffix` | `GET /v2/transactions/suffix/{userAddress}/{vaultId}` | hex string without `0x` (48 hex chars observed) |
+| Rewards claim | Claim reward tokens across vaults for a wallet. | `claimable.<network>[].claimId`, `claimable.<network>[].asset.claimableAmount`, `claimable.<network>[].asset.claimableAmountInUsd`; param `claimIds` (repeat the key) | `GET /v2/transactions/rewards/context/{userAddress}`, `GET /v2/transactions/rewards/claim/{userAddress}` | base units; USD decimal string |
+| Deposit / redeem step type | Coarse hint of the flow shape. An `instant` deposit can still be two transactions (approve, then deposit). | `transactionalProperties.depositStepsType`, `transactionalProperties.redeemStepsType` (`instant`, `complex`) | detailed-vault responses | — |
+
+## Borrowing (Beta)
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| Borrow market | A lending market where users supply and borrow assets. | `marketId`, `assetsData[]` | `GET /beta/borrow/markets/` | — |
+| marketAssetId (assetId) | The asset id inside a market, usually the token address. | `assetsData[].marketAssetId`; path param `assetId` | same | address string |
+| Supply / borrow rate | Current annual rates for suppliers and borrowers. | `supplyRate`, `borrowRate`, `utilizationRate` | same | decimal fraction |
+| Health factor, LTV | Liquidation safety of a wallet's market position. | `healthFactor`, `ltv` | `GET /beta/borrow/portfolio/positions/{userAddress}` | number; decimal fraction |
+| Borrow actions | Actions for borrow markets. | path param `action`: `supply`, `withdraw`, `borrow`, `repay` | `GET /beta/borrow/markets/transactions/{action}/{userAddress}/{network}/{marketId}/{assetId}` | `amount` in base units |
+
+## API mechanics
+
+| Term | Definition | Field(s) / parameter | Endpoint | Unit |
+| - | - | - | - | - |
+| API key | REST credential. Send it in `x-api-key`. The MCP server instead uses `Authorization: Bearer <key>`, which REST does not accept. | header `x-api-key` | all REST endpoints except `GET /v2/health` | — |
+| x402 | Pay-per-request access without a key. A request with no key returns HTTP 402 with a payment challenge. | `x402Version`, `accepts[].amount`, `accepts[].scheme`, `accepts[].network`, `accepts[].asset` | any paid endpoint without a key | `accepts[].amount`: USDC base units (`"2000"` = $0.002) |
+| Credits | Units each request costs against your plan. | — | see [Credits](/plans/credits) | credits per call |
+| Rate-limit headers | Remaining quota on authenticated responses. | headers `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset` | authenticated responses | requests; seconds |
+| Pagination | List responses: read `nextPage`; it is **absent** (not `null`) on the last page; no total count. | `itemsOnPage`, `nextPage`, `data`; params `page` (from 0), `perPage` (default 50, max 5000) | `GET /v2/detailed-vaults`, `GET /v2/vaults`, `GET /v2/historical/{network}/{vaultId}` and other lists | — |
+| Soft errors | Unrecognised filter values return HTTP 200 with fewer results and the value echoed here. | `errors.unsupportedNetworks`, `errors.unsupportedAssets`, `errors.unsupportedProtocols` | list and portfolio endpoints | — |
+| Array parameter | Multi-value query parameter. Repeat the key (`allowedNetworks=base&allowedNetworks=arbitrum`); a comma list returns 0 results. | `allowedNetworks`, `allowedAssets`, `allowedProtocols`, `tags`, `curators`, `claimIds` | all list endpoints | — |
+| Stability level | `/v2` is generally available; `/beta` works but may change; `/alpha` is experimental. | path prefix | — | see [Versioning](/api-reference/versioning) |
+
+Related: [Introduction](/introduction), [API conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Vault discovery](/concepts/vault-discovery), [Portfolio tracking](/concepts/portfolio-tracking), [Transaction flows](/concepts/transaction-flows), [Reputation Score](/methodology/reputation-score), [Calculating APY](/methodology/calculating-apy).

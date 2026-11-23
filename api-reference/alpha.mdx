@@ -1,67 +1,132 @@
 ---
-title: "Alpha"
-description: "Early access features. These endpoints may change without notice and are not covered by stability guarantees."
+title: "Alpha endpoints: cross-chain intents, CCTP bridge, flows, holders"
+sidebarTitle: "Alpha"
+description: "Index of all 11 /alpha early-access endpoints (cross-chain intents, CCTP USDC bridge, daily vault flows, historical positions and balances, vault holders) with links to every endpoint page, required inputs and usage notes."
 ---
 
-<Warning>
-  Alpha endpoints are experimental and subject to breaking changes at any time. They are not included in the standard API changelog. Use them to explore upcoming features, not in production flows that require stability.
-</Warning>
+This page indexes every `/alpha` endpoint (11 operations) and links each one to its reference page. Alpha covers cross-chain intents, the CCTP USDC bridge, daily vault flows, a wallet's historical positions and balances, and vault holders. Use it to find the right alpha endpoint and its required inputs.
 
-Alpha features are accessible using your existing API key. The endpoints below cover upcoming product areas that are still in active development.
+Alpha endpoints are early access. They may change or be removed **without notice** and carry no stability guarantee, so don't depend on them in production flows that need stability. What each stability level promises is on [Versioning and stability](/api-reference/versioning).
 
-Where an endpoint supports `allowedProtocols` or `disallowedProtocols`, each value may be either a broad protocol name or a full [protocol ID](/concepts/supported-protocols#protocol-names-and-ids) for one product and version.
+Requests go to `https://api.vaults.fyi` (no version suffix; the `/alpha` prefix is part of each path) with the header `x-api-key: $VAULTSFYI_API_KEY`. Every API key can call /alpha endpoints. /alpha endpoints need an API key (they are currently not offered over [x402](/ai-agents/x402)); an invalid key returns 401.
+
+Unless a row says otherwise: APY values are decimal fractions (`0.0315` = 3.15%), token amounts are integer strings in base units, timestamps are Unix seconds, and list filters that take several values use repeated keys (`allowedNetworks=base&allowedNetworks=arbitrum`). See [Conventions](/api-reference/conventions).
+
+Alpha endpoints cost 0 credits during early access, but they still need an API key.
+
+Alpha endpoints are free during early access; pricing may be introduced later and would be announced in the changelog.
 
 ## Cross-chain intents
 
-Quote, execute, and track intent-based cross-chain position changes. This is the higher-level cross-chain transaction flow for products that want to move users into vault positions without building every bridge and execution step themselves.
+Quote, execute and track intent-based moves into a vault on another chain. Only **deposits into vaults** are supported: a token-to-token quote returns 400.
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Create a transaction intent quote | `POST /alpha/transactions/intent/getQuote` | JSON body: `userAddress`, `inputPosition`, `outputPosition`, `feeToken`, `provider` |
-| Execute a transaction intent | `POST /alpha/transactions/intent/execute` | JSON body: `payloadSignature`, `provider`. Optional body: `originalQuote` |
-| Check transaction intent status | `GET /alpha/transactions/intent/status` | Query: `crosschainTransactionId`, `provider` |
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`POST /alpha/transactions/intent/getQuote`](/api-reference/cross-chain/create-transaction-intent-quote) | Quote a cross-chain move into a vault (only deposits into vaults are supported). Returns a Permit2 payload to sign. | Body: `userAddress`, `inputPosition`, `outputPosition`, `feeToken`, `provider` | 0 (free during early access) |
+| [`POST /alpha/transactions/intent/execute`](/api-reference/cross-chain/execute-transaction-intent) | Submit a signed intent quote (`payloadSignature`, `provider`). | Body: `payloadSignature`, `provider` | 0 (free during early access) |
+| [`GET /alpha/transactions/intent/status`](/api-reference/cross-chain/get-transaction-intent-status) | Track an intent. | Query: `crosschainTransactionId`, `provider` | 0 (free during early access) |
+
+Things to know:
+
+- The quote returns a Permit2 payload. The user signs it; you send the signature to the execute endpoint as `payloadSignature`. Never sign on the user's behalf. See [Transaction safety](/ai-agents/transaction-safety).
 
 ## CCTP bridge
 
-Build USDC bridge flows with transaction context, calldata generation, in-transit tracking, and bridge status checks.
+Bridge USDC between networks with Circle CCTP: context, unsigned bridge and claim transactions, in-transit transfers and status.
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Check CCTP balances and bridge context | `GET /alpha/transactions/cctp/context/{userAddress}/{srcNetwork}/{dstNetwork}/{assetAddress}` | Path: `userAddress`, `srcNetwork`, `dstNetwork`, `assetAddress` |
-| Build a CCTP bridge transaction | `GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}` | Path: `action`, `userAddress`, `srcNetwork`, `dstNetwork`. Optional query includes `assetAddress`, `amount`, `recipientAddress`, `transferType`, `useForwarding`, `message`, and `attestation` depending on the bridge step |
-| List CCTP transfers in transit | `GET /alpha/transactions/cctp/money-in-transit/{userAddress}` | Path: `userAddress` |
-| Check CCTP transfer status | `GET /alpha/transactions/cctp/status` | Query: `burnTxHash`, `srcNetwork` |
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /alpha/transactions/cctp/context/{userAddress}/{srcNetwork}/{dstNetwork}/{assetAddress}`](/api-reference/cctp-bridge/get-cctp-transaction-context) | Balances, fees and options before a USDC bridge. Not every enum network is supported (gnosis returns 400). | Path: `userAddress`, `srcNetwork`, `dstNetwork`, `assetAddress` | 0 (free during early access) |
+| [`GET /alpha/transactions/cctp/transactions/{action}/{userAddress}/{srcNetwork}/{dstNetwork}`](/api-reference/cctp-bridge/create-cctp-transaction) | Build unsigned CCTP bridge or claim transactions. | Path: `action`, `userAddress`, `srcNetwork`, `dstNetwork` | 0 (free during early access) |
+| [`GET /alpha/transactions/cctp/money-in-transit/{userAddress}`](/api-reference/cctp-bridge/list-cctp-money-in-transit) | List a wallet's CCTP transfers that have not arrived yet. | Path: `userAddress` | 0 (free during early access) |
+| [`GET /alpha/transactions/cctp/status`](/api-reference/cctp-bridge/get-cctp-transaction-status) | Status of a CCTP burn. Set a polling timeout. | Query: `burnTxHash`, `srcNetwork` | 0 (free during early access) |
+
+Things to know:
+
+- Not every network in the `network` enum supports CCTP: `gnosis` as destination returned 400 "not supported for CCTP".
+- **Poll `getCctpTransactionStatus` with a timeout** and confirm the burn transaction onchain.
 
 ## Historical flows
 
-Inspect daily vault inflows and outflows for flow analytics, dashboards, and monitoring.
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /alpha/historical/{network}/{vaultId}/daily-flows`](/api-reference/historical/get-historical-daily-vault-flows) | Daily inflows and outflows for one vault. `fromDate` / `toDate` are `YYYY-MM-DD` strings; flows are base-unit strings. | Path: `network`, `vaultId`; Query: `fromDate`, `toDate` | 0 (free during early access) |
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Fetch historical daily vault inflows and outflows | `GET /alpha/historical/{network}/{vaultId}/daily-flows` | Path: `network`, `vaultId`. Query: `fromDate`, `toDate`. Optional query: `page`, `perPage` |
+`fromDate` and `toDate` are `YYYY-MM-DD` strings, not Unix timestamps. `totalDeposits` and `totalRedemptions` are integer strings in the vault asset's base units (USDC: divide by 10^6).
 
 ## Historical positions
 
-Fetch a wallet's historical vault positions for account history, retention analytics, and portfolio timeline views.
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /alpha/historical-positions/{userAddress}`](/api-reference/historical-positions/list-user-historical-positions) | A wallet's past vault positions (latency around 40 s). | Path: `userAddress` | 0 (free during early access) |
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List historical positions for a wallet | `GET /alpha/historical-positions/{userAddress}` | Path: `userAddress`. Optional query: `fromTimestamp`, `toTimestamp` |
+This endpoint took about 40 s on a busy wallet. Use a client timeout of at least 60 s.
 
 ## Historical balances
 
-Reconstruct a wallet's vault balances at a specific point in time. This is useful for historical account snapshots, period reporting, retention analysis, and backtesting portfolio views against previous user exposure.
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /alpha/historical-balances/{userAddress}/{timestamp}`](/api-reference/historical-positions/list-user-historical-balances) | A wallet's vault balances at one Unix-seconds `timestamp`. Default 4-network scope. | Path: `userAddress`, `timestamp` | 0 (free during early access) |
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| Fetch historical balances for a wallet | `GET /alpha/historical-balances/{userAddress}/{timestamp}` | Path: `userAddress`, `timestamp`. Optional query filters include `allowedNetworks`, `disallowedNetworks`, `allowedAssets`, `disallowedAssets`, `allowedProtocols`, `disallowedProtocols`, `minTvl`, `maxTvl`, `minApy`, `maxApy`, `minVaultScore`, `tags`, `curators`, `onlyTransactional`, `onlyAppFeatured`, `allowCorrupted`, `allowVaultsWithWarnings`, `minUsdAssetValueThreshold`, `apyInterval`, `sortBy`, and `sortOrder` |
+This endpoint (about 13 s on a busy wallet) takes a Unix-**seconds** `timestamp` in the path and has the same default 4-network scope as v2 positions (base, mainnet, arbitrum, optimism). Pass `allowedNetworks` (repeated key) for others.
 
 ## Holders
 
-Analyze vault holders and LP-token balances for concentration, ownership, and distribution views.
+| Endpoint | Use it when | Required inputs | Credits |
+| - | - | - | - |
+| [`GET /alpha/{network}/{vaultId}/holders`](/api-reference/holders/list-vault-holders) | Holders of one vault and their LP-token balances (`perPage` ≤ 1000, default 100). | Path: `network`, `vaultId` | 0 (free during early access) |
 
-| Capability | How to call | Required inputs |
-|------------|-------------|-----------------|
-| List vault holders and LP-token balances | `GET /alpha/{network}/{vaultId}/holders` | Path: `network`, `vaultId`. Optional query: `page`, `perPage` |
+`balance` is the holder's LP-token (share) balance in LP-token base units (usually 18 decimals), not underlying-asset units. To convert to assets, multiply by the vault's share price (for example from [NRT share price](/api-reference/nrt/get-vault-nrt-share-price)).
 
-If you're interested in any of these areas, [sign up](https://portal.vaults.fyi/signup) to get an API key and start using Alpha endpoints. Existing customers can reach the team via [Telegram](https://t.me/vaultsfyisupport) or [email](mailto:support@wallfacer.io) to share feedback.
+Credits come from [Credits](/plans/credits): base cost per call, plus a per-item cost where shown. Pay-as-you-go is $0.002 per credit.
+
+## Example: top holders of a vault
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/alpha/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/holders?perPage=2"
+```
+
+Response, captured 2026-10-23 (complete):
+
+```json
+{
+  "itemsOnPage": 2,
+  "nextPage": 1,
+  "data": [
+    { "address": "0x2F865596972C0B3567bA636325C71ebaA8Cc1238", "balance": "4952501653832690363227033" },
+    { "address": "0x295e9F0B609181200bF5eeBBDb9103aDfA27D56D", "balance": "4933566597919131996363419" }
+  ]
+}
+```
+
+`4952501653832690363227033` / 10^18 ≈ 4,952,501.65 vault shares. The path order is `/alpha/{network}/{vaultId}/holders`: network first, with no section name before it.
+
+## Example: daily flows
+
+```bash
+curl -H "x-api-key: $VAULTSFYI_API_KEY" \
+  "https://api.vaults.fyi/alpha/historical/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845/daily-flows?fromDate=2026-10-01&toDate=2026-10-05&perPage=3"
+```
+
+Response, captured 2026-10-23 (trimmed to 1 of 3 days):
+
+```json
+{
+  "itemsOnPage": 3,
+  "nextPage": 1,
+  "data": [
+    {
+      "date": "2026-10-01",
+      "totalDeposits": "18448509560371",
+      "totalRedemptions": "20483423972174",
+      "depositCount": 7806,
+      "redemptionCount": 987,
+      "uniqueDepositors": 2616,
+      "uniqueRedeemers": 746
+    }
+  ]
+}
+```
+
+Related: [API overview](/api-reference/overview), [Beta](/api-reference/beta), [Conventions](/api-reference/conventions), [Errors](/api-reference/errors), [Versioning](/api-reference/versioning).

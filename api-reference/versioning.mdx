@@ -1,0 +1,111 @@
+---
+title: "Versioning and stability: v2, beta and alpha"
+sidebarTitle: "Versioning"
+description: "What the v2, beta and alpha path prefixes promise, what may change without notice, the current deprecation practice, and how to detect API changes from the changelog and OpenAPI specs."
+---
+
+This page explains what each vaults.fyi API version prefix promises, what can change and how quickly, how deprecations are signalled today, and how to detect changes automatically. Use it to decide which endpoints are safe for production and how to watch for breaking changes.
+
+All three surfaces share one base URL, `https://api.vaults.fyi`, and one API key, sent as `x-api-key`. The version is the first path segment.
+
+## Stability levels
+
+| Prefix | Status | Spec `info.version` | Operations | Intended use |
+| - | - | - | - | - |
+| `/v2` | Stable, generally available | `2.0.0` | 35 | Production integrations |
+| `/beta` | Stable in practice, collecting feedback | `0.1.0` | 32 | Production use with pinned fields and changelog monitoring; the shape may change without notice |
+| `/alpha` | Early access | `0.1.0` | 11 | Prototypes and evaluation |
+| `/v1` | Legacy | — | — | Existing integrations only. New code should use `/v2`. |
+
+### v2 (stable)
+
+- Paths, parameter names and response field names are meant to stay compatible within v2.
+- Changes so far have been **additive**: new optional fields, new networks, new enum values (for example the `90day` APY window and new `sortBy` options).
+- Fields are deprecated in place rather than removed. Example: `score.networkScore` still appears in v2 detailed-vault responses but no longer counts toward `score.vaultScore` (changelog, week 30 of 2026). The `simulate` parameter on transaction endpoints is deprecated and ignored, but still accepted.
+- Write tolerant clients: ignore unknown fields, and don't fail on new enum values such as a new network name.
+
+No breaking changes have been made to v2, and none are intended. A breaking change includes removing or renaming a path, parameter or field, changing units or value semantics, and changing a default (such as the default network scope or sort order). If one becomes unavoidable, it is announced in the [changelog](/resources/changelog) at least **30 days** before it takes effect, and the old and new behavior are kept side by side where possible.
+
+### Beta
+
+- Beta endpoints are stable in practice and used in production. They stay in beta to collect feedback on the request and response shape, and usually move to v2 unchanged when there is none.
+- There is no formal notice period for beta. The shape **can still change without notice**, and the beta spec says so. Pin the fields you read and monitor the [changelog](/resources/changelog).
+- Breaking changes have happened. Example: beta SVM APY values changed from display percent (`5`) to decimal fractions (`0.05`). The changelog (week 33 of 2026) marked this as "a breaking correction for Beta SVM clients".
+- Beta and alpha specs are unversioned previews (spec version `0.1.0`). When a beta feature graduates, expect it to move to a `/v2` path.
+
+### Alpha
+
+- Alpha endpoints are experimental and may change or disappear at any time, without notice.
+- Alpha changes do appear in the changelog in practice, but there is no guarantee of coverage.
+- Put a timeout on every polling loop against an alpha status endpoint (for example `/alpha/transactions/cctp/status`).
+
+When an alpha or beta endpoint is promoted, the old path currently keeps resolving: a request to `/alpha/...` falls through to `/beta/...` and then `/v2/...` if the endpoint no longer exists in the earlier tier. No deprecation signal is sent, so move to the new path.
+
+### v1 (legacy)
+
+The v1 API is still live and is not marked deprecated. Its credit costs are listed on [Credits](/plans/credits#legacy-v1-api-credits). No v1 spec is published, and v1 pages are not in the sitemap or `llms.txt`.
+
+## What may change, by level
+
+| Change | v2 | beta | alpha |
+| - | - | - | - |
+| New optional response fields | Yes | Yes | Yes |
+| New networks or enum values | Yes | Yes | Yes |
+| New optional query parameters | Yes | Yes | Yes |
+| Changed defaults (for example the default network scope) | Breaking change: at least 30 days' notice | Yes | Yes |
+| Units or value semantics | Not observed | Yes (SVM APY change) | Yes |
+| Renamed or removed fields or parameters | Deprecated in place so far | Yes | Yes |
+| Path changes or endpoint removal | Not observed | Yes, at GA | Yes, any time |
+
+## Deprecation practice today
+
+Notice periods per tier: **v2**, at least 30 days in the changelog before any breaking change; **beta**, no formal notice period (changes can ship without notice); **alpha**, no notice. Observed practice:
+
+- Deprecations are announced in prose: in the [changelog](/resources/changelog) and in parameter or field descriptions (for example "DEPRECATED: This parameter is deprecated and no longer functional" on `simulate`).
+- The OpenAPI specs do **not** set `deprecated: true` on deprecated parameters or fields, so generated clients and agent tool definitions will not flag them. Search descriptions for "deprecated".
+- Specs don't carry a per-operation `x-stability` marker. Stability is signalled only by the path prefix and the spec's `info.description`.
+
+The specs don't yet mark deprecations with `deprecated: true`, and the API sends no `Deprecation` or `Sunset` headers. Read the changelog and the field descriptions instead.
+
+## How to detect changes
+
+| Source | URL | What it tells you |
+| - | - | - |
+| Changelog | [docs.vaults.fyi/resources/changelog](/resources/changelog) | Weekly entries for API and app changes, including breaking beta corrections. Markdown at `https://docs.vaults.fyi/resources/changelog.md`. |
+| v2 OpenAPI spec | `https://api.vaults.fyi/v2/documentation/json` | Machine-readable contract for every v2 operation |
+| beta OpenAPI spec | `https://api.vaults.fyi/beta/documentation/json` | Same for beta |
+| alpha OpenAPI spec | `https://api.vaults.fyi/alpha/documentation/json` | Same for alpha |
+| `GET /v2/networks` | `https://api.vaults.fyi/v2/networks` | The current list of supported networks; it grows over time |
+| Docs index | `https://docs.vaults.fyi/llms.txt` | Current list of documentation pages |
+
+`info.version` has stayed at `2.0.0` (v2) and `0.1.0` (beta and alpha) while the specs changed, so don't rely on it to detect changes. Diff the spec contents instead. A minimal watcher:
+
+```bash
+#!/usr/bin/env bash
+# Save today's specs and diff them against the previous run. Specs are public; no key needed.
+set -euo pipefail
+dir="${HOME}/.vaultsfyi-specs"; mkdir -p "$dir"
+for v in v2 beta alpha; do
+  curl -fsS "https://api.vaults.fyi/${v}/documentation/json" | python3 -m json.tool --sort-keys > "$dir/${v}.new.json"
+  if [ -f "$dir/${v}.json" ] && ! diff -q "$dir/${v}.json" "$dir/${v}.new.json" > /dev/null; then
+    echo "vaults.fyi ${v} spec changed:"; diff "$dir/${v}.json" "$dir/${v}.new.json" | head -50
+  fi
+  mv "$dir/${v}.new.json" "$dir/${v}.json"
+done
+```
+
+Run it daily (for example from cron) and read the changelog entry for anything it reports.
+
+## Recommendations for integrators and agents
+
+- Use `/v2` for anything that moves money or feeds production decisions.
+- If you depend on beta or alpha, pin the fields you read, validate responses at runtime, and alert on schema drift.
+- Ignore unknown response fields. Don't use strict "no additional properties" validation on responses. The rewards-context response already returns fewer network keys than the spec marks as required.
+- Never hard-code the network list. Read it from `GET /v2/networks`.
+- Re-check the defaults described on [Conventions](/api-reference/conventions#defaults-per-endpoint) when you upgrade, and pass important filters (`allowedNetworks`, `minTvl`, `sortOrder`) explicitly instead of relying on defaults.
+
+## Related pages
+
+- [API overview](/api-reference/overview): base URL, auth and section map.
+- [Beta](/api-reference/beta) and [Alpha](/api-reference/alpha): endpoint indexes for the pre-GA surfaces.
+- [Changelog](/resources/changelog): weekly API and app changes.

@@ -1,111 +1,162 @@
 ---
-title: "How Vaults.fyi Calculates APY"
-description: "Learn how Vaults.fyi derives APY from onchain share prices using trailing windows, TVL-weighted averages, and reward token accounting."
+title: "How vaults.fyi calculates APY"
 sidebarTitle: "Calculating APY"
+description: "APY method and API representation: realized share-price APY, net of fees, decimal fraction, five windows (1hour–90day), base vs reward, and apyComposite for nested vaults."
 ---
 
-Vaults.fyi calculates APY by comparing a vault's share price across fixed trailing windows — 1 day, 7 days, and 30 days — rather than relying on instantaneous or self-reported rates. This approach smooths out short-term noise and gives you a yield figure that reflects what depositors actually earned over the period.
+This page explains how vaults.fyi computes APY and how APY appears in API responses. Use it when you need to interpret, display or compare APY values, or to explain why vaults.fyi differs from a protocol's own UI. In short: APY is the realized yield from onchain share-price changes over a trailing window, net of fees, returned as a decimal fraction (`0.0316` = 3.16%) in the object `apy.<window>.{base,reward,total}`.
 
-## Net APY
+## How APY appears in the API
 
-All APY values returned by Vaults.fyi are **net of fees**. Performance and management fees reflected in vault share price or yield accrual are already accounted for in the APY.
+| Rule | Detail |
+| - | - |
+| Unit | Decimal fraction. `0.0316` = 3.16%. Multiply by 100 to display a percentage. |
+| Net of fees | Performance and management fees are already deducted. The `fees` object is for display only; do not subtract it again. |
+| Not clamped | Values can be negative or very large. A 7-day APY of `1522.9882` (152,299%) and `-0.1769` were both observed on 2026-10-23. Screen outliers before display. |
+| Shape | `apy.<window>.base`, `apy.<window>.reward`, `apy.<window>.total`, where `total = base + reward`. |
+| Windows on detailed-vault responses | `1hour`, `1day`, `7day`, `30day`, `90day` (`GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}`). |
+| Windows on `GET /v2/detailed-vaults/{network}/{vaultId}/apy` | `1day`, `7day`, `30day`, `90day` at the top level (no `1hour`, no `apy` wrapper). |
+| Single-window responses | Portfolio endpoints and `GET /v2/historical/...` return one window as `apy.{base,reward,total}`; choose it with `apyInterval` (`1day`, `7day`, `30day`, `90day`; default `7day`). |
+| Sorting | `sortBy=apy1day`, `apy7day`, `apy30day` or `apy90day` on `GET /v2/detailed-vaults`. `sortOrder` defaults to `asc`. |
 
-The fee breakdown is still exposed through the `fees` object on detailed-vault responses so integrators can display fees alongside yield. Do not subtract those fees from returned APY values again.
+Older docs and SDK examples used flat names such as baseApy, rewardApy, apy7d or apy30d; those fields do not exist in any response. Read `apy.<window>.base`, `apy.<window>.reward` and `apy.<window>.total`. The names `totalApy` and `intrinsicApy` exist only inside `apyComposite` (see below).
 
-## Share price method
+Real response from `GET /v2/detailed-vaults/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845` (2026-10-23, trimmed to `apy`):
 
-Every yield-bearing vault issues shares that represent a depositor's proportional stake. As the vault earns yield, the total value it holds grows relative to the number of shares outstanding, so each share becomes worth more. Vaults.fyi reads these values directly from onchain contracts hourly and derives APY from the change in share price over the chosen window.
+```json
+{
+  "apy": {
+    "1hour": { "base": 0.0317, "reward": 0, "total": 0.0317 },
+    "1day":  { "base": 0.0317, "reward": 0, "total": 0.0317 },
+    "7day":  { "base": 0.0316, "reward": 0, "total": 0.0316 },
+    "30day": { "base": 0.0305, "reward": 0, "total": 0.0305 },
+    "90day": { "base": 0.0293, "reward": 0, "total": 0.0293 }
+  }
+}
+```
 
-The share price at any point in time is:
+Read it in code:
+
+```python
+seven_day_pct = vault["apy"]["7day"]["total"] * 100   # 3.16
+```
+
+```typescript
+const sevenDayPct = vault.apy["7day"].total * 100;   // 3.16
+```
+
+## Share-price method
+
+Every yield-bearing vault issues shares. As the vault earns, the assets behind each share grow, so the share price rises. vaults.fyi reads share price from chain every hour and derives APY from its change over the window.
 
 ```
-share price = total shares value / total shares
-```
-
-The interest rate over a window is then:
-
-```
+share price   = total assets / total shares
 interest rate = (current share price / previous share price) - 1
 ```
 
-## APY formulas
-
-For vaults that compound automatically, Vaults.fyi uses the compounding formula:
+For vaults that compound automatically:
 
 ```
-APY = [(1 + interest rate) ^ (year / time)] - 1
+APY = (1 + interest rate) ^ (year / time) - 1
 ```
 
-For vaults that distribute simple (non-compounding) interest:
+For vaults that pay simple (non-compounding) interest:
 
 ```
 APY = interest rate × (year / time)
 ```
 
-`time` is the length of the window in seconds and `year` is the number of seconds in a year (31,536,000).
+`time` is the window length in seconds; `year` is 31,536,000 seconds.
 
-## Why trailing averages, not spot rates
+How share price is read for each vault type (ERC-4626, rebasing, LST, staking, RWA) is in [Indexing onchain data](/methodology/indexing-onchain-data).
 
-A spot rate captures yield at a single instant, which can be skewed by temporary liquidity events, large deposits or withdrawals, or the timing of reward distributions. Trailing averages over 1d, 7d, and 30d give you a more stable picture of what a vault actually returned across different time horizons.
+## Trailing windows, not spot rates
 
-<Note>
-  The 1-day APY is the most responsive to recent changes. The 30-day APY is the most stable but slower to reflect strategy shifts. Use the window that matches your use case.
-</Note>
+A spot rate captures one instant and is skewed by liquidity events, large deposits and the timing of reward distributions. Trailing windows show what depositors actually earned.
 
-## Adjusting for TVL fluctuations
+| Window | Use |
+| - | - |
+| `1hour`, `1day` | Most responsive; noisy. Dashboards and anomaly detection. |
+| `7day` | Default for most endpoints (`apyInterval` default). Good for user-facing display. |
+| `30day`, `90day` | Most stable; slow to reflect strategy changes. |
 
-When a vault's total value locked (TVL) changes significantly within a window, a simple average overstates or understates yield. Vaults.fyi applies a TVL-weighted average to correct for this.
+## Adjusting for TVL changes
 
-Each observation is weighted by the **minimum** TVL between two consecutive data points — a conservative approach that avoids inflating yield during periods of large inflows:
-
-```
-weight_t = min(TVL_t, TVL_(t-1))
-```
-
-The weighted interest rate over the window is then:
+When TVL swings within a window, a simple average misstates yield. vaults.fyi weights each observation by the minimum TVL of two consecutive data points, which avoids inflating yield during large inflows:
 
 ```
-interest rate = (Σ (share_price_t / share_price_(t-1)) × weight_t) / (Σ weight_t) - 1
+weight_t      = min(TVL_t, TVL_(t-1))
+interest rate = Σ((share_price_t / share_price_(t-1)) × weight_t) / Σ(weight_t) - 1
 ```
 
-<Info>
-  This weighting matters most for newer vaults or vaults that experience sudden large deposits, where TVL can swing by orders of magnitude within a single measurement window.
-</Info>
+This matters most for new vaults and vaults with sudden large deposits.
 
-## Reward token APY
+## Base yield and reward yield
 
-Some vaults distribute yield in a token that is different from the deposit asset. Vaults.fyi accounts for reward tokens separately and adds them to the base vault APY.
+- `apy.<window>.base`: yield from share-price growth (lending interest, strategy returns, staking).
+- `apy.<window>.reward`: yield from reward tokens distributed on top, converted into the deposit asset.
+- `apy.<window>.total`: `base + reward`.
 
-To calculate reward APY over a given window:
+Reward APY is calculated per window as follows:
 
-1. Compute the number of reward tokens distributed per deposited token over the period, using a TVL-weighted average of the emission rate.
-2. Calculate the time-weighted average price ratio between the reward token and the deposit asset (Price In Token, or PIT).
-3. Convert the accumulated reward value into deposit-asset terms using that ratio.
-4. Compare the converted value to the initial deposit to derive APY.
+1. Compute reward tokens distributed per deposited token, using a TVL-weighted average emission rate.
+2. Compute the time-weighted average price of the reward token in deposit-asset terms.
+3. Convert accumulated rewards into deposit-asset value with that price.
+4. Compare with the initial deposit to get APY.
 
-<Tip>
-  If a vault's total APY looks higher than what the share price growth alone would suggest, the difference is likely coming from reward token emissions. Check the breakdown between `baseApy` and `rewardApy` in the API response.
-</Tip>
+Per-token reward rates are in the `rewards` array (`rewards[].asset`, `rewards[].apy.<window>`, decimal fractions). They are already included in `apy.<window>.reward`; do not add them again.
 
-## The `apyComposite` field
+If a vault's `total` is higher than its share-price growth suggests, compare `apy.<window>.base` with `apy.<window>.reward`: the difference comes from reward tokens.
 
-The API returns an `apyComposite` object that breaks APY into two components:
+## apyComposite: nested vaults
 
-| Field | Description |
-|---|---|
-| `totalApy` | The fully compounded APY, combining the vault's own yield with any underlying protocol yield (e.g., a vault built on top of an LST). |
-| `intrinsicApy` | The staking or protocol-level yield from the underlying asset alone, before the vault strategy adds its own return. |
+`apyComposite` is present only when a vault's deposit asset is itself the share (LP) token of another vault that vaults.fyi tracks, for example an Aave v3 market whose deposit asset is weETH. It is absent on all other vaults; check for it before reading.
 
-<AccordionGroup>
-  <Accordion title="Why does Vaults.fyi APY differ from what a protocol reports?">
-    Protocol UIs often display forward-looking or instantaneous rates based on the current supply/borrow utilization model. Vaults.fyi reports trailing realized APY based on what share prices actually did over the window. The two can differ — especially when rates changed recently, or when a protocol's model assumes continuous compounding that does not match how yield actually accrues.
-  </Accordion>
-  <Accordion title="What happens with vaults that update earnings irregularly?">
-    Some vaults — particularly liquid staking tokens (LSTs) and Yearn-style strategies — accrue yield in batches rather than continuously. When an earnings update lands, the share price jumps sharply, which inflates the short-term APY reading for that window. Vaults.fyi surfaces this behavior honestly; the 7d and 30d windows tend to give a cleaner picture for these vault types.
-  </Accordion>
-  <Accordion title="Are there vault types with special share price logic?">
-    Yes. Rebasing vaults (such as Aave aTokens) grow the user's token balance directly rather than the share price. Staking mechanism vaults (such as StakeWise) separate principal and reward tokens. RWA vaults use oracle prices to compute share value. Each type requires its own onchain data extraction — see [Indexing Onchain Data](/methodology/indexing-onchain-data) for details.
-  </Accordion>
-</AccordionGroup>
+| Field | Meaning | Unit |
+| - | - | - |
+| `apyComposite.vault.vaultId` | The underlying vault whose share token this vault accepts | — |
+| `apyComposite.asset` | The underlying vault's own deposit asset | — |
+| `apyComposite.intrinsicApy.<window>.{base,reward,total}` | **The yield of the underlying vault (`apyComposite.vault`) on its own**, before this vault adds anything | decimal fraction |
+| `apyComposite.totalApy.<window>.{base,reward,total}` | This vault's `apy.<window>` compounded with `intrinsicApy.<window>`: the full yield a depositor earns in terms of `apyComposite.asset` | decimal fraction |
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{__html: `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Docs","item":"https://docs.vaults.fyi"},{"@type":"ListItem","position":2,"name":"Methodology","item":"https://docs.vaults.fyi/methodology/calculating-apy"},{"@type":"ListItem","position":3,"name":"How Vaults.fyi Calculates APY","item":"https://docs.vaults.fyi/methodology/calculating-apy"}]}`}} />
+Windows are `1hour`, `1day`, `7day`, `30day`, `90day`.
+
+Real example (`GET /v2/detailed-vaults?...`, Aave v3 weETH on mainnet, 2026-10-23, trimmed): the Aave market itself earned 0 over 7 days, the weETH vault underneath earned 2.24%, so the compounded total is 2.24%.
+
+```json
+{
+  "name": "Aave v3 weETH",
+  "apy": { "7day": { "base": 0, "reward": 0, "total": 0 } },
+  "apyComposite": {
+    "vault": { "vaultId": "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee" },
+    "asset": { "symbol": "ETH", "decimals": 18 },
+    "intrinsicApy": { "7day": { "base": 0.0224, "reward": 0, "total": 0.0224 } },
+    "totalApy":     { "7day": { "base": 0.022399999999999975, "reward": 0, "total": 0.022399999999999975 } }
+  }
+}
+```
+
+```python
+comp = vault.get("apyComposite")
+full_7d = comp["totalApy"]["7day"]["total"] if comp else vault["apy"]["7day"]["total"]
+```
+
+## Frequently asked questions about APY
+
+### Why does vaults.fyi APY differ from what a protocol reports?
+
+Protocol UIs often show forward-looking or instantaneous rates from their interest-rate model. vaults.fyi reports trailing realized APY from what share prices actually did. The two differ when rates changed recently or when the protocol's compounding assumption does not match how yield accrues.
+
+### Why does APY spike for some vaults?
+
+Some vaults, especially liquid staking tokens and Yearn-style strategies, post earnings in batches. When a batch lands, the share price jumps and short windows (`1hour`, `1day`) spike. Use `7day` or `30day` for these vaults.
+
+### Do vault types need special share-price logic?
+
+Yes. Rebasing tokens (such as Aave aTokens) grow balances instead of share price; staking vaults (such as StakeWise) separate principal and reward tokens; RWA vaults use oracle prices. See [Indexing onchain data](/methodology/indexing-onchain-data).
+
+### How fresh is APY?
+
+APY is recomputed from the hourly index. Each vault's `lastUpdateTimestamp` (Unix seconds) shows the last index time.
+
+Related: [Yield and market data](/concepts/yield-and-market-data), [Benchmark rates](/methodology/benchmark-rates), [API conventions](/api-reference/conventions), [Glossary](/resources/glossary).

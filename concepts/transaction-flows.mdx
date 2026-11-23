@@ -1,94 +1,242 @@
 ---
-title: "Transaction Flows"
-description: "Generate ready-to-sign deposit, redeem, and claim payloads for hundreds of vaults without intermediary contracts or custodial risk."
+title: "Transaction flows"
 sidebarTitle: "Transaction Flows"
+description: "Build unsigned vault transactions: GET /v2/transactions/context/:userAddress/:network/:vaultId, then GET /v2/transactions/:action/:userAddress/:network/:vaultId?assetAddress=&amount=<base units>; execute actions[] in order. No balance check, no simulation."
 ---
 
-The Vaults.fyi transaction API lets you integrate vault interactions — deposits, redemptions, and reward claims — across hundreds of protocols without writing any protocol-specific contract logic. You get back ready-to-sign transaction payloads that users submit directly to the protocol. No intermediary smart contracts sit between your users and their funds.
+This page shows how to build deposit, withdrawal (redeem), queued-withdrawal and reward-claim transactions with the vaults.fyi Transactions API, and what to check before the user signs. Use it whenever your app or agent moves funds into or out of a vault. The API returns **unsigned** EVM calls (`to`, `chainId`, `data`, optional `value`) that the user's wallet signs and sends directly to the protocol contract; vaults.fyi never holds funds, inserts no wrapper contract, and does not submit anything. REST auth: `x-api-key` header on `https://api.vaults.fyi`.
 
-If you want a packaged Earn UI instead of building transaction screens yourself, the [embeddable widget](/use-cases/embeddable-widget) can combine curated discovery, positions, and transaction-ready flows in a branded interface.
+## The two calls
 
-## Supported actions
+| Step | Endpoint | Cost |
+| - | - | - |
+| 1. Context | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | 3 credits |
+| 2. Payload | `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}?assetAddress=<token>&amount=<base units>` | 5 credits |
 
-The API supports the following vault interaction types:
+**Path order matters: `userAddress` first, then `network`, then `vaultId`.** Putting the network first returns HTTP 400.
 
-| Action | Description |
-|---|---|
-| `deposit` | Move tokens into a vault to start earning yield |
-| `redeem` | Withdraw tokens from a vault in a single step (for instant-redeem vaults) |
-| `request-redeem` | Submit a withdrawal request for vaults with a queue or delay |
-| `claim-redeem` | Claim tokens after a withdrawal request has been fulfilled |
-| `claim-rewards` | Collect accrued reward tokens from a vault or across multiple vaults |
+| Parameter | Where | Rules |
+| - | - | - |
+| `userAddress` | path | The wallet that will sign: `0x` + 40 hex characters. ENS names are rejected (400). |
+| `network` | path | Network slug (`base`, `mainnet`, ...) or CAIP-2 (`eip155:8453`). A bare chain id or `ethereum` is rejected. |
+| `vaultId` | path | The vault's `vaultId` from `GET /v2/detailed-vaults` (usually the contract address; can be a non-address id). |
+| `action` | path | One of the actions below. |
+| `assetAddress` | query, **required** | Token being deposited or received, normally `asset.address` from the context response. Required for every action. For native-ETH vaults (for example Lido stETH) it is the zero address `0x0000000000000000000000000000000000000000`; the payload then sends the amount as `tx.value` with no approve step. Use the WETH address for WETH vaults; don't use `0xEeee…EeEe`. Missing → 400; a token the vault does not accept → 400 "Asset DAI is not investable in ...". |
+| `amount` | query | **Integer string in base units**, passed unchanged to the vault contract. Required for `deposit`, `request-deposit`, `redeem` and `request-redeem`. For deposits it is in the deposit asset: human amount × 10^`asset.decimals` (1 USDC = `1000000`; 1 ETH = `1000000000000000000`). For `redeem` and `request-redeem` the unit depends on the protocol (see [Redeem amount units](#redeem-amount-units)). `claim-redeem`, `claim-deposit`, `claim-rewards` and `start-redeem-cooldown` take no `amount`. `1.5` → 400 "Expected bigint". |
+| `all` | query | `true` on `redeem` or `request-redeem` replaces `amount` and redeems the wallet's full share balance. It is also accepted (and ignored) on `claim-redeem`. |
+| `simulate` | query | **Deprecated and ignored.** v2 responses never include a simulation. |
 
-<Note>
-Not all vaults support every action. Use the transaction context endpoint to check which actions are available for a specific vault and user before rendering UI controls.
-</Note>
+Only call these for vaults with `isTransactional: true` (filter lists with `onlyTransactional=true`).
 
-## How transaction preparation works
+## Actions
 
-<Steps>
-  <Step title="Fetch transaction context">
-    Call `GET /v2/transactions/context/` with the vault address, network, and user wallet address. The response tells you which actions are available, the user's current position and balances, and any claimable rewards.
-  </Step>
-  <Step title="Generate a transaction payload">
-    Call `GET /v2/transactions/{action}/` with the action you want to prepare (e.g., `deposit`), the vault, the amount, and the user address. The API returns a fully formed transaction payload — including calldata, to-address, and value — ready to be signed.
-  </Step>
-  <Step title="Present the transaction to the user">
-    Pass the payload to your wallet integration (e.g., `eth_sendTransaction` for EOA wallets, or a UserOperation for ERC-4337 smart wallets). The user signs and submits directly to the protocol.
-  </Step>
-  <Step title="Confirm and update state">
-    After the transaction is confirmed onchain, re-fetch the transaction context or portfolio endpoints to reflect the updated position in your UI.
-  </Step>
-</Steps>
+| Action | Use it when |
+| - | - |
+| `deposit` | Deposit into a vault that accepts deposits immediately. |
+| `request-deposit` | Queue a deposit in an asynchronous vault. |
+| `claim-deposit` | Claim shares after a queued deposit is processed. |
+| `redeem` | Withdraw immediately (instant-redeem vaults). |
+| `start-redeem-cooldown` | Start a cooldown that the vault requires before redeeming (for example staking modules). |
+| `request-redeem` | Queue a withdrawal in a vault with a withdrawal queue or delay. |
+| `claim-redeem` | Claim assets after a queued withdrawal is ready. |
+| `claim-rewards` | Claim reward tokens for this vault. For wallet-wide claims use `GET /v2/transactions/rewards/context/{userAddress}` then `GET /v2/transactions/rewards/claim/{userAddress}?claimIds=<id>&claimIds=<id>`. |
 
-## EOA and smart wallet support
+Do not hard-code which action a vault needs: read it from the context response (`currentDepositStep`, `currentRedeemStep`).
 
-The API works with both externally owned accounts (EOA) and ERC-4337 compatible smart contract wallets.
+## Step 1: read the context
 
-<Tabs>
-  <Tab title="EOA wallets">
-    For standard wallets (e.g., MetaMask, Coinbase Wallet), the API returns a single transaction object. Pass it directly to your wallet library and prompt the user to sign.
+The context response tells you the next action, the wallet's balances and any pending requests.
 
-    The user's transaction goes straight to the protocol contract — no proxy or intermediary contract is involved.
-  </Tab>
-  <Tab title="Smart contract wallets">
-    For ERC-4337 wallets, the API returns a payload formatted as a UserOperation. Submit it to your bundler of choice.
+| Field | Meaning |
+| - | - |
+| `currentDepositStep` | Next deposit-side action to call, for example `deposit` or `request-deposit`. |
+| `depositSteps[].name`, `depositSteps[].actions`, `depositSteps[].actionsUrl` | The deposit steps, the transactions each produces (for example `["approve","deposit"]`) and the payload path. |
+| `currentRedeemStep`, `redeemSteps[]` | Same for withdrawals (`redeem`, `request-redeem`, `claim-redeem`, `start-redeem-cooldown`). |
+| `asset.balanceNative` | The wallet's balance of the deposit token, base units. Use it to cap deposit amounts. |
+| `asset.positionValueInAsset` | The wallet's position in this vault, in asset base units. |
+| `asset.decimals` | Use to convert human amounts to base units. |
+| `lpToken.balanceNative` | The wallet's vault share (LP) token balance, LP base units. |
+| `pendingRequests.deposits[]`, `pendingRequests.redeems[]` | Queued requests with `status` (`pending` or `ready`), `assetAmount`, `lpTokenAmount`, `requestTimestamp` and `estimatedResolution` (Unix timestamps in seconds). Filled only for some queue protocols, so also check `currentRedeemStep` and `vaultSpecificData`. |
+| `vaultSpecificData` | Protocol-specific state, for example `cooldownData.status` (`active`, `ready`, `expired`) or `claimData`. |
 
-    As with EOA wallets, the operation targets the protocol contract directly. No additional contract layers are introduced.
-  </Tab>
-</Tabs>
+Real response (2026-10-23, `GET /v2/transactions/context/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845`, trimmed):
 
-## Key properties
+```json
+{
+  "currentDepositStep": "deposit",
+  "depositSteps": [{ "name": "deposit", "actions": ["approve", "deposit"],
+    "actionsUrl": "/v2/transactions/deposit/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845" }],
+  "currentRedeemStep": "redeem",
+  "redeemSteps": [{ "name": "redeem", "actions": ["redeem"], "actionsUrl": "/v2/transactions/redeem/..." }],
+  "lpToken": { "symbol": "sirloinUSDC", "decimals": 18, "balanceNative": "0", "balanceUsd": "0" },
+  "asset": { "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "symbol": "USDC", "decimals": 6,
+             "balanceNative": "78995979", "balanceUsd": "78.98465729", "positionValueInAsset": "0", "depositLimit": "0" }
+}
+```
 
-<CardGroup cols={2}>
-  <Card title="Non-custodial" icon="lock">
-    Users transact directly with protocol smart contracts. Vaults.fyi never holds or controls user funds.
-  </Card>
-  <Card title="No extra contracts" icon="shield-check">
-    The API prepares calldata for the protocol's own contracts. No proxy or aggregator contracts are inserted.
-  </Card>
-  <Card title="Multi-vault rewards" icon="coins" href="/api-reference/transactions">
-    The rewards endpoint discovers claimable rewards across all supported vaults for an address and generates batched claim payloads.
-  </Card>
-  <Card title="TVL tracking and rebates" icon="circle-dollar-sign" href="/concepts/tvl-attribution">
-    Transactions generated by Vaults.fyi include attribution metadata so integrations can track TVL flows and support fee rebate programs where available.
-  </Card>
-</CardGroup>
+## Step 2: get the payload
 
-## TVL tracking and fee rebates
+The response is `{currentActionIndex, actions[]}`. Each action is `{name, tx: {to, chainId, data?, value?}}`.
 
-Transactions created with the Vaults.fyi Transactions API include attribution metadata automatically. This lets your integration track deposits, withdrawals, and current attributed TVL in [portal.vaults.fyi](https://portal.vaults.fyi).
+- An ERC-20 deposit usually returns **two** actions: an `approve` on the token, then the deposit on the vault.
+- `tx.value` is **omitted** when no native token is sent (all ERC-20 actions). Treat a missing `value` as `0`; do not call `BigInt(tx.value)` without a default.
+- `tx.data` can be absent for native-token deposits; `tx.value` can be non-zero. Pass `data` only when present and always pass `value` (missing means 0). Value-only deposits have no calldata or attribution suffix. When present, vault-call `tx.data` already ends with the vaults.fyi attribution suffix (24 bytes; approve calls are not suffixed). Do not append another; see [TVL attribution](/concepts/tvl-attribution).
 
-The same attribution layer can also support monetization through fee rebate programs where they are available. In those cases, the transaction metadata identifies the integration that originated the flow, making it possible to connect vault activity back to the partner that drove it.
+Real response (2026-10-23, deposit of 1 USDC = `amount=1000000`):
 
-If you use the Transactions API, no extra work is required — the returned payload already includes the tracking suffix.
+```json
+{
+  "currentActionIndex": 0,
+  "actions": [
+    { "name": "Approve USDC for Steakhouse High Yield USDC Edition vault",
+      "tx": { "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "chainId": 8453,
+              "data": "0x095ea7b3000000000000000000000000beeff2490feffa212fac2f6553682c219e6a884500000000000000000000000000000000000000000000000000000000000f4240" } },
+    { "name": "Deposit USDC to Steakhouse High Yield USDC Edition vault",
+      "tx": { "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845", "chainId": 8453,
+              "data": "0x6e553f6500000000000000000000000000000000000000000000000000000000000f4240000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045232c5f404de80be3c7ef2001de2d09ce535a2a0fffc69deb" } }
+  ]
+}
+```
 
-If you build transactions yourself, use the free attribution suffix endpoint and append the returned suffix to your calldata. See [TVL Attribution](/concepts/tvl-attribution#generating-attribution-suffixes-for-existing-transaction-flows) for the full setup guide.
+## Step 3: verify, sign and send each action in order
 
-<Warning>
-Always call the transaction context endpoint before generating a payload. Attempting to prepare a transaction for an unsupported action or insufficient balance will return an error.
-</Warning>
+**The API does not check balances and does not simulate.** On 2026-10-23 it returned a valid-looking deposit payload for 1,000,000 USDC from a wallet holding 79 USDC. Your code must enforce limits.
 
-## API reference
+Before signing, check every action:
 
-See the full endpoint reference at [/api/transactions](/api-reference/transactions), or explore the live spec at `https://api.vaults.fyi/v2/documentation/`.
+1. `tx.chainId` equals the chain of the vault's `network`.
+2. `tx.to` is the deposit token (for `approve`) or the vault / protocol contract you expect.
+3. The amount does not exceed `asset.balanceNative` from the context (deposits) or the position (redeems).
+4. The approval amount equals the deposit amount (`0xf4240` = 1,000,000 above).
+5. The user has confirmed the action, amount and vault.
+
+Then send `actions[0]`, wait for its receipt, send `actions[1]`, and so on. Never send them in parallel: the deposit fails if the approval is not mined. After the last receipt, call the context endpoint again to confirm the new state. Full checklist: [Transaction safety](/ai-agents/transaction-safety).
+
+### Complete example (TypeScript, viem)
+
+```typescript
+import { createWalletClient, createPublicClient, custom, http } from "viem";
+import { base } from "viem/chains";
+
+const API = "https://api.vaults.fyi";
+const H = { "x-api-key": process.env.VAULTSFYI_API_KEY! };
+const user = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+const network = "base";
+const vaultId = "0xbeeff2490FEffa212faC2f6553682C219E6a8845";
+
+// 1. Context
+const ctx = await (await fetch(`${API}/v2/transactions/context/${user}/${network}/${vaultId}`, { headers: H })).json();
+const amount = 1n * 10n ** BigInt(ctx.asset.decimals);          // 1 USDC in base units
+if (amount > BigInt(ctx.asset.balanceNative)) throw new Error("amount exceeds wallet balance");
+
+// 2. Payload (action taken from the context, not hard-coded)
+const action = ctx.currentDepositStep;                           // "deposit"
+const q = new URLSearchParams({ assetAddress: ctx.asset.address, amount: amount.toString() });
+const res = await fetch(`${API}/v2/transactions/${action}/${user}/${network}/${vaultId}?${q}`, { headers: H });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const { actions } = await res.json();
+
+// 3. Sign and send in order, waiting for each receipt
+const wallet = createWalletClient({ chain: base, transport: custom((globalThis as any).ethereum) });
+const reader = createPublicClient({ chain: base, transport: http() });
+for (const a of actions) {
+  if (a.tx.chainId !== base.id) throw new Error("unexpected chainId");
+  const hash = await wallet.sendTransaction({
+    account: user, to: a.tx.to, ...(a.tx.data !== undefined ? { data: a.tx.data } : {}),
+    value: a.tx.value ? BigInt(a.tx.value) : 0n,                // value is omitted for ERC-20 actions
+  });
+  const receipt = await reader.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`${a.name} reverted`);
+}
+```
+
+### Python (build only; sign with your wallet library)
+
+```python
+import os, requests
+
+API = "https://api.vaults.fyi"
+H = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+user, network, vault_id = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "base", "0xbeeff2490FEffa212faC2f6553682C219E6a8845"
+
+ctx = requests.get(f"{API}/v2/transactions/context/{user}/{network}/{vault_id}", headers=H).json()
+amount = 1 * 10 ** ctx["asset"]["decimals"]                    # 1 USDC -> 1000000
+assert amount <= int(ctx["asset"]["balanceNative"]), "amount exceeds wallet balance"
+
+r = requests.get(f"{API}/v2/transactions/{ctx['currentDepositStep']}/{user}/{network}/{vault_id}",
+                 headers=H, params={"assetAddress": ctx["asset"]["address"], "amount": str(amount)})
+r.raise_for_status()
+for a in r.json()["actions"]:                                   # sign + send in order, wait for each receipt
+    tx = {"to": a["tx"]["to"], "chainId": a["tx"]["chainId"], "data": a["tx"]["data"],
+          "value": int(a["tx"].get("value", "0"))}
+    print(a["name"], tx)
+```
+
+## Withdrawals
+
+### Instant redeem
+
+Call `redeem` with `amount` or `all=true`. Real response (2026-10-23, `GET /v2/transactions/redeem/0xd8dA.../base/0xbeeff...?assetAddress=0x8335...2913&all=true`, data trimmed):
+
+```json
+{ "currentActionIndex": 0,
+  "actions": [{ "name": "Redeem all USDC from Steakhouse High Yield USDC Edition vault",
+                "tx": { "to": "0xbeeff2490FEffa212faC2f6553682C219E6a8845", "chainId": 8453, "data": "0xba087652...fffc69deb" } }] }
+```
+
+### Queued withdrawals (request → wait → claim)
+
+When `currentRedeemStep` is `request-redeem`, the vault has a withdrawal queue:
+
+1. **Request.** Call `GET /v2/transactions/request-redeem/{userAddress}/{network}/{vaultId}?assetAddress=<asset>&amount=<amount>` (or `all=true`), then sign and send the actions in order.
+2. **Wait.** Poll the context endpoint. Read `pendingRequests.redeems[]`: `status` is `pending` until the vault processes the request, then `ready`. `estimatedResolution` gives an estimate when the protocol exposes one. Some vaults expose state in `vaultSpecificData` instead (for example `vaultSpecificData.claimData` or `vaultSpecificData.cooldownData.status`). `currentRedeemStep` changes to `claim-redeem` when claiming is possible; then call its `actionsUrl`. You don't pass claim IDs: the claim payload finds claimable requests on-chain. `vaultSpecificData` timestamps such as `withdrawalStart` and `withdrawalEnd` are Unix seconds.
+3. **Claim.** Call `GET /v2/transactions/claim-redeem/{userAddress}/{network}/{vaultId}?assetAddress=<asset>&all=true`, then sign and send.
+
+Vaults with a cooldown use `start-redeem-cooldown` first, then `redeem` when `vaultSpecificData.cooldownData.status` is `ready`.
+
+**Observed on an ERC-4626 vault (2026-10-23):** `GET /v2/transactions/redeem/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045/base/0xbeeff2490FEffa212faC2f6553682C219E6a8845?assetAddress=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913&amount=1000000` (Steakhouse High Yield USDC Edition) returned one action whose calldata is `redeem(0x0f4240, receiver, owner)` (selector `0xba087652`, first argument 1,000,000). ERC-4626 `redeem` takes a number of **shares**, so on this vault `amount` was passed through as vault-share (`lpToken.decimals`) base units, not as USDC. Decode the calldata before signing: if you want a fixed amount of the underlying asset, convert it to shares first, or use `all=true` for a full withdrawal.
+
+#### Redeem amount units
+
+For `redeem` and `request-redeem`, `amount` is passed to the vault contract unchanged, so its unit is the one the contract expects:
+
+- **Most vaults** (ERC-4626, ERC-7540, Ethena, Veda): vault-share (LP-token) base units, `lpToken.decimals`.
+- **Asset-based lending markets** such as Aave and Compound v3: underlying-asset base units, `asset.decimals`.
+
+The REST spec's description ("Amount of the asset") is wrong for share-based vaults. Prefer `all=true` for full withdrawals, and decode the calldata before signing a partial one.
+
+Queued deposits work the same way with `request-deposit`, `pendingRequests.deposits[]` and `claim-deposit`.
+
+
+## EOA and smart-contract wallets
+
+The API returns the same `actions[]` (plain `to`, `data`, `value` calls) for every wallet type.
+
+- **EOA wallets:** send each action as a normal transaction (`eth_sendTransaction`), in order.
+- **Smart wallets (Safe, EIP-5792 and other smart accounts):** batch the actions yourself, in order, into one smart-account call, Safe transaction or `wallet_sendCalls` call. Keep each action's `data` unchanged so the attribution suffix stays on the vault call. Build the payload for the address the vault sees as the depositor (for a smart wallet, the smart-account address).
+
+## Errors you will see
+
+| Situation | Result |
+| - | - |
+| Path params in the wrong order | 400 |
+| `amount` with decimals (`1.5`) | 400, "Expected bigint" |
+| Missing `assetAddress` | 400, "Required" |
+| Token the vault does not accept | 400, "Asset ... is not investable in ..." |
+| Unknown action (`stake`) | 400 listing the eight valid actions |
+| Amount above the wallet balance | **200 with a payload** (no check) |
+| No `x-api-key` | 402 x402 payment challenge |
+
+400 bodies carry a JSON-encoded Zod array inside `message`. See [Errors](/api-reference/errors).
+
+## TVL tracking
+
+Payloads from `/v2/transactions/*` already include the attribution suffix, so deposits and withdrawals made through them are attributed to your API key in [portal.vaults.fyi](https://portal.vaults.fyi). If you build transactions yourself, see [TVL attribution](/concepts/tvl-attribution).
+
+## Related
+
+- [Transaction safety](/ai-agents/transaction-safety): what to verify before signing.
+- [Portfolio tracking](/concepts/portfolio-tracking): positions after the transaction.
+- [Borrowing](/concepts/borrowing): the Beta borrow-market equivalent (`supply`, `withdraw`, `borrow`, `repay`).
+- [API conventions](/api-reference/conventions) (units, networks), [Errors](/api-reference/errors), [Glossary](/resources/glossary).
+- Endpoint reference: [Get transaction context](/api-reference/transactions/get-transaction-context), [Get transaction payload](/api-reference/transactions/get-transaction-payload). OpenAPI JSON: `https://api.vaults.fyi/v2/documentation/json`.

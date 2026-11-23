@@ -1,0 +1,169 @@
+---
+title: "Recipe: estimate the credit cost of a workload (hourly dashboard example)"
+sidebarTitle: "Estimate credit cost"
+description: "Executed recipe: compute vaults.fyi credits from the published base and per-item costs, price a real call from itemsOnPage, and size an hourly 200-vault dashboard (601 credits per refresh, 432,720 per month, Growth plan)."
+---
+
+This recipe answers "how many credits will my integration use per month, and which plan fits?" It prices one real call from its `itemsOnPage`, then models a monthly schedule from the published credit table. Use it before you build a polling loop or let an agent call the API on a timer.
+
+Requests go to `https://api.vaults.fyi` with the header `x-api-key: $VAULTSFYI_API_KEY`. Costs come from the [credits](/plans/credits) table; the API does not return a per-request credit count. Pay-as-you-go is $0.002 per credit. All code on this page was run on 2026-10-23.
+
+## Benchmark tasks covered
+
+T14 (monthly credit cost of an hourly dashboard). See the [recipes overview](/recipes/overview).
+
+## Prerequisites
+
+- An API key exported as `VAULTSFYI_API_KEY` (one sample call, 10 credits).
+- Python 3.9+ with `requests`, or Node.js 18+.
+
+## The formula
+
+**credits = base cost per call + (cost per item × items returned)**
+
+| Endpoint | Base | Per item |
+| - | -: | - |
+| `GET /v2/vaults` | 1 | — |
+| `GET /v2/detailed-vaults` | 1 | 3 per vault |
+| `GET /v2/detailed-vaults/{network}/{vaultId}` | 3 | — |
+| `GET /v2/historical/{network}/{vaultId}/apy` | 1 | 1 per point |
+| `GET /v2/benchmarks/{network}` | 3 | — |
+| `GET /v2/portfolio/positions/{userAddress}` | 5 | — |
+| `GET /v2/portfolio/best-deposit-options/{userAddress}` | 1 | 2 per vault |
+| `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}` | 3 | — |
+| `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` | 5 | — |
+
+The NRT endpoints (`/v2/nrt/vault/*`) cost 1 credit per call. `/v2/health` is free. Requests that don't return 200 are not charged.
+
+## Python
+
+```python
+"""Estimate credits before you build: price one real call, then a monthly schedule. No API key spent
+beyond the single sample call. Costs are from the published credits table (/plans/credits)."""
+import math
+import os
+
+import requests
+
+API = "https://api.vaults.fyi"
+HEADERS = {"x-api-key": os.environ["VAULTSFYI_API_KEY"]}
+
+# (base CU per call, CU per datapoint) -- docs table, not returned by the API.
+COST = {
+    "/v2/vaults": (1, 0),
+    "/v2/detailed-vaults": (1, 3),
+    "/v2/detailed-vaults/{network}/{vaultId}": (3, 0),
+    "/v2/historical/{network}/{vaultId}/apy": (1, 1),
+    "/v2/benchmarks/{network}": (3, 0),
+    "/v2/portfolio/positions/{userAddress}": (5, 0),
+    "/v2/portfolio/best-deposit-options/{userAddress}": (1, 2),
+    "/v2/transactions/context/{userAddress}/{network}/{vaultId}": (3, 0),
+    "/v2/transactions/{action}/{userAddress}/{network}/{vaultId}": (5, 0),
+}
+
+
+def credits(endpoint, datapoints=0, calls=1):
+    base, per = COST[endpoint]
+    return calls * base + per * datapoints
+
+
+# 1) Price a real call: itemsOnPage is the datapoint count for list endpoints.
+r = requests.get(f"{API}/v2/detailed-vaults", headers=HEADERS, timeout=30,
+                 params=[("allowedNetworks", "base"), ("allowedAssets", "USDC"), ("perPage", 3)])
+r.raise_for_status()
+n = r.json()["itemsOnPage"]
+print(f"this call returned {n} vaults -> {credits('/v2/detailed-vaults', n)} credits")
+
+# 2) Hourly dashboard: 200 vaults of detailed data, 24 x 30 refreshes a month.
+per_refresh = credits("/v2/detailed-vaults", 200)          # one call with perPage=200 -> 601
+monthly = per_refresh * 24 * 30
+print(f"hourly 200-vault refresh: {per_refresh} CU/refresh, {monthly:,} CU/month, "
+      f"${monthly * 0.002:,.2f} at pay-as-you-go $0.002/credit")
+
+# Splitting into pages adds 1 CU per extra call: 4 pages of 50 = 4 + 600 = 604.
+print("same data in 4 pages of 50:", credits("/v2/detailed-vaults", 200, calls=4), "CU")
+
+# 3) 90 days of daily APY for 10 vaults (1 call each; a 90-day window returned 90 points).
+print("90-day daily history x 10 vaults:", 10 * credits("/v2/historical/{network}/{vaultId}/apy", 90), "CU")
+
+# 4) One full deposit flow: context + payload.
+flow = credits("/v2/transactions/context/{userAddress}/{network}/{vaultId}") + credits(
+    "/v2/transactions/{action}/{userAddress}/{network}/{vaultId}")
+print("one deposit flow (context + payload):", flow, "CU")
+
+PLANS = [("Analyst", 250_000), ("Growth", 500_000), ("Builder", 1_000_000)]  # credits/month, /plans/overview
+fits = next((name for name, cap in PLANS if cap >= monthly), "Enterprise")
+print(f"smallest plan that covers {monthly:,} CU/month: {fits}")
+```
+
+Output (2026-10-23):
+
+```text
+this call returned 3 vaults -> 10 credits
+hourly 200-vault refresh: 601 CU/refresh, 432,720 CU/month, $865.44 at pay-as-you-go $0.002/credit
+same data in 4 pages of 50: 604 CU
+90-day daily history x 10 vaults: 910 CU
+one deposit flow (context + payload): 8 CU
+smallest plan that covers 432,720 CU/month: Growth
+```
+
+## TypeScript
+
+```typescript
+// Estimate credits before you build. Costs come from the published credits table (/plans/credits).
+const API = 'https://api.vaults.fyi';
+const headers = { 'x-api-key': process.env.VAULTSFYI_API_KEY! };
+
+const COST: Record<string, [base: number, perDatapoint: number]> = {
+  '/v2/detailed-vaults': [1, 3],
+  '/v2/historical/{network}/{vaultId}/apy': [1, 1],
+  '/v2/transactions/context/{userAddress}/{network}/{vaultId}': [3, 0],
+  '/v2/transactions/{action}/{userAddress}/{network}/{vaultId}': [5, 0],
+};
+const credits = (endpoint: string, datapoints = 0, calls = 1) => calls * COST[endpoint][0] + COST[endpoint][1] * datapoints;
+
+const qs = new URLSearchParams([['allowedNetworks', 'base'], ['allowedAssets', 'USDC'], ['perPage', '3']]);
+const res = await fetch(`${API}/v2/detailed-vaults?${qs}`, { headers });
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+const { itemsOnPage } = await res.json();
+console.log(`this call returned ${itemsOnPage} vaults -> ${credits('/v2/detailed-vaults', itemsOnPage)} credits`);
+
+const perRefresh = credits('/v2/detailed-vaults', 200); // 601
+const monthly = perRefresh * 24 * 30;                   // 432,720
+console.log(`hourly 200-vault refresh: ${perRefresh} CU/refresh, ${monthly.toLocaleString('en-US')} CU/month, $${(monthly * 0.002).toFixed(2)} pay-as-you-go`);
+const plans: [string, number][] = [['Analyst', 250_000], ['Growth', 500_000], ['Builder', 1_000_000]];
+console.log('smallest plan that fits:', plans.find(([, cap]) => cap >= monthly)?.[0] ?? 'Enterprise');
+```
+
+Output (2026-10-23):
+
+```text
+this call returned 3 vaults -> 10 credits
+hourly 200-vault refresh: 601 CU/refresh, 432,720 CU/month, $865.44 pay-as-you-go
+smallest plan that fits: Growth
+```
+
+## The dashboard answer
+
+- One refresh of 200 vaults with `perPage=200`: 1 + 3 × 200 = **601 credits**.
+- Hourly for a 30-day month: 601 × 24 × 30 = **432,720 credits**.
+- Plans: Analyst includes 250,000 (too small); **Growth** includes 500,000 and fits; Builder includes 1,000,000. Pay-as-you-go would cost $865.44. Plan prices are on [plans](/plans/overview).
+- Splitting into pages adds 1 credit per extra call (4 pages of 50 = 604).
+- When the key's credit balance reaches zero, priced endpoints return 403 until you top up or upgrade; see [credits](/plans/credits#when-credits-run-out). Pay-as-you-go keys have no spending cap: usage is billed per credit with no upper limit, so set your own budget alerts or call limits if you need one.
+
+## Pitfalls
+
+- **Forgetting the base cost.** 200 vaults cost 601, not 600.
+- **Using v1 costs** (4 per vault). v2 detailed vaults cost 3 per vault.
+- **Mixing x402 prices and credits.** x402 prices are dollars per request; on 2026-10-23 they matched credits × $0.002, but this is not documented as a rule.
+- **Over-polling.** Indexed data refreshes about hourly; polling more often mostly re-buys the same data.
+- **Large historical windows at `granularity=1hour`.** 30 days hourly on the combined endpoint is 2,163 credits; use `1day` and the single-series endpoints.
+
+## Related pages
+
+- [Credits](/plans/credits) and [plans](/plans/overview).
+- [API conventions](/api-reference/conventions) and [errors](/api-reference/errors).
+- [Transaction safety](/ai-agents/transaction-safety).
+- [Paginate all vaults](/recipes/paginate-all-vaults).
+
+_Last updated: 2026-10-23. Every code block on this page was executed against the live API on that date._

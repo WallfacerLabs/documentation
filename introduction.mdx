@@ -1,67 +1,110 @@
 ---
-title: "Vaults.fyi: The API for DeFi Yield"
-description: "Vaults.fyi gives you a single API to access market data, execute transactions, and track portfolios across 1,000+ DeFi yield strategies on 80+ protocols, including Solana/SVM coverage in Beta."
+title: "vaults.fyi: the API for DeFi yield"
+sidebarTitle: "Vaults.fyi: The API for DeFi Yield"
+description: "Start here: what the vaults.fyi REST API covers, the base URL and x-api-key header, the defaults that silently narrow results, and a first working request."
 ---
 
-Vaults.fyi is the unified API for onchain yield. Whether you're building a wallet, a data analytics tool, or an AI agent, a single integration gives you standardized access to 1,000\+ DeFi yield strategies across 80\+ protocols, 20\+ EVM chains, and Solana/SVM vault coverage in Beta — without building a DeFi team or managing per-protocol integrations.
+This page explains what the vaults.fyi API does and how to make your first request: base URL, authentication, the defaults that change results, and where to go next. Read it first if you are new to vaults.fyi or are an AI agent deciding which page to load. The API serves normalized yield data for DeFi vaults, builds unsigned transactions for those vaults, and reports wallet positions. Request: `https://api.vaults.fyi` plus a versioned path (`/v2/...`), with your key in the `x-api-key` header.
 
-<CardGroup cols={2}>
-  <Card title="Why Vaults.fyi?" icon="circle-question" href="/why-vaultsfyi">
-    See how teams use Vaults.fyi for yield data, risk context, transactions, portfolios, attribution, and agents.
-  </Card>
+## What vaults.fyi covers
 
-  <Card title="Get Started with the SDK" icon="rocket" href="/sdk/quickstart">
-    Install the TypeScript or Python SDK and make your first API call in minutes.
-  </Card>
+| Area | What you get | Main endpoints |
+| - | - | - |
+| Yield and market data | APY (decimal fraction, net of fees), TVL, fees, rewards, Reputation Score, flags, holders, capacity | `GET /v2/detailed-vaults`, `GET /v2/detailed-vaults/{network}/{vaultId}` |
+| History and benchmarks | APY, TVL and share-price time series; USD and ETH benchmark rates | `GET /v2/historical/{network}/{vaultId}`, `GET /v2/benchmarks/{network}` |
+| Transactions | Unsigned, ready-to-sign deposit, redeem, queued-withdrawal and reward-claim calls sent straight to the protocol contract | `GET /v2/transactions/context/{userAddress}/{network}/{vaultId}`, `GET /v2/transactions/{action}/{userAddress}/{network}/{vaultId}` |
+| Portfolio | A wallet's vault positions, idle tokens, returns, events and deposit suggestions | `GET /v2/portfolio/positions/{userAddress}`, `GET /v2/portfolio/idle-assets/{userAddress}` |
+| Beta surfaces | Borrow markets, Solana (SVM) vaults, advanced analytics, fixed-term markets | `/beta/...` (may change before general availability) |
 
-  <Card title="API Reference" icon="code" href="/api-reference/overview">
-    Explore all v2 endpoints for vaults, portfolio, transactions, and benchmarks.
-  </Card>
+Coverage: 3,000+ vaults (taken from `GET /v2/vaults`), 80+ protocols (126 protocol IDs from `GET /v2/protocols` on 2026-10-23), 22 EVM networks (`GET /v2/networks`), plus Solana vaults on the Beta SVM endpoints. Use the reference endpoints for current numbers rather than these counts. See [Supported protocols and networks](/concepts/supported-protocols).
 
-  <Card title="Core Concepts" icon="book-open" href="/concepts/vault-discovery">
-    Understand vault discovery, yield data, transaction flows, portfolio tracking, and borrowing.
-  </Card>
+## Authentication and base URL
 
-  <Card title="AI & Agents" icon="robot" href="/ai-agents/overview">
-    Use the MCP server or x402 pay-per-request for autonomous agent workflows.
-  </Card>
-</CardGroup>
+- **Base URL:** `https://api.vaults.fyi`. Every path already starts with its version (`/v2`, `/beta`, `/alpha`). Do not add `/v2` to the base URL: `https://api.vaults.fyi/v2` + `/v2/detailed-vaults` doubles the version prefix and fails.
+- **REST auth:** send `x-api-key: <your key>` on every request. Get a key at [portal.vaults.fyi/signup](https://portal.vaults.fyi/signup).
+- **MCP auth is different:** the hosted MCP server uses `Authorization: Bearer <key>`. The REST API does not accept `Authorization: Bearer`; a REST call with only that header is treated as keyless.
+- **No key → HTTP 402**, not 401. The 402 body is an x402 payment challenge (pay per request in USDC on Base). An invalid key → HTTP 401. See [Errors](/api-reference/errors) and [x402](/ai-agents/x402).
+- `GET /v2/health` is public and needs no key.
 
-## Why teams use Vaults.fyi
+## Your first request
 
-<CardGroup cols={3}>
-  <Card title="Data & Analytics" icon="chart-bar" href="/concepts/yield-and-market-data">
-    Standardized APY, TVL, fees, and the Reputation Score across all protocols — sourced hourly direct from onchain contracts.
-  </Card>
+This call lists the three highest 7-day-APY USDC vaults on Base. Replace nothing; it reads the key from the environment.
 
-  <Card title="Transactions" icon="arrow-right-arrow-left" href="/concepts/transaction-flows">
-    Ready-to-sign deposit, redeem, and claim payloads for hundreds of vaults. No intermediary contracts, fully non-custodial.
-  </Card>
+```bash
+curl -s "https://api.vaults.fyi/v2/detailed-vaults?allowedNetworks=base&allowedAssets=USDC&sortBy=apy7day&sortOrder=desc&perPage=3" \
+  -H "x-api-key: $VAULTSFYI_API_KEY"
+```
 
-  <Card title="Portfolio" icon="wallet" href="/concepts/portfolio-tracking">
-    Track user positions, detect idle assets, and surface personalized yield opportunities matched to wallet holdings.
-  </Card>
-</CardGroup>
+```python
+import os, requests
 
-## Get started
+r = requests.get(
+    "https://api.vaults.fyi/v2/detailed-vaults",
+    headers={"x-api-key": os.environ["VAULTSFYI_API_KEY"]},
+    params={"allowedNetworks": "base", "allowedAssets": "USDC",
+            "sortBy": "apy7day", "sortOrder": "desc", "perPage": 3},
+)
+r.raise_for_status()
+for v in r.json()["data"]:
+    print(v["name"], v["apy"]["7day"]["total"], v["score"]["vaultScore"])
+```
 
-<Steps>
-  <Step title="Get an API key">
-    [Create an account](https://portal.vaults.fyi/) to get access. You'll receive an API key to authenticate all requests.
-  </Step>
-  <Step title="Install the SDK">
-    Install the `@vaultsfyi/sdk` package (TypeScript) or `vaultsfyi` package (Python) and initialize the client with your key.
-  </Step>
-  <Step title="Explore vault data">
-    Call `getAllVaults()` or `GET /v2/detailed-vaults` to browse available yield opportunities filtered by network, protocol, asset, or APY.
-  </Step>
-  <Step title="Integrate into your product">
-    Use transactional endpoints to prepare deposit and redeem payloads, and portfolio endpoints to track user positions and PnL.
-  </Step>
-</Steps>
+```typescript
+const url = new URL("https://api.vaults.fyi/v2/detailed-vaults");
+url.search = new URLSearchParams({
+  allowedNetworks: "base", allowedAssets: "USDC",
+  sortBy: "apy7day", sortOrder: "desc", perPage: "3",
+}).toString();
+const res = await fetch(url, { headers: { "x-api-key": process.env.VAULTSFYI_API_KEY! } });
+if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+const body = await res.json();
+for (const v of body.data) console.log(v.name, v.apy["7day"].total, v.score.vaultScore);
+```
 
-## Trusted by leading teams
+Response (real capture from 2026-10-23, trimmed to one vault and selected fields):
 
-Vaults.fyi powers yield analytics, dashboards, and transaction flows for [Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper](https://jumper.exchange/earn), [Kraken Wallet](https://www.kraken.com/wallet), [Gauntlet](https://gauntlet.xyz/), [Maple Finance](https://maple.finance/), [KPK](https://kpk.io/), and more. See the [case studies](/resources/case-studies) for integration details.
+```json
+{
+  "itemsOnPage": 3,
+  "nextPage": 1,
+  "data": [
+    {
+      "vaultId": "0xcdDCDd18A16ED441F6CB10c3909e5e7ec2B9e8f3",
+      "name": "Apostro Resolv USDC",
+      "network": { "name": "base", "chainId": 8453, "networkCaip": "eip155:8453" },
+      "apy": { "7day": { "base": 1522.9882, "reward": 0, "total": 1522.9882 } },
+      "tvl": { "usd": "753990", "native": "754098395207" },
+      "score": { "vaultScore": 33.84391737297204 },
+      "flags": [{ "content": "Vault has ~7.7% unallocated deficit due to bad debt exposure in Resolv lending markets.", "severity": "warning", "endDate": 4946619450 }]
+    }
+  ],
+  "errors": { "unsupportedNetworks": [], "unsupportedAssets": [], "unsupportedProtocols": [] }
+}
+```
 
-<script type="application/ld+json" dangerouslySetInnerHTML={{__html: `{"@context":"https://schema.org","@type":"Organization","name":"Wallfacer Labs","url":"https://vaults.fyi","logo":"https://docs.vaults.fyi/images/Logo-384px-black.png","sameAs":["https://twitter.com/vaultsfyi","https://github.com/WallfacerLabs"]}`}} />
+This real result shows why you should screen results: the top "APY" is 1522.99 (152,299%) on a vault with a bad-debt warning and a low score. APY values are not clamped. Filter on `flags`, `score.vaultScore` and `isCorrupted` before showing vaults to users.
+
+## Defaults that silently change results
+
+| Behavior | Detail |
+| - | - |
+| Default network scope | `GET /v2/detailed-vaults` and the `/v2/portfolio/*` list endpoints return only `base`, `mainnet`, `arbitrum` and `optimism` unless you pass `allowedNetworks`. `GET /v2/vaults` and `GET /v2/assets` have no default scope. |
+| Default TVL floor | `minTvl` defaults to `100000` (USD) on detailed-vaults and portfolio endpoints. Pass `minTvl=0` to include small vaults. |
+| Default sort | `sortOrder` defaults to `asc`, so sorting by APY without `sortOrder=desc` returns the lowest first. |
+| Array parameters | Repeat the key: `allowedNetworks=base&allowedNetworks=arbitrum`. A comma list returns 200 with 0 results and the value echoed in `errors.unsupportedNetworks`. |
+| Last page | `nextPage` is absent (not `null`) on the last page. There is no total count. |
+| Units | APY is a decimal fraction (`0.0316` = 3.16%). Token amounts are integer strings in base units (1 USDC = `"1000000"`). Timestamps are Unix seconds. |
+
+Full rules: [API conventions](/api-reference/conventions).
+
+## Where to go next
+
+- **Find and compare vaults:** [Vault discovery](/concepts/vault-discovery) (every detailed-vault field) and [Yield and market data](/concepts/yield-and-market-data).
+- **Build deposits and withdrawals:** [Transaction flows](/concepts/transaction-flows), then [Transaction safety](/ai-agents/transaction-safety) before you sign anything.
+- **Show a wallet's positions:** [Portfolio tracking](/concepts/portfolio-tracking).
+- **Understand the numbers:** [Calculating APY](/methodology/calculating-apy), [Reputation Score](/methodology/reputation-score), [Benchmark rates](/methodology/benchmark-rates).
+- **Agents:** [Rules for agents](/ai-agents/rules-for-agents), [MCP server](/ai-agents/mcp-server), [x402](/ai-agents/x402).
+- **SDKs:** [SDK quickstart](/sdk/quickstart) for `@vaultsfyi/sdk` (TypeScript) and `vaultsfyi` (Python).
+- **Terms:** [Glossary](/resources/glossary). **Costs:** [Credits](/plans/credits) and [Plans](/plans/overview).
+
+Teams using vaults.fyi include [Arbitrum Earn](/resources/case-studies/arbitrum), [Jumper Earn](/resources/case-studies/jumper-earn), [Kraken Wallet](/resources/case-studies/kraken-wallet), [Gauntlet](/resources/case-studies/gauntlet), [Maple Finance](/resources/case-studies/maple-finance) and [KPK](/resources/case-studies/kpk).
