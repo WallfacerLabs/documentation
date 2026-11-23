@@ -8,6 +8,28 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 43, 2026 — Oct 20–26
+
+**API**
+
+- Added **90-day APY** alongside existing yield windows in supported vault, portfolio, historical, and benchmark responses. V2 and Solana Beta detailed-vault lists support `sortBy=apy90day`, and their APY filters now account for the new window. SDK `2.3.14` includes the updated response types.
+
+- Increased the **detailed-vault cache refresh frequency** from hourly to every 20 minutes, so cached yield and TVL can update sooner.
+
+- Updated **withdrawal handling** for full-balance requests in Mellow Core and Kelp and for claims that include multiple Lido withdrawal requests.
+
+- Updated **Spark Savings position reporting** to show position value independently of available withdrawal liquidity.
+
+- Improved **API error responses**. Missing benchmark series and unknown Solana vaults now return `404`. Invalid Solana transaction requests, malformed CCTP amounts, and empty Upshift claims now return `400`.
+
+- Updated **Aave network handling** to use each vault’s configuration for position reads and actions on supported networks, including MegaETH.
+
+**App**
+
+- Updated **CCTP bridge claim visibility**. The app keeps eligible transfers visible through the end of Circle’s claim window.
+
+---
+
 ## Week 42, 2026 — Oct 13–19
 
 **API**
