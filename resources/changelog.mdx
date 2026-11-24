@@ -8,6 +8,48 @@ This page tracks all notable updates to the vaults.fyi API and application, orga
 
 ---
 
+## Week 47, 2026 — Nov 17–23
+
+**API**
+
+- Moved **Borrow Markets from Beta to V2**. Market discovery, historical and near-real-time data, portfolio positions and events, and transaction routes now live under `/v2/borrow/`. Existing `/beta/borrow/` URLs continue to work. A Pro API key is still required.
+
+- Expanded **borrow position metadata**. Responses can now include the protocol logo, URL, and description where available. For supported Compound V3, Morpho, and Fluid routes, the API returns `400` when the requested asset is ineligible for the action.
+
+- Streamlined **deposit instructions for native ETH and BNB**. For Compound V2 and Venus, transaction context now lists only the deposit step when no token approval is needed.
+
+- Improved **Merkl reward APY accuracy**. Missing token prices no longer pull the reward APY toward zero. Eligible campaigns that use a list of the vault’s own depositors can now contribute to reported yield.
+
+- Added a **withdrawal eligibility check for Ember**. The API now returns a clear error before building a redeem transaction when the Ember validator excludes the wallet.
+
+---
+
+## Week 46, 2026 — Nov 10–16
+
+**API**
+
+- Updated **wallet balance reporting on BSC**. Transaction context reports the native BNB balance for Venus BNB and the ETH token balance for the Fluid Ethereum Token vault.
+
+- Aligned **InfiniFi liUSD claim availability** with the contract’s withdrawal schedule. Position responses and claim generation now use the same timing as the contract.
+
+**App**
+
+- Added **vault search by contract address or vault ID**. A full contract address finds all matching vaults. A full vault ID finds the specific vault, and both work alongside existing filters.
+
+- Improved **mobile vault search**. The keyboard stays open even when a query returns no results.
+
+---
+
+## Week 45, 2026 — Nov 3–9
+
+**API**
+
+- Updated **transaction request validation** to match tokens by contract address. This distinguishes tokens that share the same symbol.
+
+- Improved **x402 payment handling** when a channel has no pending request, including during verification and refunds.
+
+---
+
 ## Week 43, 2026 — Oct 20–26
 
 **API**
